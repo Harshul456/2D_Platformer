@@ -1,0 +1,12 @@
+{
+  "$GMShader":"",
+  "%Name":"shd_glassy_floor",
+  "name":"shd_glassy_floor",
+  "parent":{
+    "name":"Shaders",
+    "path":"folders/Shaders.yy",
+  },
+  "resourceType":"GMShader",
+  "resourceVersion":"2.0",
+  "type":1,
+}
