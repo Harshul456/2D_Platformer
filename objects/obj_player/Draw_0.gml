@@ -1,92 +1,122 @@
 // --- 0. PRE-RENDER CALCULATIONS ---
-var _cx = floor(camera_get_view_x(view_camera[0]));
-var _cy = floor(camera_get_view_y(view_camera[0]));
-var _vw = camera_get_view_width(view_camera[0]);
-var _vh = camera_get_view_height(view_camera[0]);
-var side_dist = 13;
+// Debug sensor visualization derives from mask, not hard-coded constants
+var _side_dist = floor((bbox_right - bbox_left) * 0.5) - 1;
 
-// --- 1. REFLECTION SURFACE ---
-if (!surface_exists(surf_reflection)) {
-    surf_reflection = surface_create(_vw, _vh);
+// --- 1. REFLECTION (Professional strip-based clipping) ---
+// Draw reflection in vertical strips, only showing parts directly over tiles
+// This matches how Celeste, Ori, and other professional platformers handle reflections
+var _feet_y = floor(bbox_bottom);
+var _in_x_bounds = (x >= reflect_region_x1 && x <= reflect_region_x2);
+
+// Check if any part of character is over tiles (for timer management)
+var _has_tile_contact = false;
+if (global.tilemap_collision_id != noone) {
+    var _leftmost = floor(bbox_left);
+    var _rightmost = floor(bbox_right);
+    var _center = floor((bbox_left + bbox_right) * 0.5);
+    _has_tile_contact = check_tile_collision(_leftmost, _feet_y + 1) ||
+                        check_tile_collision(_center, _feet_y + 1) ||
+                        check_tile_collision(_rightmost, _feet_y + 1);
 }
 
-// Create temp surface once and reuse
-if (!surface_exists(surf_temp_reflection)) {
-    surf_temp_reflection = surface_create(max_reflection_size, max_reflection_size);
+if (_has_tile_contact && _in_x_bounds && global.reflections_enabled) {
+    reflect_region_y = _feet_y;
+    reflection_timer = reflection_timer_max;
+} else if (reflection_timer > 0) {
+    reflection_timer--;
 }
 
-// IMPORTANT: Set target for main reflection surface
-surface_set_target(surf_reflection);
-draw_clear_alpha(c_white, 0);
-
-var lay_col_id = layer_get_id("lay_collision"); 
-var map_col_id = layer_tilemap_get_id(lay_col_id);
-
-if (layer_exists(lay_col_id)) {
-    var _on_platform = check_tile_collision(floor(x) - 10, floor(y) + 1) || 
-                       check_tile_collision(floor(x) + 10, floor(y) + 1);
+// Draw reflection with strip-based clipping (only parts over tiles)
+// NOTE: draw_sprite_part_ext() positions from the part's top-left (NOT sprite origin),
+// so we must offset using the sprite origin to place the flipped image below the feet line.
+if (global.reflections_enabled && reflection_timer > 0 && global.tilemap_collision_id != noone) {
+    var _reflect_strength = reflection_timer / reflection_timer_max;
+    // Slight darken + cool tint for cyberpunk glass
+    var _base_alpha = 0.38 * _reflect_strength;
+    var _reflect_col = make_color_rgb(210, 225, 255);
     
-    if (grounded && _on_platform) {
-        var spr_w = sprite_get_width(sprite_index);
-        var spr_h = sprite_get_height(sprite_index);
-        var max_reflection_dist = spr_h * 0.6;
+    var _spr_w = sprite_get_width(sprite_index);
+    var _spr_h = sprite_get_height(sprite_index);
+    var _spr_xoff = sprite_get_xoffset(sprite_index);
+    var _spr_yoff = sprite_get_yoffset(sprite_index);
+    
+    // Reflection "origin" line (player feet)
+    var _origin_x = floor(x);
+    var _origin_y = floor(bbox_bottom) + 2;
+    
+    // We draw the sprite flipped vertically about its origin:
+    // destY for the top of the (source_y=0) rect becomes:
+    // origin_y + (0 - yoff) * (-yscale)
+    var _dest_y = round(_origin_y + (0 - _spr_yoff) * (-image_yscale));
+
+    // Vertical fade: strong at feet, fades out downwards.
+    // We only reflect the portion ABOVE the feet line (source_y 0..yoff).
+    var _src_h_total = max(1, floor(_spr_yoff));
+    var _band_h = 8;          // height of each horizontal band (lower = smoother, higher = faster)
+    var _fade_dist = 56;      // pixels until the reflection fades out
+    // Diagonal feel: add a horizontal falloff so edges fade sooner than the center.
+    // (Higher strength = more diagonal. Increase _fade_x to make it subtler.)
+    var _fade_x = 36;         // horizontal pixels until fully faded at the sides
+    var _diag_strength = 0.9; // 0..1.5 typical
+    
+    // Draw in thin vertical strips and only keep strips with tiles below them
+    // (set to 1 for pixel-perfect clipping).
+    var _strip_width = 1;
+    var _y_check = _feet_y + 1;
+    var _x_sign = (image_xscale >= 0) ? 1 : -1;
+    
+    for (var _sx = 0; _sx < _spr_w; _sx += _strip_width) {
+        var _strip_w = min(_strip_width, _spr_w - _sx);
         
-        // CRITICAL: Reset before switching to temp surface
-        surface_reset_target();
+        // Destination X for the left edge of this strip (source_x = _sx)
+        var _dest_x = round(_origin_x + (_sx - _spr_xoff) * image_xscale);
+
+        // IMPORTANT: check the *same* pixel column we draw (prevents 1px edge leak).
+        // When facing left (negative scale), the drawn column effectively occupies dest_x-1..dest_x,
+        // so we bias the check by -1 in that case.
+        var _check_x = _dest_x + (_x_sign < 0 ? -1 : 0);
         
-        // Now draw to temp surface
-        surface_set_target(surf_temp_reflection);
-        draw_clear_alpha(c_black, 0);
-        
-        draw_sprite_ext(
-            sprite_index,
-            image_index,
-            spr_w / 2,
-            0,
-            image_xscale,
-            -image_yscale,
-            0,
-            c_white,
-            1
-        );
-        
-        // Reset temp surface
-        surface_reset_target();
-        
-        // Switch back to main reflection surface
-        surface_set_target(surf_reflection);
-        
-        // Draw strips
-        var strips = 10;
-        var strip_height = max_reflection_dist / strips;
-        
-        gpu_set_blendmode(bm_normal);
-        
-        for (var i = 0; i < strips; i++) {
-            var fade = 1 - (i / strips);
-            var alpha = 0.45 * fade;
-            
-            draw_surface_part_ext(
-                surf_temp_reflection,
-                0,
-                i * strip_height,
-                spr_w,
-                strip_height,
-                floor(x) - _cx - spr_w / 2,
-                floor(y) + 2 - _cy + (i * strip_height),
-                1, 1,
-                c_white,
-                alpha
-            );
+        if (check_tile_collision(_check_x, _y_check)) {
+            // Horizontal component (centered on sprite origin X)
+            var _x_center = (_sx + (_strip_w * 0.5));
+            var _x_dist = abs(_x_center - _spr_xoff);
+            var _x_w = clamp(_x_dist / _fade_x, 0, 1);
+
+            // Draw in horizontal bands to get a smooth vertical fade without a shader
+            for (var _sy = 0; _sy < _src_h_total; _sy += _band_h) {
+                var _h = min(_band_h, _src_h_total - _sy);
+                var _band_center = _sy + (_h * 0.5);
+                
+                // Distance below the feet line in source space (yoff - source_y)
+                var _dist = max(0, _spr_yoff - _band_center);
+                var _y_w = clamp(_dist / _fade_dist, 0, 1);
+                // Diagonal fade: combine vertical + horizontal falloff
+                var _fade_w = clamp(1 - (_y_w + (_x_w * _diag_strength)), 0, 1);
+                if (_fade_w <= 0) continue;
+                
+                // destY for this band at source_y = _sy
+                var _dest_y_band = round(_origin_y + (_sy - _spr_yoff) * (-image_yscale));
+                
+                draw_sprite_part_ext(
+                    sprite_index,
+                    image_index,
+                    _sx,            // Source X
+                    _sy,            // Source Y (band)
+                    _strip_w,       // Source width
+                    _h,             // Source height (band height)
+                    _dest_x,        // Dest X
+                    _dest_y_band,   // Dest Y (top-left of the band in world space)
+                    image_xscale,   // X scale (preserve facing)
+                    -image_yscale,  // Y scale (vertical flip)
+                    _reflect_col,
+                    _base_alpha * _fade_w
+                );
+            }
         }
     }
 }
 
-// CRITICAL: Always reset at the end
-surface_reset_target();
-
 // --- 2. MAIN RENDERING ---
-draw_surface(surf_reflection, _cx, _cy);
 draw_sprite_ext(sprite_index, image_index, floor(x), floor(y), 
                 image_xscale, image_yscale, 0, c_white, image_alpha);
 
@@ -96,9 +126,9 @@ if (global.show_debug) {
     var _py = floor(y);
     
     draw_set_color(c_aqua);
-    draw_circle(_px - side_dist, _py + 1, 2, false);
+    draw_circle(_px - _side_dist, _py + 1, 2, false);
     draw_circle(_px, _py + 1, 2, false);
-    draw_circle(_px + side_dist, _py + 1, 2, false);
+    draw_circle(_px + _side_dist, _py + 1, 2, false);
 }
 
 draw_set_alpha(1.0);

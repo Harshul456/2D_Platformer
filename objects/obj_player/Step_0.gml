@@ -5,6 +5,11 @@ if (scr_hitstop_handler()) {
     exit; // Skip all movement/logic during hitstop
 }
 
+// Toggle reflections while recording (F2)
+if (keyboard_check_pressed(vk_f2)) {
+    global.reflections_enabled = !global.reflections_enabled;
+}
+
 // 1. PROCESS NORMAL MOVEMENT 
 scr_player_movement();
 
@@ -39,15 +44,21 @@ if (attacking) {
     var _is_swinging = (image_index >= 1 && image_index <= 3);
     
     if (_is_swinging && !has_hit) { 
-        var _bw = 27; 
-        var _bh = 60; 
-        var _ox = 15 * last_direction; 
-        var _oy = -60; 
-        
-        var x1 = x + _ox;
-        var y1 = y + _oy;
-        var x2 = x + _ox + (_bw * last_direction);
-        var y2 = y + _oy + _bh;
+        // Hitbox scales with current collision mask size (64x64 now, 96x96 later)
+        var _w = (bbox_right - bbox_left);
+        var _reach = max(16, _w * 0.42); // ~27px reach for a 64px-wide character
+        var _pad_y = 4;
+
+        var y1 = bbox_top + _pad_y;
+        var y2 = bbox_bottom - _pad_y;
+        var x1, x2;
+        if (last_direction > 0) {
+            x1 = bbox_right;
+            x2 = bbox_right + _reach;
+        } else {
+            x1 = bbox_left - _reach;
+            x2 = bbox_left;
+        }
         var _hit_enemy = collision_rectangle(x1, y1, x2, y2, obj_enemy, false, true);
         
         if (_hit_enemy != noone) {
@@ -108,6 +119,5 @@ if (attackCooldownTimer > 0) {
 // 5. VISUALS & CLEANUP
 scr_player_invincibility();
 
-// PIXEL SNAP (Critical for tile collision and camera stability)
-x = round(x);
-y = round(y);
+// NOTE:
+// Keep sub-pixel positions for smoother movement. Draw events already snap to pixels where needed.

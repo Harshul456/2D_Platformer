@@ -12,7 +12,9 @@ var _cam_y = camera_get_view_y(cam);
 // During attacks, follow player more closely to prevent losing them during combos
 var _anchor_speed = obj_player.attacking ? 0.15 : 0.08;
 camera_anchor_x = lerp(camera_anchor_x, obj_player.x, _anchor_speed);
-camera_anchor_y = lerp(camera_anchor_y, obj_player.y - 32, 0.1);
+// Vertical anchor adapts to character height (supports 64x64 now, 96x96 later)
+var _player_half_h = (obj_player.bbox_bottom - obj_player.bbox_top) * 0.5;
+camera_anchor_y = lerp(camera_anchor_y, obj_player.y - _player_half_h, 0.1);
 
 // --- 3. STATE-BASED LOOK-AHEAD SYSTEM ---
 var _look_target = 0;

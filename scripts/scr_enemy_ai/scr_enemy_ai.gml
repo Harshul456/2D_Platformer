@@ -21,9 +21,11 @@ function scr_enemy_ai(){
 
         case STATE_CHASE:
             // 2. MOVEMENT LOGIC
-            // 64 is the width of your static mask.
-            // Using 60 ensures they move until they are right in your face.
-            var _stop_distance = 60; 
+            // Stop distance adapts to mask sizes (supports 64x64 now, future larger masks later)
+            var _enemy_half_w  = (bbox_right - bbox_left) * 0.5;
+            var _player_half_w = (obj_player.bbox_right - obj_player.bbox_left) * 0.5;
+            // Small inset so they don't overlap due to rounding/lerps
+            var _stop_distance = max((_enemy_half_w + _player_half_w) - 4, 0);
 
             if (_dist_x > _stop_distance) {
                 hsp = _dir * moveSpeed; 
@@ -45,7 +47,7 @@ function scr_enemy_ai(){
     }
 
     // 5. DEBUG OUTPUT
-    if (state == STATE_CHASE) {
+    if (global.show_debug && state == STATE_CHASE) {
         show_debug_message("Dist_X: " + string(_dist_x) + " | HSP: " + string(hsp) + " | Dir: " + string(_dir));
     }
 }

@@ -1,6 +1,6 @@
 // This is the "Reset" logic
-x = 20;
-y = 704;
+x = 160;
+y = 640;
 vsp = 0;
 hsp = 0;
 is_dying = false;

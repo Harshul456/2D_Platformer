@@ -23,6 +23,9 @@ global.show_debug = false; // Renamed to avoid conflict with built-in variable
 
 global.hitstop = 0;
 
+// Toggle reflections on/off (for before/after captures)
+global.reflections_enabled = true;
+
 // Borderless fullscreen (more reliable)
 window_set_fullscreen(false);
 window_set_size(display_get_width(), display_get_height());

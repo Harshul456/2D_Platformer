@@ -25,7 +25,9 @@ if (instance_exists(obj_player)) {
     
     // Set initial position centered on player
     camera_anchor_x = target.x;
-    camera_anchor_y = target.y - 32;
+    // Adapt to target height (supports 64x64 now, 96x96 later)
+    var _target_half_h = (target.bbox_bottom - target.bbox_top) * 0.5;
+    camera_anchor_y = target.y - _target_half_h;
     
     var _start_x = camera_anchor_x - (cam_w / 2);
     var _start_y = camera_anchor_y - (cam_h / 2);

@@ -1,6 +1,7 @@
 function scr_enemy_movement() {
-    var _side = 28; // Padding from center
-    var _waist_y = y - 32; // Check 1 tile up from floor
+    // Derive sensors from current mask (supports 64x64 enemy now, future changes later)
+    var _side = floor((bbox_right - bbox_left) * 0.5) - 4; // Padding from center
+    var _waist_y = (bbox_top + bbox_bottom) * 0.5; // Waist height
 
     if (hsp != 0) {
         var _check_x = x + (_side * sign(hsp)) + hsp;

@@ -34,7 +34,7 @@ MOVEMENT_THRESHOLD = 0.5;       // hsp threshold to trigger run animation
 GROUND_CHECK_DIST = 1;          // Distance to check for grounded state
 LANDING_ANIM_DIST = 3;          // Distance to trigger landing animation
 WALL_CHECK_OFFSET = 4;          // Head collision offset for wall checks
-side_dist = 13;                 // Horizontal collision sensor distance
+// NOTE: Collision sampling now derives from bbox_* inside `scr_player_movement()`.
 
 // --- MOMENTUM PHYSICS ---
 MOMENTUM_DECAY_NORMAL = 0.01;   // Air momentum decay rate (straight)
@@ -89,7 +89,13 @@ cam_look_ahead  = 0;            // Current horizontal offset
 camera_anchor_x = x;
 camera_anchor_y = y;
 
-// --- REFLECTION SURFACES ---
-surf_reflection = -1;           // Main reflection surface
-surf_temp_reflection = -1;      // Temporary reflection drawing surface
-max_reflection_size = 128;      // Max size needed (adjust based on largest sprite)
+// --- REFLECTION (Shader-based) ---
+reflection_timer = 0;
+reflection_timer_max = 20;      // Frames to fade reflection when jumping away
+
+// Reflection region (art-directed mirror strip).
+// X bounds control horizontal reflective area (set per-room if you want specific platforms only).
+// Y is now dynamic - reflection works on any platform when grounded.
+reflect_region_x1 = 0;                  // Left bound of reflective area (0 = entire room)
+reflect_region_x2 = room_width;         // Right bound of reflective area (room_width = entire room)
+reflect_region_y  = 0;                  // Dynamic - set automatically when on platform
