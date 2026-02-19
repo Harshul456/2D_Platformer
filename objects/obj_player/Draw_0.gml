@@ -30,40 +30,42 @@ if (_has_tile_contact && _in_x_bounds && global.reflections_enabled) {
 // NOTE: draw_sprite_part_ext() positions from the part's top-left (NOT sprite origin),
 // so we must offset using the sprite origin to place the flipped image below the feet line.
 if (global.reflections_enabled && reflection_timer > 0 && global.tilemap_collision_id != noone) {
+    // Reset color state to ensure no blue tint leaks in
+    draw_set_color(c_white);
+    draw_set_alpha(1.0);
+    
     var _reflect_strength = reflection_timer / reflection_timer_max;
-    // Slight darken + cool tint for cyberpunk glass
+    // Pure white - no color tint at all
     var _base_alpha = 0.38 * _reflect_strength;
-    var _reflect_col = make_color_rgb(210, 225, 255);
+    var _reflect_col = c_white;
     
     var _spr_w = sprite_get_width(sprite_index);
     var _spr_h = sprite_get_height(sprite_index);
     var _spr_xoff = sprite_get_xoffset(sprite_index);
     var _spr_yoff = sprite_get_yoffset(sprite_index);
     
-    // Reflection "origin" line (player feet)
+    // Reflection "origin" line (player feet) — no +2 so we use full 32px of tile (cut below torso)
     var _origin_x = floor(x);
-    var _origin_y = floor(bbox_bottom) + 2;
+    var _origin_y = floor(bbox_bottom);
     
     // We draw the sprite flipped vertically about its origin:
     // destY for the top of the (source_y=0) rect becomes:
     // origin_y + (0 - yoff) * (-yscale)
     var _dest_y = round(_origin_y + (0 - _spr_yoff) * (-image_yscale));
 
-    // Vertical fade: strong at feet, fades out downwards.
-    // We only reflect the portion ABOVE the feet line (source_y 0..yoff).
+    // We only reflect the portion above the feet line (source_y 0..yoff). Fade and band sizes
+    // come from Create so tuning is in one place (REFLECT_* constants).
     var _src_h_total = max(1, floor(_spr_yoff));
-    var _band_h = 8;          // height of each horizontal band (lower = smoother, higher = faster)
-    var _fade_dist = 56;      // pixels until the reflection fades out
-    // Diagonal feel: add a horizontal falloff so edges fade sooner than the center.
-    // (Higher strength = more diagonal. Increase _fade_x to make it subtler.)
-    var _fade_x = 36;         // horizontal pixels until fully faded at the sides
-    var _diag_strength = 0.9; // 0..1.5 typical
+    var _band_h = REFLECT_BAND_HEIGHT;
+    var _fade_dist = REFLECT_FADE_DIST;
+    var _fade_x = REFLECT_FADE_X;
+    var _diag_strength = REFLECT_DIAG_STRENGTH;
     
-    // Draw in thin vertical strips and only keep strips with tiles below them
-    // (set to 1 for pixel-perfect clipping).
-    var _strip_width = 1;
+    var _strip_width = 1;   // Pixel-perfect horizontal clipping (only draw over tiles)
     var _y_check = _feet_y + 1;
     var _x_sign = (image_xscale >= 0) ? 1 : -1;
+    
+    // Per-strip we scan down to find platform bottom (bounded by REFLECT_PLATFORM_SCAN_MAX so no infinite loop).
     
     for (var _sx = 0; _sx < _spr_w; _sx += _strip_width) {
         var _strip_w = min(_strip_width, _spr_w - _sx);
@@ -72,11 +74,18 @@ if (global.reflections_enabled && reflection_timer > 0 && global.tilemap_collisi
         var _dest_x = round(_origin_x + (_sx - _spr_xoff) * image_xscale);
 
         // IMPORTANT: check the *same* pixel column we draw (prevents 1px edge leak).
-        // When facing left (negative scale), the drawn column effectively occupies dest_x-1..dest_x,
-        // so we bias the check by -1 in that case.
         var _check_x = _dest_x + (_x_sign < 0 ? -1 : 0);
         
         if (check_tile_collision(_check_x, _y_check)) {
+            // Platform depth at this column only — so "tile underneath" vs "no tile" doesn't bleed
+            var _platform_bottom = _y_check;
+            for (var _s = 0; _s < REFLECT_PLATFORM_SCAN_MAX; _s++) {
+                if (!check_tile_collision(_check_x, _platform_bottom + 1)) break;
+                _platform_bottom++;
+            }
+            // Clip at last solid row so reflection doesn't draw below the platform (was +1 = cut too low)
+            var _clip_bottom = _platform_bottom;
+
             // Horizontal component (centered on sprite origin X)
             var _x_center = (_sx + (_strip_w * 0.5));
             var _x_dist = abs(_x_center - _spr_xoff);
@@ -96,6 +105,15 @@ if (global.reflections_enabled && reflection_timer > 0 && global.tilemap_collisi
                 
                 // destY for this band at source_y = _sy
                 var _dest_y_band = round(_origin_y + (_sy - _spr_yoff) * (-image_yscale));
+                var _band_drawn_height = _h * abs(image_yscale);
+                var _band_bottom = _dest_y_band + _band_drawn_height;
+                // Clip band so it doesn't draw below the platform (stops vertical bleed)
+                if (_band_bottom > _clip_bottom) {
+                    var _max_height = _clip_bottom - _dest_y_band;
+                    if (_max_height <= 0) continue;
+                    _h = min(_h, floor(_max_height / abs(image_yscale)));
+                    if (_h <= 0) continue;
+                }
                 
                 draw_sprite_part_ext(
                     sprite_index,
@@ -103,7 +121,7 @@ if (global.reflections_enabled && reflection_timer > 0 && global.tilemap_collisi
                     _sx,            // Source X
                     _sy,            // Source Y (band)
                     _strip_w,       // Source width
-                    _h,             // Source height (band height)
+                    _h,             // Source height (band height, possibly clipped)
                     _dest_x,        // Dest X
                     _dest_y_band,   // Dest Y (top-left of the band in world space)
                     image_xscale,   // X scale (preserve facing)

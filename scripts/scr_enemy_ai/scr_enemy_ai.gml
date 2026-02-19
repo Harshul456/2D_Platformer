@@ -24,13 +24,22 @@ function scr_enemy_ai(){
             // Stop distance adapts to mask sizes (supports 64x64 now, future larger masks later)
             var _enemy_half_w  = (bbox_right - bbox_left) * 0.5;
             var _player_half_w = (obj_player.bbox_right - obj_player.bbox_left) * 0.5;
-            // Small inset so they don't overlap due to rounding/lerps
-            var _stop_distance = max((_enemy_half_w + _player_half_w) - 4, 0);
+            // Stop when edges are touching (half widths sum), with small buffer
+            var _stop_distance = (_enemy_half_w + _player_half_w) + 2;
 
             if (_dist_x > _stop_distance) {
-                hsp = _dir * moveSpeed; 
+                // 2b. PIT/LEDGE CHECK: don't walk off edges (raycast for ground ahead)
+                var _lead_x = (_dir > 0) ? bbox_right + 1 : bbox_left - 1;
+                var _feet_y = bbox_bottom;
+                var _ground_ahead = check_tile_collision(_lead_x, _feet_y + 1) ||
+                                   check_tile_collision(_lead_x, _feet_y + 4);
+                if (_ground_ahead) {
+                    hsp = _dir * moveSpeed;
+                } else {
+                    hsp = 0; // Pit/ledge ahead - stop so we don't block the player
+                }
             } else {
-                hsp = 0; // Close enough!
+                hsp = 0; // Close enough - stop moving!
             }
             
             // 3. VISUALS

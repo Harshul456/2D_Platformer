@@ -24,3 +24,4 @@ base_yscale = image_yscale;
 knockback_pending_x = 0;
 knockback_pending_y = 0;
 knockback_pending_lift = false;
+FINISHER_LIFT_OFFSET = 4;  // Pixels to lift enemy on finisher hit (before applying vsp)

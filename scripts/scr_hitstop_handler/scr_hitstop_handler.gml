@@ -16,15 +16,8 @@ function scr_hitstop_handler() {
         
         return true; // Indicates we're in hitstop
     } else {
-        // Resume animations
-        with (obj_player) {
-            if (!attacking) image_speed = 1;
-            else image_speed = 1; // Attack animations continue
-        }
-        with (obj_enemy) {
-            image_speed = 1;
-        }
-        
-        return false; // Not in hitstop
+        with (obj_player) image_speed = 1;
+        with (obj_enemy) image_speed = 1;
+        return false;
     }
 }

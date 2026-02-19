@@ -35,7 +35,7 @@
   "isEcma":false,
   "LibraryEmitters":[],
   "MetaData":{
-    "IDEVersion":"2024.14.2.213",
+    "IDEVersion":"2024.14.3.217",
   },
   "name":"Action platformer",
   "resources":[
@@ -52,7 +52,6 @@
     {"id":{"name":"global_init","path":"scripts/global_init/global_init.yy",},},
     {"id":{"name":"scr_camera_control","path":"scripts/scr_camera_control/scr_camera_control.yy",},},
     {"id":{"name":"scr_enemy_ai","path":"scripts/scr_enemy_ai/scr_enemy_ai.yy",},},
-    {"id":{"name":"scr_enemy_movement","path":"scripts/scr_enemy_movement/scr_enemy_movement.yy",},},
     {"id":{"name":"scr_hitstop_handler","path":"scripts/scr_hitstop_handler/scr_hitstop_handler.yy",},},
     {"id":{"name":"scr_player_attack","path":"scripts/scr_player_attack/scr_player_attack.yy",},},
     {"id":{"name":"scr_player_invincibility","path":"scripts/scr_player_invincibility/scr_player_invincibility.yy",},},
@@ -69,6 +68,7 @@
     {"id":{"name":"spr_mc_idle","path":"sprites/spr_mc_idle/spr_mc_idle.yy",},},
     {"id":{"name":"spr_mc_jog","path":"sprites/spr_mc_jog/spr_mc_jog.yy",},},
     {"id":{"name":"spr_mc_jump","path":"sprites/spr_mc_jump/spr_mc_jump.yy",},},
+    {"id":{"name":"spr_mc_walljump","path":"sprites/spr_mc_walljump/spr_mc_walljump.yy",},},
     {"id":{"name":"spr_pit","path":"sprites/spr_pit/spr_pit.yy",},},
     {"id":{"name":"spr_solid","path":"sprites/spr_solid/spr_solid.yy",},},
     {"id":{"name":"spr_tutorial_platforms","path":"sprites/spr_tutorial_platforms/spr_tutorial_platforms.yy",},},

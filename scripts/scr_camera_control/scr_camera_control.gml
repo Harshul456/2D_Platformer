@@ -14,7 +14,12 @@ var _anchor_speed = obj_player.attacking ? 0.15 : 0.08;
 camera_anchor_x = lerp(camera_anchor_x, obj_player.x, _anchor_speed);
 // Vertical anchor adapts to character height (supports 64x64 now, 96x96 later)
 var _player_half_h = (obj_player.bbox_bottom - obj_player.bbox_top) * 0.5;
-camera_anchor_y = lerp(camera_anchor_y, obj_player.y - _player_half_h, 0.1);
+var _anchor_y_speed = 0.1;
+// When falling, anchor must keep up so camera doesn't lag behind
+if (!obj_player.grounded && obj_player.vsp > 0) {
+    _anchor_y_speed = 0.25; // Faster follow when falling (was fixed 0.1 = camera lagged)
+}
+camera_anchor_y = lerp(camera_anchor_y, obj_player.y - _player_half_h, _anchor_y_speed);
 
 // --- 3. STATE-BASED LOOK-AHEAD SYSTEM ---
 var _look_target = 0;
@@ -35,10 +40,10 @@ if (obj_player.attacking) {
     _camera_speed = 0.12; // Faster camera to keep up
     
 } else if (!obj_player.grounded) {
-    // IN AIR: Moderate look-ahead, slightly slower camera
+    // IN AIR: Moderate look-ahead; when falling use faster vertical follow so camera keeps up
     _look_target = 100 * obj_player.last_direction;
     _look_speed = 0.10;
-    _camera_speed = 0.08;
+    _camera_speed = (obj_player.vsp > 0) ? 0.18 : 0.08; // Faster when falling
     
 } else if (abs(obj_player.hsp) > 0.5) {
     // WALKING/RUNNING: Normal look-ahead

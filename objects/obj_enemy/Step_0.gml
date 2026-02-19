@@ -7,7 +7,7 @@ if (global.hitstop == 0 && (knockback_pending_x != 0 || knockback_pending_y != 0
     
     // Apply vertical knockback and lift
     if (knockback_pending_lift) {
-        y -= 4; // Lift higher off ground
+        y -= FINISHER_LIFT_OFFSET;
         vsp = knockback_pending_y;
         knockback_pending_lift = false;
     } else if (knockback_pending_y != 0) {

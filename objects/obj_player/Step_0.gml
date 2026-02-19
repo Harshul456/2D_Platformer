@@ -21,7 +21,7 @@ if (attack_buffer_timer > 0 && attackCooldownTimer <= 0 && grounded) {
     // Only reset these if the script actually started a NEW swing
     if (image_index == 0) {
         attackCooldownTimer = attackCooldown;
-        has_hit = false; 
+        attack_has_hit = false; 
         is_dashing = false; 
         dash_timer = 0;
     }
@@ -30,24 +30,19 @@ if (attack_buffer_timer > 0 && attackCooldownTimer <= 0 && grounded) {
 // 3. PROCESS THE ATTACK STATE & PHYSICS
 if (attacking) {
     // --- STRONGER LUNGE FRICTION ---
-    // Apply much stronger friction to stop sliding into enemies
-    hsp = lerp(hsp, 0, 0.35);
-    if (abs(hsp) < 0.3) hsp = 0;
+    hsp = lerp(hsp, 0, ATTACK_LUNGE_FRICTION);
+    if (abs(hsp) < ATTACK_LUNGE_CUTOFF) hsp = 0;
     
     // --- STOP ON HIT ---
-    // When you hit an enemy, immediately reduce momentum to prevent sliding through
-    if (has_hit) {
-        hsp *= 0.5;
-    }
+    if (attack_has_hit) hsp *= ATTACK_ON_HIT_HSLOW;
     
     // --- HIT DETECTION ---
     var _is_swinging = (image_index >= 1 && image_index <= 3);
     
-    if (_is_swinging && !has_hit) { 
-        // Hitbox scales with current collision mask size (64x64 now, 96x96 later)
+    if (_is_swinging && !attack_has_hit) { 
         var _w = (bbox_right - bbox_left);
-        var _reach = max(16, _w * 0.42); // ~27px reach for a 64px-wide character
-        var _pad_y = 4;
+        var _reach = max(ATTACK_REACH_MIN, _w * ATTACK_REACH_FACTOR);
+        var _pad_y = ATTACK_HITBOX_PAD_Y;
 
         var y1 = bbox_top + _pad_y;
         var y2 = bbox_bottom - _pad_y;
@@ -62,36 +57,35 @@ if (attacking) {
         var _hit_enemy = collision_rectangle(x1, y1, x2, y2, obj_enemy, false, true);
         
         if (_hit_enemy != noone) {
-            has_hit = true;
+            attack_has_hit = true;
             
             // PUSH ENEMY BACK - balanced for combo follow-up
             with (_hit_enemy) {
-                // Damage and state change happen immediately
-                hit_blink_timer = 20; 
-                obj_enemy_health -= 20;
+                hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
+                obj_enemy_health -= other.ATTACK_DAMAGE_PER_HIT;
                 
                 if (state != STATE_STUNNED) {
                     state = STATE_STUNNED;
-                    stunTimer = 30;
+                    stunTimer = other.ATTACK_STUN_FRAMES;
                 }
                 
-                // Store knockback values to apply AFTER hitstop
+                var _knockback_dir = -sign(other.x - x);
+                if (_knockback_dir == 0) _knockback_dir = other.last_direction;
+                
                 if (other.comboCount < 3) {
-                    knockback_pending_x = other.last_direction * 1.5;
+                    knockback_pending_x = _knockback_dir * other.ATTACK_LIGHT_KNOCKBACK;
                     knockback_pending_y = 0;
                     knockback_pending_lift = false;
-                    global.hitstop = 3; // Light hit = short freeze
+                    global.hitstop = other.ATTACK_LIGHT_HITSTOP;
                 } else {
-                    // Finisher - big horizontal push + launch
-                    knockback_pending_x = other.last_direction * 6;
-                    knockback_pending_y = -6;
+                    knockback_pending_x = _knockback_dir * other.ATTACK_FINISHER_KNOCKBACK_X;
+                    knockback_pending_y = other.ATTACK_FINISHER_KNOCKBACK_Y;
                     knockback_pending_lift = true;
-                    global.hitstop = 8;
+                    global.hitstop = other.ATTACK_FINISHER_HITSTOP;
                 }
             }
             
-            // Small pushback on hit to prevent overlap
-            hsp -= last_direction * 0.5;
+            hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
         }
     }
     
