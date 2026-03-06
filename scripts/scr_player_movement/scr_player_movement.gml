@@ -31,9 +31,9 @@ function scr_player_movement() {
         if (key_jump) jump_buffer_timer = jump_buffer_max; 
         if (jump_buffer_timer > 0) jump_buffer_timer--;
         
-        // Attack buffer
+        // Attack buffer (don't decrement while attacking — lets short double-tap count for combo)
         if (key_attack) attack_buffer_timer = attack_buffer_max;
-        if (attack_buffer_timer > 0) attack_buffer_timer--;
+        if (!attacking && attack_buffer_timer > 0) attack_buffer_timer--;
     }
 
     // --- 2. GROUNDED & COYOTE LOGIC ---
@@ -378,6 +378,10 @@ function scr_player_movement() {
                 sprite_index = spr_mc_jump;
                 image_index = ANIM_LAND_CROUCH_START;
                 force_landing_crouch = true;
+            } else if (sprite_index == spr_mc_attack2 || sprite_index == spr_asta_attack1) {
+                // Attack just ended — transition to jog/idle
+                sprite_index = (abs(hsp) > MOVEMENT_THRESHOLD) ? spr_mc_jog : spr_mc_idle;
+                image_index = 0;
             } else if (is_dashing || sprite_index == spr_mc_dash) {
                 if (sprite_index != spr_mc_dash) { sprite_index = spr_mc_dash; image_index = 0; }
             

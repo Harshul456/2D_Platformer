@@ -12,14 +12,27 @@ function scr_player_attack() {
     attacking = true;
     combo_buffer = false;
     attack_has_hit = false;
+    attack_key_released_this_swing = false;
     image_index = 0;
     comboTimer = comboCooldown;
 
-    // Apply the burst. We use higher numbers because we'll be 
-    // applying friction in the Step Event to slow it down quickly.
     switch (comboCount) {
-        case 1: hsp = last_direction * 4; sprite_index = spr_asta_attack1; image_blend = c_white; break;
-        case 2: hsp = last_direction * 5; sprite_index = spr_asta_attack1; image_blend = c_lime;  break;
-        case 3: hsp = last_direction * 8; sprite_index = spr_asta_attack1; image_blend = c_aqua;  break;
+        case 1:
+            hsp = last_direction * 4;
+            sprite_index = spr_asta_attack1;
+            image_blend = c_white;
+            break;
+        case 2:
+            hsp = last_direction * 5;
+            sprite_index = spr_mc_attack2;
+            image_blend = c_lime;
+            break;
+        case 3:
+            hsp = last_direction * 8;
+            sprite_index = spr_asta_attack1;
+            image_blend = c_aqua;
+            break;
     }
+    // Lockout: block section 2 from starting new attack until this one finishes (extra frames = safety margin)
+    attack_lockout = image_number + 3;
 }

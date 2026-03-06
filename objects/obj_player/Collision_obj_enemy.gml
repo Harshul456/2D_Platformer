@@ -1,8 +1,6 @@
 // --- obj_player Collision Event with obj_enemy ---
-var _is_swinging = (attacking); 
-var _facing_enemy = (other.x > x && last_direction == 1) || (other.x < x && last_direction == -1);
 var _enemy_incapacitated = (other.state == STATE_STUNNED || other.stunTimer > 0);
-var _protected = (_is_swinging && _facing_enemy) || _enemy_incapacitated;
+var _protected = attacking || (attack_recovery_grace > 0) || (attack_buffer_timer > 0) || _enemy_incapacitated;  // Attack + recovery + buffered press = protected
 
 // NEW: SEPARATION LOGIC
 // If we are overlapping (even if protected), push the player out 

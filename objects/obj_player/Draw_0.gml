@@ -147,6 +147,14 @@ if (global.show_debug) {
     draw_circle(_px - _side_dist, _py + 1, 2, false);
     draw_circle(_px, _py + 1, 2, false);
     draw_circle(_px + _side_dist, _py + 1, 2, false);
+    
+    // Attack hitbox (exact coords from Step collision_rectangle)
+    if (debug_hitbox_active) {
+        draw_set_color(c_yellow);
+        draw_rectangle(debug_hitbox_x1, debug_hitbox_y1, debug_hitbox_x2, debug_hitbox_y2, false);
+        draw_set_color(c_lime);
+        draw_rectangle(debug_hitbox_x1 - 1, debug_hitbox_y1 - 1, debug_hitbox_x2 + 1, debug_hitbox_y2 + 1, false);  // Outer edge so outline is visible
+    }
 }
 
 draw_set_alpha(1.0);

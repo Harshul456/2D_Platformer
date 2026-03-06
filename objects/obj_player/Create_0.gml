@@ -10,7 +10,7 @@ coyote_time_max = 6;            // Grace period frames for late jumps
 coyote_time_timer = 0;          // Countdown
 jump_buffer_max = 5;            // Frames to "remember" a jump press
 jump_buffer_timer = 0;          // Countdown
-attack_buffer_max = 5;          // Frames to "remember" an attack press
+attack_buffer_max = 8;          // Frames to "remember" an attack press (longer = easier 1→2 chain)
 attack_buffer_timer = 0;        // Countdown
 
 // --- MOVEMENT SETTINGS ---
@@ -83,6 +83,7 @@ attackCooldownTimer = 0;
 ATTACK_REACH_FACTOR   = 0.42;   // Reach = max(ATTACK_REACH_MIN, bbox_w * this)
 ATTACK_REACH_MIN      = 16;     // Minimum attack reach in pixels
 ATTACK_HITBOX_PAD_Y   = 4;      // Vertical padding for attack hitbox
+debug_hitbox_x1 = 0; debug_hitbox_y1 = 0; debug_hitbox_x2 = 0; debug_hitbox_y2 = 0; debug_hitbox_active = false;
 ATTACK_LUNGE_FRICTION = 0.35;   // Friction during attack lunge (lerp toward 0)
 ATTACK_LUNGE_CUTOFF   = 0.3;    // Zero hsp when below this
 ATTACK_ON_HIT_HSLOW   = 0.5;    // Multiply hsp when attack hits (stop sliding through)
@@ -111,8 +112,12 @@ comboCount      = 0;
 comboTimer      = 0;
 comboCooldown   = 40;
 combo_buffer    = false;        // Did the player click while already swinging?
+attack_key_released_this_swing = false;  // For 1→2: release-then-press = double-tap (avoids single-hold chain)
 attack_has_hit  = false;        // Prevent multi-hits on one swing
 hitstop_timer   = 0;            // For that "weighty" feel
+ATTACK_RECOVERY_GRACE = 8;      // Frames of protection after attack ends (covers 3rd attack windup)
+attack_recovery_grace = 0;      // Countdown; set when attack ends without combo
+attack_lockout = 0;             // Blocks new attack from section 2 until current attack finishes
 
 // --- INVINCIBILITY & FEEDBACK ---
 invincible      = false;
