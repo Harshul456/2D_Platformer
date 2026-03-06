@@ -64,6 +64,7 @@
     {"id":{"name":"s_snow_platform","path":"sprites/s_snow_platform/s_snow_platform.yy",},},
     {"id":{"name":"spr_asta_attack1","path":"sprites/spr_asta_attack1/spr_asta_attack1.yy",},},
     {"id":{"name":"spr_enemy","path":"sprites/spr_enemy/spr_enemy.yy",},},
+    {"id":{"name":"spr_mc_attack2","path":"sprites/spr_mc_attack2/spr_mc_attack2.yy",},},
     {"id":{"name":"spr_mc_dash","path":"sprites/spr_mc_dash/spr_mc_dash.yy",},},
     {"id":{"name":"spr_mc_idle","path":"sprites/spr_mc_idle/spr_mc_idle.yy",},},
     {"id":{"name":"spr_mc_jog","path":"sprites/spr_mc_jog/spr_mc_jog.yy",},},
