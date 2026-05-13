@@ -2,6 +2,8 @@
 function scr_hitstop_handler() {
     if (global.hitstop > 0) {
         global.hitstop--;
+        // Player Step is skipped during hitstop — still tick i-frames so dash hits aren't delayed until after freeze.
+        with (obj_player) scr_player_invincibility();
         
         // Pause all animations
         with (obj_player) {

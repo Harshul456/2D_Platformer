@@ -135,8 +135,19 @@ if (global.reflections_enabled && reflection_timer > 0 && global.tilemap_collisi
 }
 
 // --- 2. MAIN RENDERING ---
-draw_sprite_ext(sprite_index, image_index, floor(x), floor(y), 
-                image_xscale, image_yscale, 0, c_white, image_alpha);
+// Wall cling: small draw-only nudge + optional tilt (physics/collision unchanged).
+var _draw_x = floor(x);
+var _draw_y = floor(y);
+if (!attacking && wall_side != 0) {
+    var _nudge = (wall_side == 1) ? WALL_CLING_DRAW_NUDGE_PX_R : WALL_CLING_DRAW_NUDGE_PX_L;
+    _draw_x += wall_side * _nudge;
+}
+var _cling_rot = 0;
+if (!attacking && wall_side != 0 && WALL_CLING_VISUAL_TILT != 0) {
+    _cling_rot = wall_side * WALL_CLING_VISUAL_TILT;
+}
+draw_sprite_ext(sprite_index, image_index, _draw_x, _draw_y,
+                image_xscale, image_yscale, _cling_rot, c_white, image_alpha);
 
 // --- 3. DEBUG OVERLAY ---
 if (global.show_debug) {

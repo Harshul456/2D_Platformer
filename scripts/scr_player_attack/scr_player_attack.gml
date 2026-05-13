@@ -12,27 +12,24 @@ function scr_player_attack() {
     attacking = true;
     combo_buffer = false;
     attack_has_hit = false;
-    attack_key_released_this_swing = false;
     image_index = 0;
     comboTimer = comboCooldown;
 
     switch (comboCount) {
         case 1:
-            hsp = last_direction * 4;
+            hsp = last_direction * 3;
             sprite_index = spr_asta_attack1;
             image_blend = c_white;
             break;
         case 2:
-            hsp = last_direction * 5;
+            hsp = last_direction * 3.5;
             sprite_index = spr_mc_attack2;
             image_blend = c_lime;
             break;
         case 3:
-            hsp = last_direction * 8;
+            hsp = last_direction * 5;
             sprite_index = spr_asta_attack1;
             image_blend = c_aqua;
             break;
     }
-    // Lockout: block section 2 from starting new attack until this one finishes (extra frames = safety margin)
-    attack_lockout = image_number + 3;
 }

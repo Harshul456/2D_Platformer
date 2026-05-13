@@ -10,11 +10,13 @@ coyote_time_max = 6;            // Grace period frames for late jumps
 coyote_time_timer = 0;          // Countdown
 jump_buffer_max = 5;            // Frames to "remember" a jump press
 jump_buffer_timer = 0;          // Countdown
-attack_buffer_max = 8;          // Frames to "remember" an attack press (longer = easier 1→2 chain)
+attack_buffer_max = 12;         // Frames to "remember" an attack press (idle only — not refilled while swinging)
 attack_buffer_timer = 0;        // Countdown
+attack_chain_buffer_max = 8;    // Second hit: buffer from a *new* press during swing 1 (holding X won't chain)
+attack_chain_buffer_timer = 0;
 
 // --- MOVEMENT SETTINGS ---
-hsp             = 0;            // Horizontal velocity
+hsp             = 0;            // velocity
 vsp             = 0;            // Vertical velocity
 grv             = 0.5;          // Gravity strength
 walksp          = 3.5;          // Standard walk speed
@@ -23,6 +25,7 @@ jumpsp          = 9.0;          // Jump power
 jump_count      = 0;            // Double jump tracker
 last_direction  = 1;            // Facing: 1 = Right, -1 = Left
 runMomentum     = 0;            // Stores speed for air-carry
+post_attack_accel_timer = 0;    // Ramp walk speed after heavy attack land
 
 // --- ANIMATION THRESHOLDS ---
 JUMP_RISE_THRESHOLD = -1;       // vsp threshold for rising animation
@@ -36,13 +39,57 @@ ANIM_HAIR_FLICKER_THRESHOLD = 2.5; // Which half of interval for frame 5 vs 6
 ANIM_DASH_LOOP_END = 5.9;       // Dash sprite: loop frames 0–5, then reset
 ANIM_DASH_REEL_START = 6;       // Dash sprite: reel-back starts at frame 6
 ANIM_DASH_REEL_END = 8.8;       // Dash sprite: after frame 8 complete, go idle
+ANIM_JOG_FRAME_COUNT = 7;       // spr_mc_jog subimages; wall-jump extend timing follows this
 
 // --- COLLISION DISTANCES ---
-GROUND_CHECK_DIST = 1;          // Distance to check for grounded state
+GROUND_CHECK_DIST = 1;          // Distance to check for grounded state (probe below bbox bottom)
+GROUND_PROBE_EDGE_INSET = 12;   // Inset L/R floor probes on full floors (cap tiles use bbox L/R)
+AIR_FALL_EDGE_INSET = 18;       // Inset used for airborne falling probes (prevents toe-hover when stepping off edges)
+GROUND_STANDABLE_EMBED_PX = 10;
+GROUND_LAND_VOTES_MIN_AIR = 2;
+GROUND_LAND_VOTES_MIN_CLING = 3;
+// Thin shelf caps: bbox center can sit over empty half of the 32px cell while both feet still hit solid.
+// Allow grounded when floor votes pass and probe hits stay within this many tile columns (blocks abyss bridges).
+CAP_GROUND_CELL_SPAN_MAX = 1;
+// Full TILECOL_SHAPE_FULL blocks: Mega Man–style lip — allow grounded when inset stand votes pass even if center probe misses void (see 6c + anchor).
+FULL_BLOCK_EDGE_GROUND_FORGIVE = true;
+// Full block: if feet row local Y >= this, treat as sunk into tile (pop up / no lip-teeter).
+FULL_BLOCK_FEET_INTERIOR_LY_MIN = 2;
+// Air peel: treat overlap with only the top N rows of a full block like thin-cap peel (no y-- pop off the lip).
+FULL_BLOCK_TOP_PEEL_BAND_PX = 4;
+// When toes still hug a full-block lip, keep stable ground visuals in air anim / teeter (avoids flicker if grounded hiccups).
+FULL_BLOCK_LIP_ANIM_STICKY_HOLD_FRAMES = 12;
+full_lip_anim_sticky = 0;
+// Consecutive frames with center under feet before clearing lip sticky (stops 1-frame center flicker from wiping sticky).
+FULL_BLOCK_LIP_STICKY_CLEAR_CENTER_FRAMES = 4;
+full_lip_center_stable_frames = 0;
+// On thin shelves, one toe on the lip often fails the 2-of-3 stand vote; still treat as standing when |vsp| is small.
+SHELF_STAND_VSP_ABS_MAX = 3;
+// When tile index 1 shelf is under feet, single-toe relax uses this smaller |vsp| cap (stricter than other shelves).
+SHELF_STAND_VSP_TILE1 = 1.15;
+EDGE_GROUND_VSP_MAX = 0.55;
+TILEMAP_AIR_SEPARATION_MAX = 6;
+GROUND_SNAP_MAX = 4;
+GROUND_SNAP_PROBE_DEPTH = 6;
+GROUND_SNAP_POST_ANIM_MAX = 10;
+GROUND_SNAP_THIN_CAP_MAX = 1;
+GROUND_SNAP_POST_THIN_CAP_MAX = 2;
 LANDING_ANIM_DIST = 3;          // Distance to trigger landing animation
-WALL_CHECK_OFFSET = 4;          // Head collision offset for wall checks
-LEDGE_STEP_MAX = 2;             // Max pixels to step up when blocked by small ledge (1–2px lip)
-LEDGE_TOE_INSET = 2;            // Vertical inset for toe when checking horizontal clearance (feet_y - this)
+WALL_CHECK_OFFSET = 4;
+WALL_CLING_SCAN_ABOVE_HEAD = 6;
+WALL_CLING_COLUMN_MAX_BELOW_TOP = 4;
+WALL_CLING_SNAP_ITER_MAX = 32;
+LEDGE_STEP_MAX = 2;
+LEDGE_TOE_INSET = 2;
+HORIZONTAL_LEDGE_WINDOW_PX = 6; // Side collision ignored when bbox_bottom is this close to tile top (mount / corner clip).
+PLAYER_STATE_IDLE = 0;
+PLAYER_STATE_LAND = 1;
+player_movement_state = PLAYER_STATE_IDLE;
+SIDE_ENTRY_MIN_VSP = 0.2;       // Passive side-entry: min downward speed (hold toward ledge bypasses vsp + air gates).
+SIDE_ENTRY_CATCH_WINDOW_PX = 4; // Vertical window for side-entry only (tighter than horizontal mount window).
+SIDE_ENTRY_MIN_AIR_FRAMES = 2;  // Passive side-entry: min consecutive air frames (hold toward ledge bypasses).
+side_entry_airborne_frames = 0; // Incremented each airborne Step end; reset when grounded.
+POST_ATTACK_ACCEL_FRAMES = 12;
 // NOTE: Collision sampling derives from bbox_* inside scr_player_movement().
 
 // --- MOMENTUM PHYSICS ---
@@ -64,13 +111,21 @@ wall_slide_speed      = 0.4;    // Max downward speed while clinging (slow slide
 wall_jump_hsp         = 5;     // Horizontal push away from wall on jump
 wall_jump_lock        = 0;     // Frames after wall jump where we can't re-stick
 wall_jump_lock_frames  = 15;   // Value set when we wall jump (duration of lock + direction lock)
-wall_jump_extend_time  = 6;    // Frames to show "extend" sprite (frame 1) after push-off
+wall_jump_extend_time  = 7;    // Align with spr_mc_jog length (ANIM_JOG_FRAME_COUNT)
 wall_jump_extend_timer = 0;    // Countdown for extend animation
 wall_cling_grace       = 0;    // Frames to keep wall_side after detection (stops flicker)
 wall_cling_grace_frames = 8;   // Value set when we detect wall (keeps cling from flickering at edges)
 wall_cling_frames      = 0;    // Frames spent clinging (reset on land/leave wall; for future use)
-wall_cling_vsp_min     = -1;   // Only cling at apex or falling (vsp >= this); rising = full jump anim
+wall_cling_vsp_min     = 0;    // Only cling when falling / at rest vertically (not while rising past wall)
+// Top-wall corner anti-stuck: once we detect the "near top lip" zone, keep cling disabled until bbox_bottom is below this threshold.
+wall_top_no_cling_y_left  = noone;
+wall_top_no_cling_y_right = noone;
+WALL_TOP_NO_CLING_EXIT_PAD_PX = 3;
 wall_jump_last_side    = 0;    // -1/1 = wall we last jumped from; 0 = none (allows side-to-side, blocks same wall)
+// Draw event only (Draw_0): nudge sprite toward wall (mask is often narrower than art — tune until cling looks flush).
+WALL_CLING_DRAW_NUDGE_PX_L = 8;
+WALL_CLING_DRAW_NUDGE_PX_R = 8;
+WALL_CLING_VISUAL_TILT = 0;
 
 // --- COMBAT & DAMAGE ---
 obj_player_health = 100;
@@ -86,6 +141,8 @@ ATTACK_HITBOX_PAD_Y   = 4;      // Vertical padding for attack hitbox
 debug_hitbox_x1 = 0; debug_hitbox_y1 = 0; debug_hitbox_x2 = 0; debug_hitbox_y2 = 0; debug_hitbox_active = false;
 ATTACK_LUNGE_FRICTION = 0.35;   // Friction during attack lunge (lerp toward 0)
 ATTACK_LUNGE_CUTOFF   = 0.3;    // Zero hsp when below this
+// First subimage with an active hitbox (Step uses >= 1); enemies use this for startup priority / dash contact.
+ATTACK_HIT_ACTIVE_START_INDEX = 1;
 ATTACK_ON_HIT_HSLOW   = 0.5;    // Multiply hsp when attack hits (stop sliding through)
 ATTACK_ON_HIT_PUSHBACK = 0.5;   // Player pushback on hit (prevent overlap)
 
@@ -106,6 +163,31 @@ ATTACK_LIGHT_HITSTOP    = 3;    // Light hit freeze frames
 ATTACK_FINISHER_KNOCKBACK_X = 6;  // Finisher horizontal
 ATTACK_FINISHER_KNOCKBACK_Y = -6; // Finisher vertical (launch)
 ATTACK_FINISHER_HITSTOP = 8;    // Finisher freeze frames
+
+// --- ATTACK LUNGE / SHIFT / HITBOX (Step_0 attack block; keep in sync with sprites) ---
+attack_priority_timer = 0;    // Startup priority frames (set by attack flow if needed)
+attack_no_lunge = false;        // When true: skip shift + combo lunge (e.g. air-locked swings)
+attack_shift_remaining = 0;   // Pixels of forward slide queued on attack start
+ATTACK_SHIFT_PX_1 = 4;
+ATTACK_SHIFT_PX_2 = 5;
+ATTACK_SHIFT_PX_PER_FRAME = 1;
+ATTACK_COMBO_LUNGE_FRAME_END = 0.42;   // image_index <= image_number * this during lunge window
+ATTACK_COMBO_LUNGE_PER_FRAME = 0;      // 0 = off (only scr_player_attack initial hsp + friction; no per-frame drive)
+ATTACK_COMBO_LUNGE_MAX_HSP = 5.5;
+ATTACK_COMBO_LUNGE_MAX_HSP_2 = 7;
+ATTACK_COMBO2_PLAYER_RECOIL = 1.5;
+ATTACK_HITBOX_REACH_1 = 28;
+ATTACK_HITBOX_REACH_2 = 38;
+ATTACK_HITBOX_TOP_PAD_1 = 10;
+ATTACK_HITBOX_TOP_PAD_2 = 10;
+ATTACK_HITBOX_BOT_PAD_1 = 14;
+ATTACK_HITBOX_BOT_PAD_2 = 14;
+ATTACK_HITBOX_X_INSET = 4;
+ENEMY_HIT_PRESSURE_WINDOW_FRAMES = 45;
+HIT_PRESSURE_KB_PER_STACK = 0.08;
+HIT_PRESSURE_KB_MULT_CAP = 1.5;
+ENEMY_STUN_AFTER_HIT1 = 20;
+ENEMY_STUN_AFTER_HIT2 = 35;
 
 // --- COMBO SYSTEM ---
 comboCount      = 0;
@@ -153,3 +235,8 @@ REFLECT_PLATFORM_SCAN_MAX = 64; // Max pixels to scan down for platform bottom (
 reflect_region_x1 = 0;                  // Left bound of reflective area (0 = entire room)
 reflect_region_x2 = room_width;         // Right bound of reflective area (room_width = entire room)
 reflect_region_y  = 0;                  // Dynamic - set automatically when on platform
+
+// Previous frame bbox_bottom for one-way ledge threshold (indices 1,5,34,35,36; see tilemap_shelf_threshold_land_dy).
+shelf_bb_bottom_prev = bbox_bottom;
+// True for this Step after tilemap_shelf_threshold_land_dy applied a snap (strict 34/36 lip needs 6c grounded).
+shelf_threshold_snap_this_step = false;

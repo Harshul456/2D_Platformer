@@ -1,3 +1,3 @@
 global_init();
 
-audio_play_sound(s_tutorial_stage, 1, true);
+audio_play_sound(s_alone, 1, true);

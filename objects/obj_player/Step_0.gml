@@ -5,6 +5,12 @@ if (scr_hitstop_handler()) {
     exit; // Skip all movement/logic during hitstop
 }
 
+if (attack_priority_timer > 0) attack_priority_timer--;
+
+// Stable collision hull: keep hurtbox consistent even while attacking.
+// Using the attack sprite as the mask makes the hurtbox include the weapon/extents and feels unfair.
+mask_index = spr_mc_idle;
+
 // Toggle reflections while recording (F2)
 if (keyboard_check_pressed(vk_f2)) {
     global.reflections_enabled = !global.reflections_enabled;
@@ -13,12 +19,41 @@ if (keyboard_check_pressed(vk_f2)) {
 // 1. PROCESS NORMAL MOVEMENT 
 scr_player_movement();
 
+// Hits can land after attack Step (collision order) or same frame as knockback — never keep swing physics while stunned.
+if (stunTimer > 0 && attacking) {
+    attacking = false;
+    attack_lockout = 0;
+    attack_buffer_timer = 0;
+    attack_chain_buffer_timer = 0;
+    combo_buffer = false;
+    attack_shift_remaining = 0;
+    comboTimer = 0;
+    comboCount = 0;
+    image_blend = c_white;
+    debug_hitbox_active = false;
+    attack_priority_timer = 0;
+}
+
+// attack_lockout must tick down even if attacking was cleared mid-swing (e.g. enemy hit),
+// otherwise section 2 never allows a new attack.
+if (attack_lockout > 0) attack_lockout--;
+
+function _attack_step_shift() {
+    // Queue a small slide instead of instant teleport.
+    if (attack_no_lunge) return;
+    attack_shift_remaining = (comboCount == 1) ? ATTACK_SHIFT_PX_1 : ATTACK_SHIFT_PX_2;
+}
+
 // 2. PROCESS ATTACK INPUT (with buffer)
 // Skip if attacking — let combo transition handle chaining.
 // Skip if attack_lockout > 0: prevents starting before current attack finishes.
-// Skip if attack_recovery_grace > 0: prevents restarting attack 1 immediately after it ends (8-frame cooldown)
-if (!attacking && attack_lockout <= 0 && attack_recovery_grace <= 0 && attack_buffer_timer > 0 && attackCooldownTimer <= 0 && grounded) {
+// Skip if attack_recovery_grace > 0: prevents restarting attack 1 immediately after it ends (see ATTACK_RECOVERY_GRACE)
+if (!attacking && stunTimer <= 0 && attack_lockout <= 0 && attack_recovery_grace <= 0 && attack_buffer_timer > 0 && attackCooldownTimer <= 0 && grounded) {
     scr_player_attack(); 
+    
+    // Start the forward slide on attack 1.
+    _attack_step_shift();
+
     attack_buffer_timer = 0; // Consume the buffer — one press = one attack
     
     // Only reset these if the script actually started a NEW swing
@@ -30,39 +65,81 @@ if (!attacking && attack_lockout <= 0 && attack_recovery_grace <= 0 && attack_bu
     }
 }
 
-// 3. PROCESS THE ATTACK STATE & PHYSICS
-if (attacking) {
-    if (attack_lockout > 0) attack_lockout--;
+// 3. PROCESS THE ATTACK STATE & PHYSICS (stunned = knockback only; no lunge / combo in air)
+if (attacking && stunTimer <= 0) {
     // --- STRONGER LUNGE FRICTION ---
     hsp = lerp(hsp, 0, ATTACK_LUNGE_FRICTION);
     if (abs(hsp) < ATTACK_LUNGE_CUTOFF) hsp = 0;
     
+    // Optional sustained mid-swing hsp (disabled when ATTACK_COMBO_LUNGE_PER_FRAME is 0 in Create).
+    if (ATTACK_COMBO_LUNGE_PER_FRAME != 0) {
+        var _lunge_end = image_number * ATTACK_COMBO_LUNGE_FRAME_END;
+        if (!attack_has_hit && !attack_no_lunge && image_index >= 1 && image_index <= _lunge_end) {
+            var _ld = last_direction;
+            hsp += _ld * ATTACK_COMBO_LUNGE_PER_FRAME;
+            var _cap = (comboCount >= 2) ? ATTACK_COMBO_LUNGE_MAX_HSP_2 : ATTACK_COMBO_LUNGE_MAX_HSP;
+            hsp = clamp(hsp, -_cap, _cap);
+        }
+    }
+    
     // --- STOP ON HIT ---
     if (attack_has_hit) hsp *= ATTACK_ON_HIT_HSLOW;
+
+    // --- FORWARD SLIDE (small, smooth) ---
+    if (!attack_no_lunge && attack_shift_remaining > 0) {
+        var _step = (last_direction != 0) ? last_direction : (image_xscale >= 0 ? 1 : -1);
+        var _n = min(ATTACK_SHIFT_PX_PER_FRAME, attack_shift_remaining);
+        repeat (_n) {
+            var _cy = floor((bbox_top + bbox_bottom) * 0.5);
+            var _side = (_step > 0) ? floor(bbox_right) : floor(bbox_left);
+            if (!check_tile_collision(_side + _step, _cy)) {
+                x += _step;
+                attack_shift_remaining -= 1;
+            } else {
+                attack_shift_remaining = 0;
+                break;
+            }
+        }
+    }
     
     // --- HIT DETECTION ---
     var _is_swinging = (image_index >= 1 && image_index <= 3);
     
     if (_is_swinging && !attack_has_hit) { 
-        var _w = (bbox_right - bbox_left);
-        var _reach = max(ATTACK_REACH_MIN, _w * ATTACK_REACH_FACTOR);
-        var _pad_y = ATTACK_HITBOX_PAD_Y;
-
-        var y1 = bbox_top + _pad_y;
-        var y2 = bbox_bottom - _pad_y;
+        // HITBOX: use stable hurtbox (idle mask) and tuned reach/pads, not the sprite extents.
+        var _reach = (comboCount >= 2) ? ATTACK_HITBOX_REACH_2 : ATTACK_HITBOX_REACH_1;
+        var _top_pad = (comboCount >= 2) ? ATTACK_HITBOX_TOP_PAD_2 : ATTACK_HITBOX_TOP_PAD_1;
+        var _bot_pad = (comboCount >= 2) ? ATTACK_HITBOX_BOT_PAD_2 : ATTACK_HITBOX_BOT_PAD_1;
+        var y1 = bbox_top + _top_pad;
+        var y2 = bbox_bottom - _bot_pad;
         var x1, x2;
         if (last_direction > 0) {
-            x1 = bbox_right;
-            x2 = bbox_right + _reach;
+            x1 = bbox_right - ATTACK_HITBOX_X_INSET;
+            x2 = x1 + _reach;
         } else {
-            x1 = bbox_left - _reach;
-            x2 = bbox_left;
+            x2 = bbox_left + ATTACK_HITBOX_X_INSET;
+            x1 = x2 - _reach;
         }
         // Store for debug draw (exact coords used by collision)
         debug_hitbox_x1 = x1; debug_hitbox_y1 = y1; debug_hitbox_x2 = x2; debug_hitbox_y2 = y2; debug_hitbox_active = true;
         var _hit_enemy = collision_rectangle(x1, y1, x2, y2, obj_enemy, false, true);
+        var _hit_parent = noone;
+        if (_hit_enemy == noone) {
+            _hit_parent = collision_rectangle(x1, y1, x2, y2, obj_enemy_parent, false, true);
+        }
         
-        if (_hit_enemy != noone) {
+        if (_hit_parent != noone) {
+            attack_has_hit = true;
+            with (_hit_parent) {
+                scr_enemy_grounded_apply_damage(other.ATTACK_DAMAGE_PER_HIT, other.x);
+                hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
+            }
+            global.hitstop = ATTACK_LIGHT_HITSTOP;
+            hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
+            if (comboCount >= 2) {
+                hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
+            }
+        } else if (_hit_enemy != noone) {
             attack_has_hit = true;
             
             // PUSH ENEMY BACK - balanced for combo follow-up
@@ -70,64 +147,110 @@ if (attacking) {
                 hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
                 obj_enemy_health -= other.ATTACK_DAMAGE_PER_HIT;
                 
-                if (state != STATE_STUNNED) {
-                    state = STATE_STUNNED;
-                    stunTimer = other.ATTACK_STUN_FRAMES;
-                }
+                pressure_hit_count += 1;
+                pressure_window_timer = enemy_pressure_window_frames;
                 
-                var _knockback_dir = -sign(other.x - x);
-                if (_knockback_dir == 0) _knockback_dir = other.last_direction;
+                var _armor_windup = (state == STATE_ATTACK && attack_phase == 0 && attack_phase_timer > 0
+                    && attack_phase_timer <= enemy_attack_windup_armor_last_frames);
+                var _armor_dash = (state == STATE_ATTACK && attack_phase == 1
+                    && attack_phase_timer > (enemy_attack_dash_frames - enemy_attack_dash_super_armor_frames));
                 
-                if (other.comboCount < 3) {
-                    knockback_pending_x = _knockback_dir * other.ATTACK_LIGHT_KNOCKBACK;
-                    knockback_pending_y = 0;
-                    knockback_pending_lift = false;
+                if (_armor_windup || _armor_dash) {
+                    if (state == STATE_ATTACK && attack_phase == 0) {
+                        telegraph_shake_x = 0;
+                        telegraph_shake_y = 0;
+                    }
                     global.hitstop = other.ATTACK_LIGHT_HITSTOP;
                 } else {
-                    knockback_pending_x = _knockback_dir * other.ATTACK_FINISHER_KNOCKBACK_X;
-                    knockback_pending_y = other.ATTACK_FINISHER_KNOCKBACK_Y;
-                    knockback_pending_lift = true;
-                    global.hitstop = other.ATTACK_FINISHER_HITSTOP;
+                    // Include STATE_ATTACK: punishing their swing must clear was_in_attack_threat_zone or
+                    // CHASE/AGGRESSIVE never re-enters threat while you stand still in the band (looks "stuck").
+                    var _interrupt = (state == STATE_ATTACK || state == STATE_PATIENT_WAIT || state == STATE_DEFENSIVE_RETREAT
+                        || state == STATE_THREAT_REACTION || state == STATE_THREAT_NEUTRAL);
+                    if (_interrupt) {
+                        decision_cooldown_timer = max(decision_cooldown_timer, enemy_interrupt_decision_cooldown_frames);
+                        threat_next_roll_retreat_bias = true;
+                        threat_commit_count = 0;
+                        was_in_attack_threat_zone = false;
+                    }
+                    
+                    if (state == STATE_ATTACK) {
+                        attack_hit_dealt = true;
+                    }
+                    image_blend = c_white;
+                    telegraph_shake_x = 0;
+                    telegraph_shake_y = 0;
+                    
+                    hit_pressure_hits = min(hit_pressure_hits + 1, 24);
+                    hit_pressure_timer = other.ENEMY_HIT_PRESSURE_WINDOW_FRAMES;
+                    var _mult = min(1 + max(0, hit_pressure_hits - 1) * other.HIT_PRESSURE_KB_PER_STACK,
+                        other.HIT_PRESSURE_KB_MULT_CAP);
+                    
+                    state = STATE_STUNNED;
+                    stunTimer = (other.comboCount >= 2) ? other.ENEMY_STUN_AFTER_HIT2 : other.ENEMY_STUN_AFTER_HIT1;
+                    last_hit_was_finisher = (other.comboCount >= 2);
+                    
+                    var _pcx = (other.bbox_left + other.bbox_right) * 0.5;
+                    var _ecx = (bbox_left + bbox_right) * 0.5;
+                    var _knockback_dir = sign(_ecx - _pcx);
+                    if (_knockback_dir == 0) _knockback_dir = other.last_direction;
+                    
+                    var _kx = _knockback_dir * other.ATTACK_LIGHT_KNOCKBACK * _mult;
+                    knockback_pending_x = _kx;
+                    knockback_pending_y = 0;
+                    knockback_pending_lift = false;
+                    knockbackX = _kx;
+                    global.hitstop = other.ATTACK_LIGHT_HITSTOP;
                 }
             }
             
             hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
+            if (comboCount >= 2) {
+                hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
+            }
         }
     }
     if (!_is_swinging) debug_hitbox_active = false;
     
-    // --- RELEASE-THEN-PRESS: 1→2 only — detects quick double-tap (key briefly released then pressed)
-    if (comboCount == 1 && keyboard_check_released(ord("X"))) attack_key_released_this_swing = true;
-    
-    // --- COMBO BUFFER: new press (buffer) OR release-then-press for 1→2 (single hold = no chain) ---
-    var _has_input = (attack_buffer_timer > 0);
-    if (comboCount == 1) _has_input = _has_input || (attack_key_released_this_swing && keyboard_check(ord("X")));
-    if (image_index > image_number * 0.22 && _has_input) {
+    // --- COMBO: second hit needs a distinct press during swing 1 (attack_chain_buffer_* from movement) ---
+    if (comboCount == 1 && image_index > image_number * 0.22 && attack_chain_buffer_timer > 0) {
         combo_buffer = true;
     }
     
     // --- COMBO TRANSITION ---
     if (image_index >= image_number - 1) {
-        if (combo_buffer && comboCount < 3 && comboTimer > 0) {
-            // Only chain 1→2 and 2→3; finisher (3) ends the combo. comboTimer>0 prevents chain when combo expired.
+        if (combo_buffer && comboCount < 2 && comboTimer > 0) {
+            // Chain 1→2 only; second hit ends combo (no 2→3). comboTimer>0 prevents chain when combo expired.
             attacking = false;
             attack_lockout = 0;
-            attack_buffer_timer = 0;  // Consume buffer so each chain requires a new press
+            attack_buffer_timer = 0;
+            attack_chain_buffer_timer = 0;
             scr_player_attack(); 
+            // Tiny forward shift on attack 2 start (chain happens here, not in section 2).
+            _attack_step_shift();
         } else {
             attacking = false;
             attack_lockout = 0;
             image_blend = c_white;
             attack_recovery_grace = ATTACK_RECOVERY_GRACE;  // Brief protection so direction+mash doesn't get hit
             attack_buffer_timer = 0;  // Consume so leftover buffer doesn't immediately start attack 1 again
+            attack_chain_buffer_timer = 0;
+            post_attack_accel_timer = POST_ATTACK_ACCEL_FRAMES; // Heavy feet: ramp to full walk over N frames
         }
     }
+}
+
+// Hit / interrupt can leave attacking=false while debug_hitbox_active was true — clear it here.
+if (!attacking) {
+    debug_hitbox_active = false;
 }
 
 // 4. DECREMENT TIMERS
 if (comboTimer > 0) {
     comboTimer--;
-    if (comboTimer <= 0) comboCount = 0;
+    if (comboTimer <= 0) {
+        comboCount = 0;
+        attack_chain_buffer_timer = 0;
+    }
 }
 if (attackCooldownTimer > 0) {
     attackCooldownTimer--;

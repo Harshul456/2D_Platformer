@@ -1,7 +1,8 @@
 // In Enemy Draw Event
 // Force the enemy to snap to the pixel grid just like the player
-draw_sprite_ext(sprite_index, image_index, floor(x), floor(y),
-                image_xscale, image_yscale, image_angle, image_blend, image_alpha);
+draw_sprite_ext(sprite_index, image_index,
+    floor(x + telegraph_shake_x), floor(y + telegraph_shake_y),
+    image_xscale, image_yscale, image_angle, image_blend, image_alpha);
 
 // Debug Draw Collision Points
 if (global.show_debug) {
