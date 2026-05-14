@@ -8,7 +8,7 @@ is_dashing      = false;        // Dash state toggle
 // --- RESPONSIVENESS BUFFERS ---
 coyote_time_max = 6;            // Grace period frames for late jumps
 coyote_time_timer = 0;          // Countdown
-jump_buffer_max = 8;            // Frames to "remember" a jump press (wall cling + late wall jump)
+jump_buffer_max = 11;           // Frames to "remember" a jump press (wall cling + late wall jump; see §2c slide pause)
 jump_buffer_timer = 0;          // Countdown
 attack_buffer_max = 12;         // Frames to "remember" an attack press (idle only — not refilled while swinging)
 attack_buffer_timer = 0;        // Countdown
@@ -97,12 +97,17 @@ WALL_JUMP_MIN_AWAY_HOLD = 0;    // Extra |hsp| floor while kicking (0 = off). Ca
 WALL_JUMP_LOCK_FRAMES = 12;
 WALL_JUMP_EXTEND_FRAMES = 10;
 WALL_JUMP_CEIL_CLEAR = 6;
+// After wall jump: hold spr_mc_walljump subimage 1 (kick-off) this many Steps, then spr_mc_jump while extend_timer runs.
+WALL_JUMP_KICK_HOLD_FRAMES = 5;
+// Wall jump only when falling into the wall slide (not while rising); lets double jump win beside walls.
+WALL_JUMP_MIN_FALL_VSP = 0.15;
 // Wall jump only while holding into the wall (same as wall slide) — avoids double-jump beside wall without hugging.
 WALL_KICK_COOLDOWN_FRAMES = 22; // Cannot re-stick to kicked wall; air control clamps away (MMX separation)
 WALL_CLING_DRAW_NUDGE_PX = 5;   // Draw-only: pull spr_mc_walljump toward wall (mask stays idle)
 wall_side = 0;                  // −1 = wall on left, +1 = wall on right
 wall_jump_lock = 0;
 wall_jump_extend_timer = 0;
+wall_jump_kick_hold_timer = 0;
 wall_kick_cooldown = 0;         // >0: ignore kicked wall column + enforce away hsp
 wall_kick_from_side = 0;       // Wall side we last kicked from (−1 / +1)
 LEDGE_STEP_MAX = 2;
@@ -144,7 +149,7 @@ ATTACK_REACH_MIN      = 16;     // Minimum attack reach in pixels
 ATTACK_HITBOX_PAD_Y   = 4;      // Vertical padding for attack hitbox
 debug_hitbox_x1 = 0; debug_hitbox_y1 = 0; debug_hitbox_x2 = 0; debug_hitbox_y2 = 0; debug_hitbox_active = false;
 // When true: yellow HUD (always) + IDE Output lines for airborne + small |vsp| (ledge stall hunt). Off after capture.
-DEBUG_LEDGE_AIR_STALL = true;
+DEBUG_LEDGE_AIR_STALL = false;
 // Log / HUD when !grounded and |vsp| <= this (0.001 misses float dust; 0.12 catches slow starts without spamming whole fall).
 DEBUG_LEDGE_LOG_VSP_MAX = 0.12;
 debug_ledge_hunt_announced = false;

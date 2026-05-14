@@ -35,7 +35,7 @@ function scr_player_movement() {
         key_dash      = keyboard_check_pressed(ord("Z")); 
         key_attack    = keyboard_check_pressed(ord("X"));
 
-        // Jump buffer (decay after §2c — can pause while sliding into wall or hugging wall with air jump banked)
+        // Jump buffer (decay after §2c — can pause while sliding into wall with a live jump buffer, or hugging wall with air jump banked)
         if (key_jump) jump_buffer_timer = jump_buffer_max;
         
         // Attack buffer: only while idle (refilling during swing); chain buffer for 1→2 on new press during swing 1
@@ -249,6 +249,9 @@ function scr_player_movement() {
                 var _hug_buf = key_right - key_left;
                 if (_hug_buf == wall_side && air_chain_jump_used) {
                     _pause_jump_buf = true;
+                } else if (_hug_buf == wall_side && vsp > 0 && jump_buffer_timer > 0) {
+                    // Sliding into wall with an unconsumed jump buffer — don't burn frames before the jump press (late wall jump).
+                    _pause_jump_buf = true;
                 }
             }
         }
@@ -259,8 +262,9 @@ function scr_player_movement() {
     var jumped_this_frame = false;
     if (stunTimer <= 0 && jump_buffer_timer > 0 && !attacking) {
         var _head_room_ok = !check_tile_collision(p_center, head_y - WALL_JUMP_CEIL_CLEAR, true, feet_y);
-        // Wall kick unless we already used a mid-air jump this hop (then double jump goes up the wall, not kick).
-        if (!grounded && wall_side != 0 && _head_room_ok && ((key_right - key_left) == wall_side) && !air_chain_jump_used) {
+        // Wall kick only while falling into the slide (vsp>0); rising + second jump = double jump, not kick off wall.
+        var _wj_fall_ok = vsp > WALL_JUMP_MIN_FALL_VSP;
+        if (!grounded && wall_side != 0 && _head_room_ok && _wj_fall_ok && ((key_right - key_left) == wall_side) && !air_chain_jump_used) {
             wall_kick_from_side = wall_side;
             wall_kick_cooldown = WALL_KICK_COOLDOWN_FRAMES;
             vsp = -WALL_JUMP_VSP;
@@ -277,6 +281,7 @@ function scr_player_movement() {
             lip_s2_edge_air_streak = 0;
             wall_jump_lock = WALL_JUMP_LOCK_FRAMES;
             wall_jump_extend_timer = WALL_JUMP_EXTEND_FRAMES;
+            wall_jump_kick_hold_timer = WALL_JUMP_KICK_HOLD_FRAMES;
             is_dashing = false;
         } else if (!_wall_jump_defer && (coyote_time_timer > 0 || jump_count < 2)) {
             var _jump_from_grounded = grounded;
@@ -298,6 +303,10 @@ function scr_player_movement() {
             }
         }
     }
+
+    // §5b wall-jump must use this (pre-gravity-after-§3), not post-§4 vsp — one grv tick can flip a tiny rise
+    // into "falling" and steal a buffered double jump after defer / late wall contact (often asymmetric L vs R).
+    var _vsp_wall_jump_fall_ref = vsp;
 
     // --- 4. GRAVITY & DASH LOGIC ---
     vsp += grv;
@@ -500,7 +509,8 @@ function scr_player_movement() {
         p_center = floor((bbox_left + bbox_right) * 0.5);
         var _head_post = !check_tile_collision(p_center, head_y - WALL_JUMP_CEIL_CLEAR, true, feet_y);
         var _hug_post = key_right - key_left;
-        if (!grounded && wall_side != 0 && _head_post && (_hug_post == wall_side) && !air_chain_jump_used) {
+        var _wj_post_fall_ok = _vsp_wall_jump_fall_ref > WALL_JUMP_MIN_FALL_VSP;
+        if (!grounded && wall_side != 0 && _head_post && _wj_post_fall_ok && (_hug_post == wall_side) && !air_chain_jump_used) {
             wall_kick_from_side = wall_side;
             wall_kick_cooldown = WALL_KICK_COOLDOWN_FRAMES;
             // Match §3 early wall jump after one gravity tick: vsp was already += grv in §4 this frame.
@@ -518,6 +528,7 @@ function scr_player_movement() {
             lip_s2_edge_air_streak = 0;
             wall_jump_lock = WALL_JUMP_LOCK_FRAMES;
             wall_jump_extend_timer = WALL_JUMP_EXTEND_FRAMES;
+            wall_jump_kick_hold_timer = WALL_JUMP_KICK_HOLD_FRAMES;
             is_dashing = false;
         }
     }
@@ -1309,11 +1320,26 @@ function scr_player_movement() {
             }
         } else {
             // Air logic — wall cling / wall-jump pose (MMX wall_slide + wall_jump anim), then jump rise / peak / fall
-            if (wall_jump_extend_timer > 0) {
+            if (wall_jump_kick_hold_timer > 0) {
                 sprite_index = spr_mc_walljump;
-                image_index = min(1, sprite_get_number(spr_mc_walljump) - 1);
+                image_index = 1;
                 image_speed = 0;
+                image_xscale = -wall_side * image_base_scale;
+            } else if (wall_jump_extend_timer > 0) {
+                sprite_index = spr_mc_jump;
+                image_speed = 1;
                 image_xscale = last_direction * image_base_scale;
+                if (vsp < JUMP_RISE_THRESHOLD) {
+                    image_index = 0;
+                } else if (vsp >= JUMP_PEAK_MIN && vsp <= JUMP_PEAK_MAX) {
+                    image_index = 2;
+                    image_speed = 0;
+                } else {
+                    image_speed = 0;
+                    hair_flicker_counter++;
+                    if (hair_flicker_counter >= ANIM_HAIR_FLICKER_INTERVAL) hair_flicker_counter = 0;
+                    image_index = (hair_flicker_counter < ANIM_HAIR_FLICKER_THRESHOLD) ? 5 : 6;
+                }
             } else if (wall_side != 0 && _input_dir == wall_side && vsp > 0) {
                 sprite_index = spr_mc_walljump;
                 image_index = 0;
@@ -1475,6 +1501,7 @@ function scr_player_movement() {
     if (grounded) {
         side_entry_airborne_frames = 0;
         wall_jump_extend_timer = 0;
+        wall_jump_kick_hold_timer = 0;
         wall_kick_cooldown = 0;
         wall_kick_from_side = 0;
     } else {
@@ -1482,6 +1509,7 @@ function scr_player_movement() {
     }
     if (wall_jump_lock > 0) wall_jump_lock--;
     if (wall_jump_extend_timer > 0) wall_jump_extend_timer--;
+    if (wall_jump_kick_hold_timer > 0) wall_jump_kick_hold_timer--;
     if (wall_kick_cooldown > 0) wall_kick_cooldown--;
 
     // --- DEBUG: ledge air-stall (set DEBUG_LEDGE_AIR_STALL = true in obj_player Create) ---
