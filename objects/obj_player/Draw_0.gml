@@ -135,19 +135,31 @@ if (global.reflections_enabled && reflection_timer > 0 && global.tilemap_collisi
 }
 
 // --- 2. MAIN RENDERING ---
-// Wall cling: small draw-only nudge + optional tilt (physics/collision unchanged).
 var _draw_x = floor(x);
 var _draw_y = floor(y);
-if (!attacking && wall_side != 0) {
-    var _nudge = (wall_side == 1) ? WALL_CLING_DRAW_NUDGE_PX_R : WALL_CLING_DRAW_NUDGE_PX_L;
-    _draw_x += wall_side * _nudge;
+// spr_mc_walljump art is wider than idle collision mask — nudge draw toward wall so cling looks flush.
+var _wall_draw_nudge = 0;
+if (sprite_index == spr_mc_walljump && variable_instance_exists(id, "wall_side") && wall_side != 0)
+    _wall_draw_nudge = wall_side * WALL_CLING_DRAW_NUDGE_PX;
+draw_sprite_ext(sprite_index, image_index, _draw_x + _wall_draw_nudge, _draw_y,
+                image_xscale, image_yscale, 0, c_white, image_alpha);
+
+// --- LEDGE STALL HUNT (works in exported .exe; show_debug_message often does not) ---
+if (variable_instance_exists(id, "DEBUG_LEDGE_AIR_STALL") && DEBUG_LEDGE_AIR_STALL) {
+    var _cam = view_camera[0];
+    var _vx = camera_get_view_x(_cam);
+    var _vy = camera_get_view_y(_cam);
+    draw_set_halign(fa_left);
+    draw_set_valign(fa_top);
+    draw_set_color(c_yellow);
+    draw_text(_vx + 8, _vy + 8, "LEDGE HUNT  gnd=" + string(grounded) + " vsp=" + string(vsp) + " hsp=" + string(hsp));
+    draw_text(_vx + 8, _vy + 28, "xy=" + string(floor(x)) + "," + string(floor(y)) + "  |vsp|<=" + string(DEBUG_LEDGE_LOG_VSP_MAX) + " logs");
+    if (variable_instance_exists(id, "ledge_dbg_line") && ledge_dbg_line != "") {
+        draw_set_color(c_orange);
+        draw_text(_vx + 8, _vy + 48, ledge_dbg_line);
+    }
+    draw_set_color(c_white);
 }
-var _cling_rot = 0;
-if (!attacking && wall_side != 0 && WALL_CLING_VISUAL_TILT != 0) {
-    _cling_rot = wall_side * WALL_CLING_VISUAL_TILT;
-}
-draw_sprite_ext(sprite_index, image_index, _draw_x, _draw_y,
-                image_xscale, image_yscale, _cling_rot, c_white, image_alpha);
 
 // --- 3. DEBUG OVERLAY ---
 if (global.show_debug) {

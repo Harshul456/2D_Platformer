@@ -69,3 +69,4 @@ options_local.json
 *.pfx
 *.bak
 *.unf
+_ref_MMXEngine/

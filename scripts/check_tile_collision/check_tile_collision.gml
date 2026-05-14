@@ -284,18 +284,6 @@ function tilemap_point_solid(_tm, _px, _py) {
     return tilecol_solid_at_local(sh, lx, ly, tw, th, idx);
 }
 
-function check_tile_collision_wall_cling_surface(_x, _y) {
-    if (global.tilemap_collision_id == noone) return false;
-    if (!tilemap_point_solid(global.tilemap_collision_id, _x, _y)) return false;
-    var td = tilemap_get_at_pixel(global.tilemap_collision_id, _x, _y);
-    if (td == 0) return false;
-    var _idxw = tile_get_index(td);
-    if (tilecol_one_way_shelf_tile_index(_idxw)) return false;
-    var sh = tilecol_shape_for_tile_index(_idxw);
-    if (sh == TILECOL_SHAPE_CAP_TL || sh == TILECOL_SHAPE_CAP_TR) return false;
-    return true;
-}
-
 function tilemap_cell_shape_is_cap(_tm, _px, _py) {
     if (_tm == noone || _tm == -1) return false;
     var td = tilemap_get_at_pixel(_tm, _px, _py);
@@ -447,19 +435,6 @@ function tilemap_horizontal_ledge_mount_priority(_tm, _wall_x, _bbox_bottom, _y_
         return true;
     }
     return false;
-}
-
-function tilemap_wall_cling_under_cap_overhang(_tm, _probe_x, _first_solid_y) {
-    if (_tm == noone || _tm == -1 || _first_solid_y == noone) return false;
-    var tcx = tilemap_get_cell_x_at_pixel(_tm, _probe_x, _first_solid_y);
-    var tcy = tilemap_get_cell_y_at_pixel(_tm, _probe_x, _first_solid_y);
-    if (tcy <= 0) return false;
-    var td_above = tilemap_get(_tm, tcx, tcy - 1);
-    if (td_above == 0) return false;
-    var _ia = tile_get_index(td_above);
-    if (tilecol_one_way_shelf_tile_index(_ia)) return true;
-    var sh = tilecol_shape_for_tile_index(_ia);
-    return (sh == TILECOL_SHAPE_CAP_TL || sh == TILECOL_SHAPE_CAP_TR);
 }
 
 /// When a downward step hits a ledge, snap so bbox_bottom = cell_top - 1 (geometric dy; avoids floor(y) jitter).

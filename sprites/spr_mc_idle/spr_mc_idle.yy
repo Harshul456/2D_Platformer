@@ -1,9 +1,9 @@
 {
   "$GMSprite":"v2",
   "%Name":"spr_mc_idle",
-  "bboxMode":0,
+  "bboxMode":2,
   "bbox_bottom":63,
-  "bbox_left":13,
+  "bbox_left":18,
   "bbox_right":46,
   "bbox_top":1,
   "collisionKind":1,
