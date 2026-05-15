@@ -179,6 +179,7 @@ if (state == STATE_ATTACK && _dash_hit_frame && !attack_hit_dealt && instance_ex
             attackCooldownTimer = 0;
             attack_buffer_timer = 0;
             attack_chain_buffer_timer = 0;
+            attack_chain_latched = false;
             attack_shift_remaining = 0;
             combo_buffer = false;
             comboTimer = 0;

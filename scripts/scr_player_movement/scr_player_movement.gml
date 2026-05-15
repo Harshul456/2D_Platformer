@@ -34,17 +34,24 @@ function scr_player_movement() {
         key_down      = keyboard_check(vk_down);
         key_dash      = keyboard_check_pressed(ord("Z")); 
         key_attack    = keyboard_check_pressed(ord("X"));
+        // Wall slide + wall jump: hold Shift at a wall (see obj_player Create). Left/right alone do not cling.
+        key_wall_cling = keyboard_check(vk_lshift) || keyboard_check(vk_rshift);
 
         // Jump buffer (decay after §2c — can pause while sliding into wall with a live jump buffer, or hugging wall with air jump banked)
         if (key_jump) jump_buffer_timer = jump_buffer_max;
         
-        // Attack buffer: only while idle (refilling during swing); chain buffer for 1→2 on new press during swing 1
+        // Attack buffer: idle only (not during recovery — avoids extra atk1 after atk2 when mashing).
         if (key_attack) {
-            if (!attacking) attack_buffer_timer = attack_buffer_max;
-            else if (attacking && comboCount == 1) attack_chain_buffer_timer = attack_chain_buffer_max;
+            if (!attacking && attack_recovery_grace <= 0) attack_buffer_timer = attack_buffer_max;
+            else if (attacking && comboCount == 1) {
+                attack_chain_latched = true;
+                attack_chain_buffer_timer = attack_chain_buffer_max;
+            }
         }
         if (!attacking && attack_buffer_timer > 0) attack_buffer_timer--;
         if (attack_chain_buffer_timer > 0) attack_chain_buffer_timer--;
+    } else {
+        key_wall_cling = false;
     }
 
     // --- 2. GROUNDED & COYOTE LOGIC ---
@@ -182,16 +189,41 @@ function scr_player_movement() {
     }
     if (grounded && _lip_ctx_wide) lip_ground_bless = GROUND_LIP_GROUND_BLESS_MAX;
 
+    // Wall cling: Shift must be held in air for WALL_SHIFT_HOLD_FRAMES_REQUIRED consecutive Steps (see Create).
+    var _wshr = (variable_instance_exists(id, "WALL_SHIFT_HOLD_FRAMES_REQUIRED") ? WALL_SHIFT_HOLD_FRAMES_REQUIRED : 14);
+    if (_wshr < 1) _wshr = 1;
+    var _sk_air = (stunTimer <= 0) && (keyboard_check(vk_lshift) || keyboard_check(vk_rshift));
+    if (stunTimer > 0) {
+        wall_shift_hold_timer = 0;
+    } else if (grounded || !_sk_air) {
+        wall_shift_hold_timer = 0;
+    } else {
+        wall_shift_hold_timer = min(wall_shift_hold_timer + 1, 120);
+    }
+    var cling_eff = false;
+    if (stunTimer <= 0) {
+        cling_eff = _sk_air && (wall_shift_hold_timer >= _wshr);
+    }
+
     // --- 2b. WALL CONTACT (mask-edge column + 3 heights — rejects “feet-only” / above-ledge false walls) ---
     wall_side = 0;
     if (!grounded && global.tilemap_collision_id != noone) {
         var __ft_w = feet_y;
         var __hd_w = head_y;
         var __cy_w = center_y;
-        var _w_hold = (stunTimer <= 0) ? (key_right - key_left) : 0;
         var _bwl = (variable_instance_exists(id, "WALL_CONTACT_HOLD_BIAS_PX") ? WALL_CONTACT_HOLD_BIAS_PX : 3);
-        var __wxl_w = floor(bbox_left) - WALL_FACE_PROBE_OUTSET + ((_w_hold < 0) ? -_bwl : 0);
-        var __wxr_w = floor(bbox_right) + WALL_FACE_PROBE_OUTSET + ((_w_hold > 0) ? _bwl : 0);
+        var __wxl_w = floor(bbox_left) - WALL_FACE_PROBE_OUTSET;
+        var __wxr_w = floor(bbox_right) + WALL_FACE_PROBE_OUTSET;
+        if (stunTimer <= 0 && cling_eff) {
+            var _ax_w = key_right - key_left;
+            if (_ax_w < 0) __wxl_w -= _bwl;
+            else if (_ax_w > 0) __wxr_w += _bwl;
+            else {
+                // Shift alone: bias both probes outward so one-sided walls register (same as hold-toward-wall before).
+                __wxl_w -= _bwl;
+                __wxr_w += _bwl;
+            }
+        }
         var __ylo_w = __ft_w - 1;
         var __ymid_w = __cy_w;
         var __yhi_w = clamp(__hd_w + WALL_BODY_HI_FROM_HEAD, __hd_w + 2, __ft_w - 4);
@@ -203,8 +235,9 @@ function scr_player_movement() {
         var __r3 = check_tile_collision(__wxr_w, __yhi_w);
         var __ln = (__l1 ? 1 : 0) + (__l2 ? 1 : 0) + (__l3 ? 1 : 0);
         var __rn = (__r1 ? 1 : 0) + (__r2 ? 1 : 0) + (__r3 ? 1 : 0);
-        var _wl = (__ln >= WALL_CONTACT_MIN_SAMPLES);
-        var _wr = (__rn >= WALL_CONTACT_MIN_SAMPLES);
+        var _need_feet_w = (!variable_instance_exists(id, "WALL_CLING_REQUIRE_FEET_BAND") || WALL_CLING_REQUIRE_FEET_BAND);
+        var _wl = (__ln >= WALL_CONTACT_MIN_SAMPLES) && (!_need_feet_w || __l1);
+        var _wr = (__rn >= WALL_CONTACT_MIN_SAMPLES) && (!_need_feet_w || __r1);
         if (wall_kick_cooldown > 0) {
             if (wall_kick_from_side == -1) _wl = false;
             if (wall_kick_from_side == 1) _wr = false;
@@ -215,24 +248,81 @@ function scr_player_movement() {
             var _wdir = key_right - key_left;
             if (_wdir < 0) wall_side = -1;
             else if (_wdir > 0) wall_side = 1;
-            else if (sign(hsp) != 0) wall_side = sign(hsp);
+            else if (cling_eff) {
+                var _face_l_w = check_tile_collision(floor(bbox_left) - 1, __ymid_w);
+                var _face_r_w = check_tile_collision(floor(bbox_right) + 1, __ymid_w);
+                if (_face_l_w && !_face_r_w) wall_side = -1;
+                else if (_face_r_w && !_face_l_w) wall_side = 1;
+                else if (__ln > __rn) wall_side = -1;
+                else if (__rn > __ln) wall_side = 1;
+                else if (sign(hsp) != 0) wall_side = sign(hsp);
+                else wall_side = -sign(last_direction);
+            } else if (sign(hsp) != 0) wall_side = sign(hsp);
             else wall_side = -sign(last_direction);
         }
+        // MMX-style scrape: while clinging (Shift), require solid past bbox into the wall (wider scan if no L/R — small post-resolve gap).
+        if (wall_side != 0) {
+            var _need_scrape = (!variable_instance_exists(id, "WALL_REQUIRE_SCRAPE_MOTION") || WALL_REQUIRE_SCRAPE_MOTION);
+            if (_need_scrape && cling_eff) {
+                var _ax_sc = key_right - key_left;
+                var _scrape_hi = 1;
+                if (_ax_sc == 0) {
+                    _scrape_hi = (variable_instance_exists(id, "WALL_SCRAPE_DEPTH_NEUTRAL_CLING_PX") ? WALL_SCRAPE_DEPTH_NEUTRAL_CLING_PX : 8);
+                    if (_scrape_hi < 1) _scrape_hi = 1;
+                }
+                var _scrape_hit = false;
+                for (var _ksi = 1; _ksi <= _scrape_hi; _ksi++) {
+                    var _sx_sc = (wall_side < 0) ? (floor(bbox_left) - _ksi) : (floor(bbox_right) + _ksi);
+                    if (check_tile_collision(_sx_sc, __ylo_w) || check_tile_collision(_sx_sc, __ymid_w) || check_tile_collision(_sx_sc, __yhi_w)) {
+                        _scrape_hit = true;
+                        break;
+                    }
+                }
+                if (!_scrape_hit) wall_side = 0;
+            }
+        }
+        // Top / bottom tile of wall: require wall continuation one tile height beyond our hit span on the face column.
+        if (wall_side != 0 && global.tilemap_collision_id != noone) {
+            var _tm_tt = global.tilemap_collision_id;
+            var _th_tt = tilemap_get_tile_height(_tm_tt);
+            var _wx_tt = (wall_side < 0) ? __wxl_w : __wxr_w;
+            var _y_top_tt = 999999;
+            var _y_bot_tt = -999999;
+            if (wall_side < 0) {
+                if (__l3) { _y_top_tt = min(_y_top_tt, __yhi_w); _y_bot_tt = max(_y_bot_tt, __yhi_w); }
+                if (__l2) { _y_top_tt = min(_y_top_tt, __ymid_w); _y_bot_tt = max(_y_bot_tt, __ymid_w); }
+                if (__l1) { _y_top_tt = min(_y_top_tt, __ylo_w); _y_bot_tt = max(_y_bot_tt, __ylo_w); }
+            } else {
+                if (__r3) { _y_top_tt = min(_y_top_tt, __yhi_w); _y_bot_tt = max(_y_bot_tt, __yhi_w); }
+                if (__r2) { _y_top_tt = min(_y_top_tt, __ymid_w); _y_bot_tt = max(_y_bot_tt, __ymid_w); }
+                if (__r1) { _y_top_tt = min(_y_top_tt, __ylo_w); _y_bot_tt = max(_y_bot_tt, __ylo_w); }
+            }
+            var _blk_top = (!variable_instance_exists(id, "WALL_CLING_BLOCK_TOP_TILE") || WALL_CLING_BLOCK_TOP_TILE)
+                && (_y_top_tt < 999999 && !check_tile_collision(_wx_tt, _y_top_tt - _th_tt));
+            var _blk_bot = (!variable_instance_exists(id, "WALL_CLING_BLOCK_BOTTOM_TILE") || WALL_CLING_BLOCK_BOTTOM_TILE)
+                && (_y_bot_tt > -999999 && !check_tile_collision(_wx_tt, _y_bot_tt + _th_tt));
+            if (_blk_top || _blk_bot) wall_side = 0;
+        }
+        // Rising with a banked air jump: do not cling (avoids snagging past walls). Shift = explicit cling — keep wall_side.
+        if (wall_side != 0 && jump_count < 2 && !air_chain_jump_used && vsp <= WALL_JUMP_MIN_FALL_VSP) {
+            if (!cling_eff) wall_side = 0;
+        }
+        if (wall_side != 0 && !cling_eff) wall_side = 0;
     }
 
     // --- 2c. WALL-JUMP DEFER SCAN (§3 runs before horizontal; wall_side can be 0 until we scrape the wall) ---
     var _wall_jump_defer = false;
     if (!grounded && global.tilemap_collision_id != noone && wall_side == 0 && jump_buffer_timer > 0 && stunTimer <= 0) {
-        var _hug_de = key_right - key_left;
         var _head_de = !check_tile_collision(p_center, head_y - WALL_JUMP_CEIL_CLEAR, true, feet_y);
-        if (_hug_de != 0 && _head_de) {
+        if (cling_eff && _head_de) {
             var _prox_n = (variable_instance_exists(id, "WALL_JUMP_PROXIMITY_PX") ? WALL_JUMP_PROXIMITY_PX : 6);
-            var _sx_de = (_hug_de > 0) ? (floor(bbox_right) + 1) : (floor(bbox_left) - 1);
             var _yM_de = floor((bbox_top + bbox_bottom) * 0.5);
             var _yF_de = feet_y - 8;
             for (var _ide = 1; _ide <= _prox_n; _ide++) {
-                var _qx_de = _sx_de + _hug_de * _ide;
-                if (check_tile_collision(_qx_de, _yM_de) || check_tile_collision(_qx_de, _yF_de)) {
+                var _qx_l = floor(bbox_left) - 1 - _ide;
+                var _qx_r = floor(bbox_right) + 1 + _ide;
+                if (check_tile_collision(_qx_l, _yM_de) || check_tile_collision(_qx_l, _yF_de)
+                    || check_tile_collision(_qx_r, _yM_de) || check_tile_collision(_qx_r, _yF_de)) {
                     _wall_jump_defer = true;
                     break;
                 }
@@ -245,14 +335,8 @@ function scr_player_movement() {
         if (!grounded) {
             if (_wall_jump_defer) {
                 _pause_jump_buf = true;
-            } else if (wall_side != 0) {
-                var _hug_buf = key_right - key_left;
-                if (_hug_buf == wall_side && air_chain_jump_used) {
-                    _pause_jump_buf = true;
-                } else if (_hug_buf == wall_side && vsp > 0 && jump_buffer_timer > 0) {
-                    // Sliding into wall with an unconsumed jump buffer — don't burn frames before the jump press (late wall jump).
-                    _pause_jump_buf = true;
-                }
+            } else if (wall_side != 0 && cling_eff) {
+                _pause_jump_buf = true;
             }
         }
         if (!_pause_jump_buf) jump_buffer_timer--;
@@ -262,19 +346,33 @@ function scr_player_movement() {
     var jumped_this_frame = false;
     if (stunTimer <= 0 && jump_buffer_timer > 0 && !attacking) {
         var _head_room_ok = !check_tile_collision(p_center, head_y - WALL_JUMP_CEIL_CLEAR, true, feet_y);
-        // Wall kick only while falling into the slide (vsp>0); rising + second jump = double jump, not kick off wall.
-        var _wj_fall_ok = vsp > WALL_JUMP_MIN_FALL_VSP;
-        if (!grounded && wall_side != 0 && _head_room_ok && _wj_fall_ok && ((key_right - key_left) == wall_side) && !air_chain_jump_used) {
+        // Wall kick only while falling into the slide; stricter vsp when double jump still banked (mid nub / 3-tile wall).
+        var _wj_thr = WALL_JUMP_MIN_FALL_VSP;
+        if (jump_count == 1 && !air_chain_jump_used) {
+            var _dg = (variable_instance_exists(id, "WALL_JUMP_MIN_VSP_FOR_DOUBLE_GUARD") ? WALL_JUMP_MIN_VSP_FOR_DOUBLE_GUARD : -1);
+            if (_dg < 0) _dg = WALL_SLIDE_VSP * 0.82;
+            if (_dg > 0 && _dg > _wj_thr) _wj_thr = _dg;
+        }
+        var _wj_fall_ok = vsp > _wj_thr;
+        if (!_wj_fall_ok && cling_eff && wall_side != 0 && vsp >= 0) {
+            var _wj_eps = (variable_instance_exists(id, "WALL_JUMP_FALL_VSP_EPSILON_CLING") ? WALL_JUMP_FALL_VSP_EPSILON_CLING : 0.28);
+            if (vsp + _wj_eps > _wj_thr) _wj_fall_ok = true;
+        }
+        if (!grounded && wall_side != 0 && _head_room_ok && _wj_fall_ok && cling_eff) {
+            var _wk_prev = wall_kick_from_side;
             wall_kick_from_side = wall_side;
-            wall_kick_cooldown = WALL_KICK_COOLDOWN_FRAMES;
+            var _shaft_cd = (variable_instance_exists(id, "WALL_KICK_COOLDOWN_SHAFT_FRAMES") ? WALL_KICK_COOLDOWN_SHAFT_FRAMES : 8);
+            if (_shaft_cd < 1) _shaft_cd = 1;
+            if (_wk_prev != 0 && wall_side == -_wk_prev) wall_kick_cooldown = _shaft_cd;
+            else wall_kick_cooldown = WALL_KICK_COOLDOWN_FRAMES;
             vsp = -WALL_JUMP_VSP;
             hsp = -wall_side * WALL_JUMP_HSP;
             runMomentum = hsp;
             last_direction = -wall_side;
             jump_buffer_timer = 0;
             jumped_this_frame = true;
-            jump_count = 0;
-            air_chain_jump_used = false;
+            jump_count = 2;
+            air_chain_jump_used = true;
             coyote_time_timer = 0;
             grounded = false;
             lip_ground_bless = 0;
@@ -284,6 +382,9 @@ function scr_player_movement() {
             wall_jump_kick_hold_timer = WALL_JUMP_KICK_HOLD_FRAMES;
             is_dashing = false;
         } else if (!_wall_jump_defer && (coyote_time_timer > 0 || jump_count < 2)) {
+            // Don't burn jump buffer on air jump same frame we intend wall tech (§5b-post can wall jump after H-resolve).
+            var _block_air_for_wall = (cling_eff && !grounded && wall_side != 0 && key_jump);
+            if (!_block_air_for_wall) {
             var _jump_from_grounded = grounded;
             vsp = -jumpsp;
             jump_count++;
@@ -301,7 +402,13 @@ function scr_player_movement() {
                 runMomentum = hsp;
                 is_dashing = false;
             }
+            }
         }
+    }
+
+    // Stepped off a ledge without jumping this Step: treat as already used the "ground" jump slot — one air jump only.
+    if (_s2_grounded_in && !grounded && !jumped_this_frame) {
+        jump_count = max(jump_count, 1);
     }
 
     // §5b wall-jump must use this (pre-gravity-after-§3), not post-§4 vsp — one grv tick can flip a tiny rise
@@ -314,8 +421,7 @@ function scr_player_movement() {
     if (vsp < 0 && !key_jump_held) vsp = max(vsp, jumpsp * (-jump_cut_multiplier));
     // Wall slide: MMX wall_slide only while falling — don’t cling on rise past a ledge
     if (!grounded && wall_side != 0 && stunTimer <= 0 && vsp > 0) {
-        var _wslide_in = (key_right - key_left);
-        if (_wslide_in == wall_side && vsp > WALL_SLIDE_VSP) vsp = WALL_SLIDE_VSP;
+        if (cling_eff && vsp > WALL_SLIDE_VSP) vsp = WALL_SLIDE_VSP;
     }
     
     if (stunTimer > 0) {
@@ -458,6 +564,12 @@ function scr_player_movement() {
         }
     }
 
+    cling_eff = false;
+    if (stunTimer <= 0) {
+        var _sk_rs = (keyboard_check(vk_lshift) || keyboard_check(vk_rshift));
+        cling_eff = _sk_rs && (wall_shift_hold_timer >= _wshr);
+    }
+
     // Re-sample wall contact after horizontal resolve (position changed this step).
     wall_side = 0;
     if (!grounded && global.tilemap_collision_id != noone) {
@@ -467,10 +579,18 @@ function scr_player_movement() {
         var __ft_rb = feet_y;
         var __hd_rb = head_y;
         var __cy_rb = center_y;
-        var _w_hold_rb = (stunTimer <= 0) ? (key_right - key_left) : 0;
         var _bwl_rb = (variable_instance_exists(id, "WALL_CONTACT_HOLD_BIAS_PX") ? WALL_CONTACT_HOLD_BIAS_PX : 3);
-        var __wxl_rb = floor(bbox_left) - WALL_FACE_PROBE_OUTSET + ((_w_hold_rb < 0) ? -_bwl_rb : 0);
-        var __wxr_rb = floor(bbox_right) + WALL_FACE_PROBE_OUTSET + ((_w_hold_rb > 0) ? _bwl_rb : 0);
+        var __wxl_rb = floor(bbox_left) - WALL_FACE_PROBE_OUTSET;
+        var __wxr_rb = floor(bbox_right) + WALL_FACE_PROBE_OUTSET;
+        if (stunTimer <= 0 && cling_eff) {
+            var _ax_rb = key_right - key_left;
+            if (_ax_rb < 0) __wxl_rb -= _bwl_rb;
+            else if (_ax_rb > 0) __wxr_rb += _bwl_rb;
+            else {
+                __wxl_rb -= _bwl_rb;
+                __wxr_rb += _bwl_rb;
+            }
+        }
         var __ylo_rb = __ft_rb - 1;
         var __ymid_rb = __cy_rb;
         var __yhi_rb = clamp(__hd_rb + WALL_BODY_HI_FROM_HEAD, __hd_rb + 2, __ft_rb - 4);
@@ -482,8 +602,9 @@ function scr_player_movement() {
         var __r3b = check_tile_collision(__wxr_rb, __yhi_rb);
         var __lnb = (__l1b ? 1 : 0) + (__l2b ? 1 : 0) + (__l3b ? 1 : 0);
         var __rnb = (__r1b ? 1 : 0) + (__r2b ? 1 : 0) + (__r3b ? 1 : 0);
-        var _wl_rb = (__lnb >= WALL_CONTACT_MIN_SAMPLES);
-        var _wr_rb = (__rnb >= WALL_CONTACT_MIN_SAMPLES);
+        var _need_feet_rb = (!variable_instance_exists(id, "WALL_CLING_REQUIRE_FEET_BAND") || WALL_CLING_REQUIRE_FEET_BAND);
+        var _wl_rb = (__lnb >= WALL_CONTACT_MIN_SAMPLES) && (!_need_feet_rb || __l1b);
+        var _wr_rb = (__rnb >= WALL_CONTACT_MIN_SAMPLES) && (!_need_feet_rb || __r1b);
         if (wall_kick_cooldown > 0) {
             if (wall_kick_from_side == -1) _wl_rb = false;
             if (wall_kick_from_side == 1) _wr_rb = false;
@@ -494,9 +615,63 @@ function scr_player_movement() {
             var _wdir2 = key_right - key_left;
             if (_wdir2 < 0) wall_side = -1;
             else if (_wdir2 > 0) wall_side = 1;
-            else if (sign(hsp) != 0) wall_side = sign(hsp);
+            else if (cling_eff) {
+                var _face_l_rb = check_tile_collision(floor(bbox_left) - 1, __ymid_rb);
+                var _face_r_rb = check_tile_collision(floor(bbox_right) + 1, __ymid_rb);
+                if (_face_l_rb && !_face_r_rb) wall_side = -1;
+                else if (_face_r_rb && !_face_l_rb) wall_side = 1;
+                else if (__lnb > __rnb) wall_side = -1;
+                else if (__rnb > __lnb) wall_side = 1;
+                else if (sign(hsp) != 0) wall_side = sign(hsp);
+                else wall_side = -sign(last_direction);
+            } else if (sign(hsp) != 0) wall_side = sign(hsp);
             else wall_side = -sign(last_direction);
         }
+        if (wall_side != 0) {
+            var _need_scrape_rb = (!variable_instance_exists(id, "WALL_REQUIRE_SCRAPE_MOTION") || WALL_REQUIRE_SCRAPE_MOTION);
+            if (_need_scrape_rb && cling_eff) {
+                var _ax_scr = key_right - key_left;
+                var _scrape_hi_rb = 1;
+                if (_ax_scr == 0) {
+                    _scrape_hi_rb = (variable_instance_exists(id, "WALL_SCRAPE_DEPTH_NEUTRAL_CLING_PX") ? WALL_SCRAPE_DEPTH_NEUTRAL_CLING_PX : 8);
+                    if (_scrape_hi_rb < 1) _scrape_hi_rb = 1;
+                }
+                var _scrape_hit_rb = false;
+                for (var _ksir = 1; _ksir <= _scrape_hi_rb; _ksir++) {
+                    var _sx_scr = (wall_side < 0) ? (floor(bbox_left) - _ksir) : (floor(bbox_right) + _ksir);
+                    if (check_tile_collision(_sx_scr, __ylo_rb) || check_tile_collision(_sx_scr, __ymid_rb) || check_tile_collision(_sx_scr, __yhi_rb)) {
+                        _scrape_hit_rb = true;
+                        break;
+                    }
+                }
+                if (!_scrape_hit_rb) wall_side = 0;
+            }
+        }
+        if (wall_side != 0 && global.tilemap_collision_id != noone) {
+            var _tm_ttb = global.tilemap_collision_id;
+            var _th_ttb = tilemap_get_tile_height(_tm_ttb);
+            var _wx_ttb = (wall_side < 0) ? __wxl_rb : __wxr_rb;
+            var _y_top_ttb = 999999;
+            var _y_bot_ttb = -999999;
+            if (wall_side < 0) {
+                if (__l3b) { _y_top_ttb = min(_y_top_ttb, __yhi_rb); _y_bot_ttb = max(_y_bot_ttb, __yhi_rb); }
+                if (__l2b) { _y_top_ttb = min(_y_top_ttb, __ymid_rb); _y_bot_ttb = max(_y_bot_ttb, __ymid_rb); }
+                if (__l1b) { _y_top_ttb = min(_y_top_ttb, __ylo_rb); _y_bot_ttb = max(_y_bot_ttb, __ylo_rb); }
+            } else {
+                if (__r3b) { _y_top_ttb = min(_y_top_ttb, __yhi_rb); _y_bot_ttb = max(_y_bot_ttb, __yhi_rb); }
+                if (__r2b) { _y_top_ttb = min(_y_top_ttb, __ymid_rb); _y_bot_ttb = max(_y_bot_ttb, __ymid_rb); }
+                if (__r1b) { _y_top_ttb = min(_y_top_ttb, __ylo_rb); _y_bot_ttb = max(_y_bot_ttb, __ylo_rb); }
+            }
+            var _blk_top_b = (!variable_instance_exists(id, "WALL_CLING_BLOCK_TOP_TILE") || WALL_CLING_BLOCK_TOP_TILE)
+                && (_y_top_ttb < 999999 && !check_tile_collision(_wx_ttb, _y_top_ttb - _th_ttb));
+            var _blk_bot_b = (!variable_instance_exists(id, "WALL_CLING_BLOCK_BOTTOM_TILE") || WALL_CLING_BLOCK_BOTTOM_TILE)
+                && (_y_bot_ttb > -999999 && !check_tile_collision(_wx_ttb, _y_bot_ttb + _th_ttb));
+            if (_blk_top_b || _blk_bot_b) wall_side = 0;
+        }
+        if (wall_side != 0 && jump_count < 2 && !air_chain_jump_used && vsp <= WALL_JUMP_MIN_FALL_VSP) {
+            if (!cling_eff) wall_side = 0;
+        }
+        if (wall_side != 0 && !cling_eff) wall_side = 0;
     }
 
     // --- 5b-post. WALL JUMP (second chance: §3 runs before horizontal; wall_side can become valid after scrape) ---
@@ -508,11 +683,24 @@ function scr_player_movement() {
         p_right = floor(bbox_right) - 1;
         p_center = floor((bbox_left + bbox_right) * 0.5);
         var _head_post = !check_tile_collision(p_center, head_y - WALL_JUMP_CEIL_CLEAR, true, feet_y);
-        var _hug_post = key_right - key_left;
-        var _wj_post_fall_ok = _vsp_wall_jump_fall_ref > WALL_JUMP_MIN_FALL_VSP;
-        if (!grounded && wall_side != 0 && _head_post && _wj_post_fall_ok && (_hug_post == wall_side) && !air_chain_jump_used) {
+        var _wj_thr_post = WALL_JUMP_MIN_FALL_VSP;
+        if (jump_count == 1 && !air_chain_jump_used) {
+            var _dg_p = (variable_instance_exists(id, "WALL_JUMP_MIN_VSP_FOR_DOUBLE_GUARD") ? WALL_JUMP_MIN_VSP_FOR_DOUBLE_GUARD : -1);
+            if (_dg_p < 0) _dg_p = WALL_SLIDE_VSP * 0.82;
+            if (_dg_p > 0 && _dg_p > _wj_thr_post) _wj_thr_post = _dg_p;
+        }
+        var _wj_post_fall_ok = _vsp_wall_jump_fall_ref > _wj_thr_post;
+        if (!_wj_post_fall_ok && cling_eff && wall_side != 0 && _vsp_wall_jump_fall_ref >= 0) {
+            var _wj_eps_post = (variable_instance_exists(id, "WALL_JUMP_FALL_VSP_EPSILON_CLING") ? WALL_JUMP_FALL_VSP_EPSILON_CLING : 0.28);
+            if (_vsp_wall_jump_fall_ref + _wj_eps_post > _wj_thr_post) _wj_post_fall_ok = true;
+        }
+        if (!grounded && wall_side != 0 && _head_post && _wj_post_fall_ok && cling_eff) {
+            var _wk_prev_p = wall_kick_from_side;
             wall_kick_from_side = wall_side;
-            wall_kick_cooldown = WALL_KICK_COOLDOWN_FRAMES;
+            var _shaft_cd_p = (variable_instance_exists(id, "WALL_KICK_COOLDOWN_SHAFT_FRAMES") ? WALL_KICK_COOLDOWN_SHAFT_FRAMES : 8);
+            if (_shaft_cd_p < 1) _shaft_cd_p = 1;
+            if (_wk_prev_p != 0 && wall_side == -_wk_prev_p) wall_kick_cooldown = _shaft_cd_p;
+            else wall_kick_cooldown = WALL_KICK_COOLDOWN_FRAMES;
             // Match §3 early wall jump after one gravity tick: vsp was already += grv in §4 this frame.
             vsp = -WALL_JUMP_VSP + grv;
             hsp = -wall_side * WALL_JUMP_HSP;
@@ -520,8 +708,8 @@ function scr_player_movement() {
             last_direction = -wall_side;
             jump_buffer_timer = 0;
             jumped_this_frame = true;
-            jump_count = 0;
-            air_chain_jump_used = false;
+            jump_count = 2;
+            air_chain_jump_used = true;
             coyote_time_timer = 0;
             grounded = false;
             lip_ground_bless = 0;
@@ -1206,6 +1394,12 @@ function scr_player_movement() {
     }
 
 
+    cling_eff = false;
+    if (stunTimer <= 0) {
+        var _sk_anim = (keyboard_check(vk_lshift) || keyboard_check(vk_rshift));
+        cling_eff = _sk_anim && (wall_shift_hold_timer >= _wshr);
+    }
+
     // --- 7. ANIMATION (reverted, cleaned up) ---
     var _input_dir = key_right - key_left;
     var _fy_pose = floor(bbox_bottom);
@@ -1245,9 +1439,10 @@ function scr_player_movement() {
             var _hold_full_lip_pose = FULL_BLOCK_EDGE_GROUND_FORGIVE && !_shelf_any_near_feet_pose && (full_lip_anim_sticky > 0 || _teeter_anim)
                 && !_feet_embed_pose
                 && !is_dashing && sprite_index != spr_mc_dash
-                && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_walljump;
+                && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_walljump
+                && sprite_index != spr_mc_jump; // allow landing crouch on full-block lip edges (was stomping jump → jog/idle)
             if (_hold_full_lip_pose) {
-                // No dedicated teeter art yet — keep stable *ground* visuals on full-block lip.
+                // No dedicated teeter art yet — keep stable *ground* visuals on full-block lip (after jump land anim finishes).
                 // If the player is moving, allow jog to play; otherwise idle.
                 var _lip_move = (_input_dir != 0) || (abs(hsp) > MOVEMENT_THRESHOLD);
                 if (_lip_move) {
@@ -1340,7 +1535,7 @@ function scr_player_movement() {
                     if (hair_flicker_counter >= ANIM_HAIR_FLICKER_INTERVAL) hair_flicker_counter = 0;
                     image_index = (hair_flicker_counter < ANIM_HAIR_FLICKER_THRESHOLD) ? 5 : 6;
                 }
-            } else if (wall_side != 0 && _input_dir == wall_side && vsp > 0) {
+            } else if (wall_side != 0 && cling_eff && vsp > 0) {
                 sprite_index = spr_mc_walljump;
                 image_index = 0;
                 image_speed = 0;
@@ -1427,7 +1622,7 @@ function scr_player_movement() {
             image_xscale = (_move_dir > 0) ? image_base_scale : -image_base_scale;
             last_direction = _move_dir;
         }
-    } else if (wall_side != 0 && !_anim_grounded && _input_dir == wall_side && vsp > 0) {
+    } else if (wall_side != 0 && !_anim_grounded && cling_eff && vsp > 0) {
         image_xscale = -wall_side * image_base_scale;
         last_direction = -wall_side;
     } else if (_input_dir != 0 && stunTimer <= 0 && !attacking) {
@@ -1504,6 +1699,7 @@ function scr_player_movement() {
         wall_jump_kick_hold_timer = 0;
         wall_kick_cooldown = 0;
         wall_kick_from_side = 0;
+        wall_shift_hold_timer = 0;
     } else {
         side_entry_airborne_frames = min(side_entry_airborne_frames + 1, 300);
     }

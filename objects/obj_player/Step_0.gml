@@ -25,6 +25,7 @@ if (stunTimer > 0 && attacking) {
     attack_lockout = 0;
     attack_buffer_timer = 0;
     attack_chain_buffer_timer = 0;
+    attack_chain_latched = false;
     combo_buffer = false;
     attack_shift_remaining = 0;
     comboTimer = 0;
@@ -211,30 +212,28 @@ if (attacking && stunTimer <= 0) {
     }
     if (!_is_swinging) debug_hitbox_active = false;
     
-    // --- COMBO: second hit needs a distinct press during swing 1 (attack_chain_buffer_* from movement) ---
-    if (comboCount == 1 && image_index > image_number * 0.22 && attack_chain_buffer_timer > 0) {
-        combo_buffer = true;
-    }
-    
-    // --- COMBO TRANSITION ---
+    // --- COMBO TRANSITION (1→2): attack_chain_latched from any X press during swing 1 ---
     if (image_index >= image_number - 1) {
-        if (combo_buffer && comboCount < 2 && comboTimer > 0) {
-            // Chain 1→2 only; second hit ends combo (no 2→3). comboTimer>0 prevents chain when combo expired.
+        if (attack_chain_latched && comboCount < 2 && comboTimer > 0) {
             attacking = false;
             attack_lockout = 0;
             attack_buffer_timer = 0;
             attack_chain_buffer_timer = 0;
-            scr_player_attack(); 
-            // Tiny forward shift on attack 2 start (chain happens here, not in section 2).
+            attack_chain_latched = false;
+            scr_player_attack();
             _attack_step_shift();
         } else {
+            // Swing over without 1→2 chain (incl. atk2 finisher) — reset so buffer can't spawn atk3/extra atk1.
             attacking = false;
             attack_lockout = 0;
             image_blend = c_white;
-            attack_recovery_grace = ATTACK_RECOVERY_GRACE;  // Brief protection so direction+mash doesn't get hit
-            attack_buffer_timer = 0;  // Consume so leftover buffer doesn't immediately start attack 1 again
+            attack_recovery_grace = ATTACK_RECOVERY_GRACE;
+            attack_buffer_timer = 0;
             attack_chain_buffer_timer = 0;
-            post_attack_accel_timer = POST_ATTACK_ACCEL_FRAMES; // Heavy feet: ramp to full walk over N frames
+            attack_chain_latched = false;
+            comboCount = 0;
+            comboTimer = 0;
+            post_attack_accel_timer = POST_ATTACK_ACCEL_FRAMES;
         }
     }
 }
@@ -250,6 +249,7 @@ if (comboTimer > 0) {
     if (comboTimer <= 0) {
         comboCount = 0;
         attack_chain_buffer_timer = 0;
+        attack_chain_latched = false;
     }
 }
 if (attackCooldownTimer > 0) {

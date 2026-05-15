@@ -1,77 +1,86 @@
-// --- obj_camera END STEP EVENT ---
-// Hollow Knight-style state-based camera system
+/// @function scr_camera_control
+/// @description MMX-style zone bounds + border scroll; state-based look-ahead only (no anchor/lerp follow).
+function scr_camera_control() {
+    if (!instance_exists(obj_player)) exit;
 
-// Check if player exists
-if (!instance_exists(obj_player)) exit;
+    var _p = obj_player;
+    var _cam_x = camera_get_view_x(cam);
+    var _cam_y = camera_get_view_y(cam);
 
-// --- 1. CURRENT CAMERA POSITION ---
-var _cam_x = camera_get_view_x(cam);
-var _cam_y = camera_get_view_y(cam);
+    // Wall slide: no horizontal look-ahead; still border-scroll to follow player (mostly vertical).
+    var _wall_cling_cam = (!_p.grounded && _p.wall_side != 0 && _p.vsp > 0
+        && _p.wall_jump_kick_hold_timer <= 0 && _p.wall_jump_extend_timer <= 0);
 
-// --- 2. SMOOTH ANCHOR (FOLLOWS PLAYER) ---
-// During attacks, follow player more closely to prevent losing them during combos
-var _anchor_speed = obj_player.attacking ? 0.15 : 0.08;
-camera_anchor_x = lerp(camera_anchor_x, obj_player.x, _anchor_speed);
-// Vertical anchor adapts to character height (supports 64x64 now, 96x96 later)
-var _player_half_h = (obj_player.bbox_bottom - obj_player.bbox_top) * 0.5;
-var _anchor_y_speed = 0.1;
-// When falling, anchor must keep up so camera doesn't lag behind
-if (!obj_player.grounded && obj_player.vsp > 0) {
-    _anchor_y_speed = 0.25; // Faster follow when falling (was fixed 0.1 = camera lagged)
+    if (_wall_cling_cam) {
+        cam_look_ahead = lerp(cam_look_ahead, 0, 0.18);
+    } else {
+        // --- Look-ahead (state-based; does not lerp the view itself) ---
+        var _look_target = 0;
+        var _look_speed = 0.12;
+        if (_p.attacking) {
+            _look_target = 90 * _p.last_direction;
+            _look_speed = 0.08;
+        } else if (_p.is_dashing) {
+            _look_target = 150 * _p.last_direction;
+            _look_speed = 0.15;
+        } else if (!_p.grounded) {
+            _look_target = 100 * _p.last_direction;
+            _look_speed = 0.10;
+        } else if (abs(_p.hsp) > 0.5) {
+            _look_target = 120 * _p.last_direction;
+            _look_speed = 0.12;
+        } else {
+            _look_target = 40 * _p.last_direction;
+            _look_speed = 0.06;
+        }
+        cam_look_ahead = lerp(cam_look_ahead, _look_target, _look_speed);
+    }
+
+    var _half_h = (_p.bbox_bottom - _p.bbox_top) * 0.5;
+    var _px = floor(_p.x + cam_look_ahead);
+    var _py = floor(_p.y - _half_h);
+
+    var _min_x = global.camera_min_x;
+    var _max_x = global.camera_max_x;
+    var _min_y = global.camera_min_y;
+    var _max_y = global.camera_max_y;
+
+    // Offset from view center (MMX obj_camera_rds)
+    var _ox = ceil(_px - (_cam_x + cam_w * 0.5));
+    var _oy = ceil(_py - (_cam_y + cam_h * 0.5));
+
+    // Vertical dead zone while airborne — small jumps don't scroll Y
+    if (!_p.grounded) {
+        var _vbor_min = global.camera_vbor_min_y;
+        var _vbor_max = global.camera_vbor_max_y;
+        if (_oy > _vbor_max) _oy -= _vbor_max;
+        else if (_oy < _vbor_min) _oy -= _vbor_min;
+        else _oy = 0;
+    }
+
+    _ox = max(_ox, _min_x - _cam_x);
+    _ox = min(_ox, _max_x - (_cam_x + cam_w));
+    _oy = max(_oy, _min_y - _cam_y);
+    _oy = min(_oy, _max_y - (_cam_y + cam_h));
+
+    if (_wall_cling_cam) _ox = 0;
+
+    var _dx = abs(_p.x - camera_prev_player_x);
+    var _dy = abs(_p.y - camera_prev_player_y);
+    var _xspeed = max(_dx, global.camera_scroll_min_x);
+    var _yspeed = max(_dy, global.camera_scroll_min_y);
+    if (abs(_ox) > _xspeed) _ox = _xspeed * sign(_ox);
+    if (abs(_oy) > _yspeed) _oy = _yspeed * sign(_oy);
+
+    camera_prev_player_x = _p.x;
+    camera_prev_player_y = _p.y;
+
+    var _new_x = _cam_x;
+    var _new_y = _cam_y;
+    if (_ox < 0 && _cam_x >= _min_x) _new_x = max(floor(_cam_x + _ox), _min_x);
+    if (_ox > 0 && (_cam_x + cam_w) <= _max_x) _new_x = min(floor(_cam_x + _ox), _max_x - cam_w);
+    if (_oy < 0 && _cam_y >= _min_y) _new_y = max(_cam_y + _oy, _min_y);
+    if (_oy > 0 && (_cam_y + cam_h) <= _max_y) _new_y = min(_cam_y + _oy, _max_y - cam_h);
+
+    camera_set_view_pos(cam, _new_x, _new_y);
 }
-camera_anchor_y = lerp(camera_anchor_y, obj_player.y - _player_half_h, _anchor_y_speed);
-
-// --- 3. STATE-BASED LOOK-AHEAD SYSTEM ---
-var _look_target = 0;
-var _look_speed = 0.12;
-var _camera_speed = 0.1;
-
-// Determine player state and adjust camera accordingly
-if (obj_player.attacking) {
-    // ATTACKING: Moderate look-ahead to see targets, slower camera for stability
-    _look_target = 90 * obj_player.last_direction;
-    _look_speed = 0.08;  // Slower transition during attacks
-    _camera_speed = 0.06; // More stable camera
-    
-} else if (obj_player.is_dashing) {
-    // DASHING: Strong look-ahead to see where you're going
-    _look_target = 150 * obj_player.last_direction;
-    _look_speed = 0.15;  // Quick transition
-    _camera_speed = 0.12; // Faster camera to keep up
-    
-} else if (!obj_player.grounded) {
-    // IN AIR: Moderate look-ahead; when falling use faster vertical follow so camera keeps up
-    _look_target = 100 * obj_player.last_direction;
-    _look_speed = 0.10;
-    _camera_speed = (obj_player.vsp > 0) ? 0.18 : 0.08; // Faster when falling
-    
-} else if (abs(obj_player.hsp) > 0.5) {
-    // WALKING/RUNNING: Normal look-ahead
-    _look_target = 120 * obj_player.last_direction;
-    _look_speed = 0.12;
-    _camera_speed = 0.1;
-    
-} else {
-    // IDLE/STANDING STILL: Minimal look-ahead, centers on player
-    _look_target = 40 * obj_player.last_direction;
-    _look_speed = 0.06; // Slow return to center
-    _camera_speed = 0.08;
-}
-
-// Smoothly transition look-ahead with state-specific speed
-cam_look_ahead = lerp(cam_look_ahead, _look_target, _look_speed);
-
-// --- 4. CALCULATE TARGET CAMERA POSITION ---
-var _target_x = camera_anchor_x + cam_look_ahead - (cam_w / 2);
-var _target_y = camera_anchor_y - (cam_h / 2);
-
-// --- 5. SMOOTH CAMERA MOVEMENT (with state-specific speed) ---
-var _final_x = lerp(_cam_x, _target_x, _camera_speed);
-var _final_y = lerp(_cam_y, _target_y, _camera_speed);
-
-// --- 6. CLAMP TO ROOM BOUNDS ---
-_final_x = clamp(_final_x, 0, room_width - cam_w);
-_final_y = clamp(_final_y, 0, room_height - cam_h);
-
-// --- 7. APPLY ---
-camera_set_view_pos(cam, floor(_final_x), floor(_final_y));

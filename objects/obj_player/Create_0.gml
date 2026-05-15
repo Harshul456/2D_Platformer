@@ -12,8 +12,9 @@ jump_buffer_max = 11;           // Frames to "remember" a jump press (wall cling
 jump_buffer_timer = 0;          // Countdown
 attack_buffer_max = 12;         // Frames to "remember" an attack press (idle only — not refilled while swinging)
 attack_buffer_timer = 0;        // Countdown
-attack_chain_buffer_max = 8;    // Second hit: buffer from a *new* press during swing 1 (holding X won't chain)
+attack_chain_buffer_max = 8;    // Legacy decay timer (kept for debug); chain uses attack_chain_latched
 attack_chain_buffer_timer = 0;
+attack_chain_latched = false;   // Any X press during swing 1 queues 1→2 (survives mash at start of swing)
 
 // --- MOVEMENT SETTINGS ---
 hsp             = 0;            // velocity
@@ -22,8 +23,8 @@ grv             = 0.5;          // Gravity strength
 walksp          = 3.5;          // Standard walk speed
 runsp           = 5.0;          // Fast walk/run speed
 jumpsp          = 9.0;          // Jump power
-jump_count      = 0;            // Double jump tracker
-// True after a coyote / mid-air jump this airborne time; blocks wall kick so double jump can go up the wall. Cleared on land / wall jump.
+jump_count      = 0;            // 0 = fresh from ground; 1 = one air jump left; 2 = no jumps until land (incl. after wall jump / walk-off).
+// True after spending the second air jump (or walk-off single-jump mode). Cleared on land. Wall jump sets both this and jump_count=2.
 air_chain_jump_used = false;
 last_direction  = 1;            // Facing: 1 = Right, -1 = Left
 runMomentum     = 0;            // Stores speed for air-carry
@@ -82,13 +83,23 @@ GROUND_SNAP_THIN_CAP_MAX = 1;
 GROUND_SNAP_POST_THIN_CAP_MAX = 2;
 LANDING_ANIM_DIST = 3;          // Distance to trigger landing animation
 WALL_CHECK_OFFSET = 4;          // Head sample for horizontal ledge / corner probes
-// Wall slide / wall jump (Mega Man X Engine–style: jumpable_wall_dir + wall_slide / wall_jump states)
-// Probes sit on the collision mask edge (MMX uses origin ±9; we use mask ±1 to avoid “wall” one cell over).
+// Wall slide / wall jump (MMX-style: jumpable_wall_dir + wall_slide / wall_jump states)
+// Probes sit on the collision mask edge (MMX uses origin ±9; we use mask ±1). Optional scrape = !can_move_x(move) analogue.
 WALL_FACE_PROBE_OUTSET = 1;     // Pixels outside bbox_left / bbox_right for wall column samples
-WALL_CONTACT_HOLD_BIAS_PX = 3;  // Shift wall probes outward while holding into that side (pre–H-move contact)
+WALL_CONTACT_HOLD_BIAS_PX = 3;  // With Shift: nudge wall probes on pressed side; Shift alone nudges both sides outward (single-wall contact).
 WALL_JUMP_PROXIMITY_PX = 6;     // Horizontal scan from bbox edge: defer air jump if solid this close (post–H wall jump)
 WALL_BODY_HI_FROM_HEAD = 14;    // Upper-body sample Y = head_y + this (reject ledge: feet-only hits)
 WALL_CONTACT_MIN_SAMPLES = 2;   // Need this many hits among [low, mid, high] on the wall column
+// Wall cling also requires the feet-band probe to hit (rejects top-tile-only corners that look like a bad cling).
+WALL_CLING_REQUIRE_FEET_BAND = true;
+// If true: cannot cling on the top tile of a wall — requires solid one tile height above the top wall hit on the face column.
+WALL_CLING_BLOCK_TOP_TILE = true;
+// If true: cannot cling on the bottom tile of a wall — requires solid one tile height below the lowest wall hit. Turn off if it fights floors / short walls.
+WALL_CLING_BLOCK_BOTTOM_TILE = true;
+// MMX-style: while holding Shift to cling, require a solid hit 1px past the bbox face (like !can_move_x(move)); rejects false clings.
+WALL_REQUIRE_SCRAPE_MOTION = true;
+// When clinging with Shift only (no L/R): scan this many pixels past bbox for scrape — fixes 1–2px air gap vs strict bbox+1 check.
+WALL_SCRAPE_DEPTH_NEUTRAL_CLING_PX = 8;
 WALL_SLIDE_VSP = 2;             // Max downward speed while sliding (MMX wall_slide_vspeed)
 WALL_JUMP_VSP = 9;              // Upward impulse on wall jump (tune height)
 WALL_JUMP_HSP = 6;              // Horizontal: initial push away; also caps enforced-away speed during kick
@@ -101,8 +112,16 @@ WALL_JUMP_CEIL_CLEAR = 6;
 WALL_JUMP_KICK_HOLD_FRAMES = 5;
 // Wall jump only when falling into the wall slide (not while rising); lets double jump win beside walls.
 WALL_JUMP_MIN_FALL_VSP = 0.15;
-// Wall jump only while holding into the wall (same as wall slide) — avoids double-jump beside wall without hugging.
-WALL_KICK_COOLDOWN_FRAMES = 22; // Cannot re-stick to kicked wall; air control clamps away (MMX separation)
+// When double jump is still banked (jump_count==1, air_chain false): wall jump needs this min vsp so slow scrapes use air jump.
+// -1 = 0.82×WALL_SLIDE_VSP (~1.64 with slide 2); 0 = same threshold as everyone (MIN_FALL only).
+WALL_JUMP_MIN_VSP_FOR_DOUBLE_GUARD = -1;
+// With Shift at a wall: allow wall jump if downward speed is this close to the fall threshold (apex / guard edge).
+WALL_JUMP_FALL_VSP_EPSILON_CLING = 0.31;
+// Wall slide + wall jump: hold Shift (L or R) in air for WALL_SHIFT_HOLD_FRAMES_REQUIRED consecutive Steps; arrows alone never cling.
+WALL_SHIFT_HOLD_FRAMES_REQUIRED = 14;
+WALL_KICK_COOLDOWN_FRAMES = 22; // Cannot re-stick to kicked wall this long (first kick / same face)
+// When wall-jumping between two walls: shorter cooldown after leaving the opposite face (narrow shaft zigzag).
+WALL_KICK_COOLDOWN_SHAFT_FRAMES = 8;
 WALL_CLING_DRAW_NUDGE_PX = 5;   // Draw-only: pull spr_mc_walljump toward wall (mask stays idle)
 wall_side = 0;                  // −1 = wall on left, +1 = wall on right
 wall_jump_lock = 0;
@@ -110,6 +129,7 @@ wall_jump_extend_timer = 0;
 wall_jump_kick_hold_timer = 0;
 wall_kick_cooldown = 0;         // >0: ignore kicked wall column + enforce away hsp
 wall_kick_from_side = 0;       // Wall side we last kicked from (−1 / +1)
+wall_shift_hold_timer = 0;     // Consecutive airborne Steps with Shift held; wall cling needs WALL_SHIFT_HOLD_FRAMES_REQUIRED
 LEDGE_STEP_MAX = 2;
 LEDGE_TOE_INSET = 2;
 HORIZONTAL_LEDGE_WINDOW_PX = 6; // Side collision ignored when bbox_bottom is this close to tile top (mount / corner clip).

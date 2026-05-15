@@ -34,6 +34,7 @@ if (!invincible && !_protected) {
     attackCooldownTimer = 0;
     attack_buffer_timer = 0;
     attack_chain_buffer_timer = 0;
+    attack_chain_latched = false;
     attack_shift_remaining = 0;
     combo_buffer = false;
     comboTimer = 0;

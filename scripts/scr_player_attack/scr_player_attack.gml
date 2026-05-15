@@ -6,11 +6,13 @@ function scr_player_attack() {
         return;
     }
 
-    if (comboTimer > 0) comboCount = (comboCount % 3) + 1;
+    // Only valid mid-combo step is 1→2 (no third hit from buffer/timer).
+    if (comboTimer > 0 && comboCount == 1) comboCount = 2;
     else comboCount = 1;
 
     attacking = true;
     combo_buffer = false;
+    attack_chain_latched = false;
     attack_has_hit = false;
     image_index = 0;
     comboTimer = comboCooldown;

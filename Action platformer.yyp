@@ -42,6 +42,7 @@
   "resources":[
     {"id":{"name":"obj_afterimage","path":"objects/obj_afterimage/obj_afterimage.yy",},},
     {"id":{"name":"obj_camera_controller","path":"objects/obj_camera_controller/obj_camera_controller.yy",},},
+    {"id":{"name":"obj_camera_zone","path":"objects/obj_camera_zone/obj_camera_zone.yy",},},
     {"id":{"name":"obj_enemy_parent","path":"objects/obj_enemy_parent/obj_enemy_parent.yy",},},
     {"id":{"name":"obj_enemy","path":"objects/obj_enemy/obj_enemy.yy",},},
     {"id":{"name":"obj_hazard_parent","path":"objects/obj_hazard_parent/obj_hazard_parent.yy",},},
@@ -49,6 +50,7 @@
     {"id":{"name":"obj_player","path":"objects/obj_player/obj_player.yy",},},
     {"id":{"name":"obj_solid","path":"objects/obj_solid/obj_solid.yy",},},
     {"id":{"name":"obj_wall","path":"objects/obj_wall/obj_wall.yy",},},
+    {"id":{"name":"room_movement_intro","path":"rooms/room_movement_intro/room_movement_intro.yy",},},
     {"id":{"name":"room_test","path":"rooms/room_test/room_test.yy",},},
     {"id":{"name":"Room2","path":"rooms/Room2/Room2.yy",},},
     {"id":{"name":"check_tile_collision","path":"scripts/check_tile_collision/check_tile_collision.yy",},},
@@ -90,6 +92,7 @@
   "resourceVersion":"2.0",
   "RoomOrderNodes":[
     {"roomId":{"name":"room_test","path":"rooms/room_test/room_test.yy",},},
+    {"roomId":{"name":"room_movement_intro","path":"rooms/room_movement_intro/room_movement_intro.yy",},},
     {"roomId":{"name":"Room2","path":"rooms/Room2/Room2.yy",},},
   ],
   "templateType":"game",

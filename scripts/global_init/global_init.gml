@@ -20,6 +20,17 @@ global.player_id = noone;
 global.player_ledge_bb_prev = -1000000;
 global.player_move_vsp = 0;
 
+// Camera (MMX-style zones — obj_camera_zone + scr_camera_control)
+global.camera_current_zone = -1;
+global.camera_min_x = 0;
+global.camera_min_y = 0;
+global.camera_max_x = 0;
+global.camera_max_y = 0;
+global.camera_vbor_min_y = -48;  // Airborne: scroll up only if player is |min|+ px above view center
+global.camera_vbor_max_y = 48;   // Airborne: scroll down only if this far below view center
+global.camera_scroll_min_x = 5;  // Min horizontal view scroll speed (px/step)
+global.camera_scroll_min_y = 3;  // Min vertical view scroll speed (px/step)
+
 // Force the game to render at your specific resolution without sub-pixel blurring
 surface_resize(application_surface, 1280, 720); // Match your Viewport Width/Height
 display_set_gui_size(1280, 720);
