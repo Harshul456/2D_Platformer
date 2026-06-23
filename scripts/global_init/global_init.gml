@@ -45,5 +45,5 @@ global.hitstop = 0;       // Hitstop frames (impact freeze); decremented in scr_
 global.reflections_enabled = false;
 
 // Borderless fullscreen (more reliable)
-window_set_fullscreen(false);
+window_set_fullscreen(true);
 

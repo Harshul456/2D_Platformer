@@ -396,6 +396,8 @@ function scr_player_movement() {
             jumped_this_frame = true;
             if (!_jump_from_grounded && jump_count >= 2) {
                 air_chain_jump_used = true;
+                double_jump_anim_active = true;
+                double_jump_anim_tick = 0;
             }
             
             if (is_dashing || abs(hsp) > walksp) {
@@ -433,7 +435,7 @@ function scr_player_movement() {
         
         // Dash check (excluding landing animation since it's handled separately)
         if (key_dash && dash_cooldown <= 0 && grounded && !attacking && sprite_index != spr_mc_jump
-            && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1) {
+            && sprite_index != spr_mc_doublejump && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1) {
             is_dashing = true;
             dash_timer = dash_duration;
             dash_cooldown = dash_duration + dash_cooldown_extra;
@@ -1440,7 +1442,7 @@ function scr_player_movement() {
                 && !_feet_embed_pose
                 && !is_dashing && sprite_index != spr_mc_dash
                 && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_walljump
-                && sprite_index != spr_mc_jump; // allow landing crouch on full-block lip edges (was stomping jump → jog/idle)
+                && sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump; // allow landing crouch on full-block lip edges
             if (_hold_full_lip_pose) {
                 // No dedicated teeter art yet — keep stable *ground* visuals on full-block lip (after jump land anim finishes).
                 // If the player is moving, allow jog to play; otherwise idle.
@@ -1457,7 +1459,8 @@ function scr_player_movement() {
                     }
                 }
                 image_speed = 1;
-            } else if (sprite_index == spr_mc_jump) {
+            } else if (sprite_index == spr_mc_jump || sprite_index == spr_mc_doublejump) {
+                if (sprite_index == spr_mc_doublejump) sprite_index = spr_mc_jump;
                 // Landing crouch: jump sprite frames ANIM_LAND_CROUCH_START..ANIM_LAND_CROUCH_END
                 if (image_index < ANIM_LAND_CROUCH_START) image_index = ANIM_LAND_CROUCH_START;
                 image_speed = 1; // Fall anim uses image_speed = 0; restore so crouch can play
@@ -1540,6 +1543,13 @@ function scr_player_movement() {
                 image_index = 0;
                 image_speed = 0;
                 image_xscale = -wall_side * image_base_scale;
+            } else if (double_jump_anim_active) {
+                var _dj_hold = (variable_instance_exists(id, "DOUBLE_JUMP_ANIM_HOLD_FRAMES") ? DOUBLE_JUMP_ANIM_HOLD_FRAMES : 6);
+                var _dj_n = sprite_get_number(spr_mc_doublejump);
+                sprite_index = spr_mc_doublejump;
+                image_speed = 0;
+                image_xscale = last_direction * image_base_scale;
+                image_index = min(floor(double_jump_anim_tick / _dj_hold), _dj_n - 1);
             } else {
             var _lip_fall_teeter_geom = _teeter_anim || (!_raw_c_teet && (_raw_l_teet || _raw_r_teet));
             // Sticky can linger after stepping off toward a lower floor; vsp<6 kept idle for the whole drop — only
@@ -1697,6 +1707,8 @@ function scr_player_movement() {
         side_entry_airborne_frames = 0;
         wall_jump_extend_timer = 0;
         wall_jump_kick_hold_timer = 0;
+        double_jump_anim_active = false;
+        double_jump_anim_tick = 0;
         wall_kick_cooldown = 0;
         wall_kick_from_side = 0;
         wall_shift_hold_timer = 0;
@@ -1706,6 +1718,16 @@ function scr_player_movement() {
     if (wall_jump_lock > 0) wall_jump_lock--;
     if (wall_jump_extend_timer > 0) wall_jump_extend_timer--;
     if (wall_jump_kick_hold_timer > 0) wall_jump_kick_hold_timer--;
+    if (double_jump_anim_active) {
+        double_jump_anim_tick++;
+        var _dj_hold = (variable_instance_exists(id, "DOUBLE_JUMP_ANIM_HOLD_FRAMES") ? DOUBLE_JUMP_ANIM_HOLD_FRAMES : 6);
+        var _dj_n = sprite_get_number(spr_mc_doublejump);
+        if (double_jump_anim_tick >= _dj_n * _dj_hold) {
+            double_jump_anim_active = false;
+        } else if (vsp > JUMP_PEAK_MAX + 2 && double_jump_anim_tick >= _dj_hold * 2) {
+            double_jump_anim_active = false;
+        }
+    }
     if (wall_kick_cooldown > 0) wall_kick_cooldown--;
 
     // --- DEBUG: ledge air-stall (set DEBUG_LEDGE_AIR_STALL = true in obj_player Create) ---

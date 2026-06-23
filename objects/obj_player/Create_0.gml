@@ -127,6 +127,8 @@ wall_side = 0;                  // −1 = wall on left, +1 = wall on right
 wall_jump_lock = 0;
 wall_jump_extend_timer = 0;
 wall_jump_kick_hold_timer = 0;
+double_jump_anim_active = false; // spr_mc_doublejump after air chain jump
+double_jump_anim_tick = 0;     // Steps elapsed in current double-jump sequence
 wall_kick_cooldown = 0;         // >0: ignore kicked wall column + enforce away hsp
 wall_kick_from_side = 0;       // Wall side we last kicked from (−1 / +1)
 wall_shift_hold_timer = 0;     // Consecutive airborne Steps with Shift held; wall cling needs WALL_SHIFT_HOLD_FRAMES_REQUIRED
