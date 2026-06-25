@@ -61,8 +61,17 @@ if (!attacking && stunTimer <= 0 && attack_lockout <= 0 && attack_recovery_grace
     if (image_index == 0) {
         attackCooldownTimer = attackCooldown;
         attack_has_hit = false; 
-        is_dashing = false; 
-        dash_timer = 0;
+        is_sprinting = false;
+        sprint_afterimage_tick = 0;
+        sprint_jump_carry = false;
+        sprint_air_trail = false;
+        sprint_reel_active = false;
+        sprint_reel_pending = false;
+        sprint_committed = false;
+        sprint_burst_tick = 0;
+        sprint_commit_dir = 0;
+        sprint_hold_latched = false;
+        sprint_resume_hold = false;
     }
 }
 

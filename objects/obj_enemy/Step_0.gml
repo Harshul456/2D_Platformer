@@ -185,8 +185,10 @@ if (state == STATE_ATTACK && _dash_hit_frame && !attack_hit_dealt && instance_ex
             comboTimer = 0;
             comboCount = 0;
             debug_hitbox_active = false;
-            is_dashing = false;
-            dash_timer = 0;
+            is_sprinting = false;
+            sprint_afterimage_tick = 0;
+            sprint_jump_carry = false;
+            sprint_air_trail = false;
             invincible = true;
             invincibleTimer = INVINCIBILITY_FRAMES;
             attack_priority_timer = 0;

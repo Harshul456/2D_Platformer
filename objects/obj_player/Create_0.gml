@@ -3,7 +3,7 @@ is_dying        = false;        // Trigger for pit death/abyss fall
 can_move        = true;         // Control toggle for input
 attacking       = false;        // State for combat lockout
 grounded        = false;        // Track floor contact
-is_dashing      = false;        // Dash state toggle
+is_sprinting    = false;        // Hold Z on ground while moving
 
 // --- RESPONSIVENESS BUFFERS ---
 coyote_time_max = 6;            // Grace period frames for late jumps
@@ -21,7 +21,7 @@ hsp             = 0;            // velocity
 vsp             = 0;            // Vertical velocity
 grv             = 0.5;          // Gravity strength
 walksp          = 3.5;          // Standard walk speed
-runsp           = 5.0;          // Fast walk/run speed
+runsp           = 5.0;          // Sprint speed (hold Z; slightly above walksp)
 jumpsp          = 9.0;          // Jump power
 jump_count      = 0;            // 0 = fresh from ground; 1 = one air jump left; 2 = no jumps until land (incl. after wall jump / walk-off).
 // True after spending the second air jump (or walk-off single-jump mode). Cleared on land. Wall jump sets both this and jump_count=2.
@@ -39,9 +39,6 @@ ANIM_LAND_CROUCH_START = 8;     // Jump sprite: first frame of landing crouch (8
 ANIM_LAND_CROUCH_END = 10;      // Jump sprite: last frame of landing crouch (then go idle)
 ANIM_HAIR_FLICKER_INTERVAL = 5; // Frames between hair flicker (falling) frame switch
 ANIM_HAIR_FLICKER_THRESHOLD = 2.5; // Which half of interval for frame 5 vs 6
-ANIM_DASH_LOOP_END = 5.9;       // Dash sprite: loop frames 0–5, then reset
-ANIM_DASH_REEL_START = 6;       // Dash sprite: reel-back starts at frame 6
-ANIM_DASH_REEL_END = 8.8;       // Dash sprite: after frame 8 complete, go idle
 ANIM_JOG_FRAME_COUNT = 7;       // spr_mc_jog subimages
 
 // --- COLLISION DISTANCES ---
@@ -150,13 +147,25 @@ MOMENTUM_DECAY_NORMAL = 0.01;   // Air momentum decay rate (straight)
 MOMENTUM_DECAY_TURNING = 0.1;   // Air momentum decay when reversing direction
 MOMENTUM_CUTOFF = 0.5;          // Stop momentum completely when below this value
 
-// --- DASH MECHANICS ---
-dash_timer       = 0;           // Current frame of dash
-dash_duration   = 12;           // Total length of dash in frames
-dash_speed      = 10;           // Burst velocity during dash
-dash_cooldown   = 0;            // Frames until next dash available
-dash_cooldown_extra = 8;        // Extra frames added to cooldown after dash (dash_cooldown = dash_duration + this)
-dash_afterimage_interval = 4;   // Create afterimage every N frames during dash
+// --- SPRINT MECHANICS ---
+sprint_afterimage_interval = 4; // Create afterimage every N frames while sprinting
+sprint_afterimage_tick = 0;     // Frame counter for sprint afterimages
+sprint_jump_carry = false;      // Airborne horizontal speed from sprint jump / sprint run-off
+sprint_air_trail = false;       // Afterimages in air after sprint jump until landing
+sprint_reel_active = false;     // spr_mc_reelback playing
+sprint_reel_pending = false;    // Armed after sprint ends — reel when direction released
+sprint_committed = false;       // Active sprint session (tap = burst only; hold Z = burst + sustain)
+sprint_hold_latched = false;    // True once Z stays held after first burst frame → sustained runsp
+sprint_resume_hold = false;     // Z held through sprint jump — resume sustain on landing without re-press
+sprint_burst_tick = 0;          // Frames elapsed this commit (1..SPRINT_BURST_FRAMES = burst speed)
+sprint_commit_dir = 0;          // Direction locked in when sprint started (−1 / +1)
+SPRINT_BURST_FRAMES = 15;       // Tap-Z dash length; hold-Z also uses this before runsp sustain
+SPRINT_BURST_SPEED = 8.5;       // Speed during burst phase (hold-Z sustain uses runsp)
+SPRINT_JUMP_CARRY_MULT = 1.12;  // Jump/leaving ground while sprinting: runsp × this (initial air hsp)
+SPRINT_AIR_DECAY = 0.003;       // Air lerp toward 0 while sprint_jump_carry (lower = longer glide)
+SPRINT_AIR_DECAY_TURN = 0.10;   // Extra decay when reversing direction in air during carry
+SPRINT_AIR_DECAY_HOLD = 0.001;  // Decay while holding Z + same direction in air (near-zero = coast)
+SPRINT_AIR_MIN = 4.25;          // End carry once |hsp| drops below this (between walksp and runsp)
 
 // --- COMBAT & DAMAGE ---
 obj_player_health = 100;

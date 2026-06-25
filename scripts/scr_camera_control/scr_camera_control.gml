@@ -20,9 +20,9 @@ function scr_camera_control() {
         if (_p.attacking) {
             _look_target = 90 * _p.last_direction;
             _look_speed = 0.08;
-        } else if (_p.is_dashing) {
-            _look_target = 150 * _p.last_direction;
-            _look_speed = 0.15;
+        } else if (_p.is_sprinting) {
+            _look_target = 130 * _p.last_direction;
+            _look_speed = 0.14;
         } else if (!_p.grounded) {
             _look_target = 100 * _p.last_direction;
             _look_speed = 0.10;
