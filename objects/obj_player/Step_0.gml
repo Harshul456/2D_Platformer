@@ -1,8 +1,28 @@
 // --- IN obj_player STEP EVENT ---
 
+function _player_sprint_deform() {
+    // Frame 1 only (Z press): coil squash; every later step while sprinting stays at normal scale.
+    if (sprint_squash_coil_frames > 0) {
+        sprint_squash_x = SPRINT_SQUASH_COIL_X;
+        sprint_squash_y = SPRINT_SQUASH_COIL_Y;
+        sprint_squash_coil_frames--;
+    } else if (sprint_committed || is_sprinting) {
+        sprint_squash_x = 1;
+        sprint_squash_y = 1;
+    } else {
+        sprint_squash_x = lerp(sprint_squash_x, 1, SPRINT_SQUASH_LERP);
+        sprint_squash_y = lerp(sprint_squash_y, 1, SPRINT_SQUASH_LERP);
+    }
+    var _face = sign(image_xscale);
+    if (_face == 0) _face = last_direction != 0 ? last_direction : 1;
+    image_xscale = _face * image_base_scale * sprint_squash_x;
+    image_yscale = image_base_scale * sprint_squash_y;
+}
+
 // --- HITSTOP CHECK (at the very start of Step Event) ---
 if (scr_hitstop_handler()) {
-    exit; // Skip all movement/logic during hitstop
+    _player_sprint_deform(); // Coil/normal scale ticks during hitstop freeze
+    exit;
 }
 
 if (attack_priority_timer > 0) attack_priority_timer--;
@@ -72,6 +92,7 @@ if (!attacking && stunTimer <= 0 && attack_lockout <= 0 && attack_recovery_grace
         sprint_commit_dir = 0;
         sprint_hold_latched = false;
         sprint_resume_hold = false;
+        sprint_dir_gap = 0;
     }
 }
 
@@ -268,6 +289,7 @@ if (attack_recovery_grace > 0) attack_recovery_grace--;
 
 // 5. VISUALS & CLEANUP
 scr_player_invincibility();
+_player_sprint_deform();
 
 // NOTE:
 // Keep sub-pixel positions for smoother movement. Draw events already snap to pixels where needed.

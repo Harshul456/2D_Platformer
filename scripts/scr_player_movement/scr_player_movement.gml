@@ -349,6 +349,7 @@ function scr_player_movement() {
     var _pre_hsp = hsp;
     var _pre_sprinting = is_sprinting;
     var _pre_sprint_committed = sprint_committed;
+    var _pre_sprint_hold_latched = sprint_hold_latched;
     var jumped_this_frame = false;
     var _grounded_jump_this_step = false;
     if (stunTimer <= 0 && jump_buffer_timer > 0 && !attacking) {
@@ -423,20 +424,29 @@ function scr_player_movement() {
                 var _jd = (key_right - key_left);
                 if (_jd == 0) _jd = sign(_pre_hsp);
                 if (_jd == 0) _jd = last_direction;
-                if (key_sprint || _pre_sprinting || _pre_sprint_committed || abs(_pre_hsp) > walksp + 0.01) {
+                if (_pre_sprinting || _pre_sprint_committed) {
                     sprint_jump_carry = true;
                     sprint_air_trail = true;
                     var _carry_sp = runsp * (variable_instance_exists(id, "SPRINT_JUMP_CARRY_MULT") ? SPRINT_JUMP_CARRY_MULT : 1);
-                    runMomentum = (key_sprint || _pre_sprinting || _pre_sprint_committed) ? _carry_sp * _jd : _pre_hsp;
+                    runMomentum = _carry_sp * _jd;
+                    hsp = runMomentum;
+                } else if (abs(_pre_hsp) > walksp + 0.01) {
+                    sprint_jump_carry = false;
+                    runMomentum = _pre_hsp;
                     hsp = runMomentum;
                 } else {
                     sprint_jump_carry = false;
                 }
                 is_sprinting = false;
+                if (key_sprint && _pre_sprint_hold_latched && (_pre_sprinting || _pre_sprint_committed)) {
+                    sprint_resume_hold = true;
+                }
                 sprint_committed = false;
                 sprint_burst_tick = 0;
-                sprint_commit_dir = 0;
-                sprint_hold_latched = false;
+                if (!(key_sprint && sprint_resume_hold)) {
+                    sprint_commit_dir = 0;
+                    sprint_hold_latched = false;
+                }
             }
             }
         }
@@ -445,15 +455,20 @@ function scr_player_movement() {
     // Stepped off a ledge
     if (_s2_grounded_in && !grounded && !jumped_this_frame) {
         jump_count = max(jump_count, 1);
-        if (key_sprint || _pre_sprinting || _pre_sprint_committed || abs(_pre_hsp) > walksp + 0.01) {
+        if (_pre_sprinting || _pre_sprint_committed || abs(_pre_hsp) > walksp + 0.01) {
             var _jd_off = sign(_pre_hsp);
             if (_jd_off == 0) _jd_off = (key_right - key_left);
             if (_jd_off == 0) _jd_off = last_direction;
             if (_jd_off != 0) {
-                sprint_jump_carry = true;
-                sprint_air_trail = true;
-                var _carry_sp_off = runsp * (variable_instance_exists(id, "SPRINT_JUMP_CARRY_MULT") ? SPRINT_JUMP_CARRY_MULT : 1);
-                runMomentum = (key_sprint || _pre_sprinting || _pre_sprint_committed) ? _carry_sp_off * _jd_off : _pre_hsp;
+                if (_pre_sprinting || _pre_sprint_committed) {
+                    sprint_jump_carry = true;
+                    sprint_air_trail = true;
+                    var _carry_sp_off = runsp * (variable_instance_exists(id, "SPRINT_JUMP_CARRY_MULT") ? SPRINT_JUMP_CARRY_MULT : 1);
+                    runMomentum = _carry_sp_off * _jd_off;
+                } else {
+                    sprint_jump_carry = false;
+                    runMomentum = _pre_hsp;
+                }
                 hsp = runMomentum;
             }
         }
@@ -493,56 +508,94 @@ function scr_player_movement() {
             var _sprint_sprite_ok = (sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
                 && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && !sprint_reel_active);
             var _burst_frames = (variable_instance_exists(id, "SPRINT_BURST_FRAMES") ? SPRINT_BURST_FRAMES : 10);
-            if (!key_sprint) sprint_resume_hold = false;
+            var _switch_gap = (variable_instance_exists(id, "SPRINT_DIR_SWITCH_GAP") ? SPRINT_DIR_SWITCH_GAP : 6);
+            if (!key_sprint) {
+                sprint_hold_latched = false;
+                sprint_resume_hold = false;
+                sprint_dir_gap = 0;
+            }
             var _sprint_start_ok = _sprint_sprite_ok || (sprint_resume_hold && key_sprint);
-            // Tap Z = short burst. Hold Z = burst + sustain. Resume hold sprint on land if Z never released.
-            var _start_sprint = (key_sprint_press || (key_sprint && sprint_resume_hold))
-                && grounded && !jumped_this_frame && vsp >= 0 && inputDir != 0
-                && _sprint_start_ok && !sprint_committed;
-            if (_start_sprint) {
+            // Tap Z = burst only. Hold Z (latched) = burst + sustain. Press starts a new session.
+            if (key_sprint_press && grounded && !jumped_this_frame && vsp >= 0 && inputDir != 0
+                && _sprint_sprite_ok && !sprint_committed) {
                 sprint_committed = true;
+                sprint_hold_latched = false;
+                sprint_burst_tick = 0;
                 sprint_commit_dir = inputDir;
                 sprint_reel_pending = false;
-                if (key_sprint && sprint_resume_hold) {
-                    sprint_hold_latched = true;
-                    sprint_burst_tick = _burst_frames + 1;
-                } else {
-                    sprint_hold_latched = false;
-                    sprint_burst_tick = 0;
-                }
+                sprint_dir_gap = 0;
+                // Sprint activation game-feel (hitstop, squash coil, screen shader)
+                global.hitstop = SPRINT_ACTIVATE_HITSTOP;
+                sprint_squash_coil_frames = 1;
+                global.dash_shader_active = true;
+                global.dash_shader_intensity = 1.0;
+            }
+            // Re-enter sustain: landed from hold-sprint jump, or turned around while Z still held
+            if (key_sprint && sprint_hold_latched && grounded && !jumped_this_frame && vsp >= 0
+                && inputDir != 0 && !sprint_committed && _sprint_start_ok) {
+                sprint_committed = true;
+                sprint_burst_tick = _burst_frames + 1;
+                sprint_commit_dir = inputDir;
+                sprint_reel_pending = false;
+                sprint_dir_gap = 0;
+                if (sprint_resume_hold) sprint_resume_hold = false;
             }
             if (sprint_committed) {
                 var _dir_held = (key_left || key_right);
-                if (inputDir != 0) sprint_commit_dir = inputDir;
-                var _move_dir = inputDir;
-                if (_move_dir == 0 && sprint_commit_dir != 0) _move_dir = sprint_commit_dir;
-                var _in_burst = false;
-                var _burst_done = false;
-                if (!grounded || jumped_this_frame || attacking || !_dir_held) {
-                    if (key_sprint && sprint_hold_latched && (!grounded || jumped_this_frame)) {
+                if (inputDir != 0) {
+                    if (sprint_commit_dir != 0 && inputDir != sprint_commit_dir) {
+                        sprint_dir_gap = _switch_gap;
+                    }
+                    sprint_commit_dir = inputDir;
+                }
+                var _move_dir = inputDir != 0 ? inputDir : sprint_commit_dir;
+                var _dir_ok = _dir_held;
+                if (!_dir_held && key_sprint && sprint_hold_latched && sprint_commit_dir != 0) {
+                    if (sprint_dir_gap <= 0) sprint_dir_gap = _switch_gap;
+                    else sprint_dir_gap--;
+                    _dir_ok = (sprint_dir_gap > 0);
+                    if (_dir_ok) _move_dir = sprint_commit_dir;
+                } else if (_dir_held) {
+                    sprint_dir_gap = 0;
+                }
+                var _leave_ground = (!grounded || jumped_this_frame);
+                var _tap_stop = (!sprint_hold_latched && !_dir_ok);
+                var _hold_stop = (sprint_hold_latched && !_dir_ok && sprint_dir_gap <= 0);
+                var _z_released = (!key_sprint && sprint_hold_latched);
+                if (attacking || _leave_ground || _z_released || _tap_stop || _hold_stop) {
+                    if (_leave_ground && key_sprint && sprint_hold_latched) {
                         sprint_resume_hold = true;
                     }
-                    if (grounded && !jumped_this_frame && !_dir_held) {
+                    if (grounded && !_leave_ground && (_tap_stop || _hold_stop) && !_z_released) {
                         sprint_reel_pending = true;
                         sprint_resume_hold = false;
                     }
                     sprint_committed = false;
-                    sprint_hold_latched = false;
                     sprint_burst_tick = 0;
-                    sprint_commit_dir = 0;
+                    var _keep_hold = (_leave_ground && key_sprint && sprint_hold_latched);
+                    var _hold_paused = (_hold_stop && key_sprint);
+                    if (!_keep_hold && !_hold_paused) {
+                        sprint_hold_latched = false;
+                        sprint_commit_dir = 0;
+                        sprint_dir_gap = 0;
+                        if (!_leave_ground) sprint_resume_hold = false;
+                    } else if (_hold_paused) {
+                        sprint_commit_dir = 0;
+                        sprint_dir_gap = 0;
+                        sprint_resume_hold = false;
+                    }
                 } else {
                     sprint_burst_tick++;
                     if (sprint_burst_tick > 1 && key_sprint) sprint_hold_latched = true;
-                    if (!key_sprint) sprint_hold_latched = false;
-                    _in_burst = (sprint_burst_tick <= _burst_frames);
-                    _burst_done = (sprint_burst_tick > _burst_frames);
+                    var _in_burst = (sprint_burst_tick <= _burst_frames);
+                    var _burst_done = (sprint_burst_tick > _burst_frames);
                     if (_burst_done && !sprint_hold_latched) {
-                        // Tap dash finished — drop to jog even if direction still held
                         sprint_committed = false;
                         sprint_hold_latched = false;
                         sprint_burst_tick = 0;
                         sprint_commit_dir = 0;
                         sprint_resume_hold = false;
+                        sprint_dir_gap = 0;
                     } else {
                         is_sprinting = true;
                         sprint_jump_carry = false;
@@ -603,11 +656,13 @@ function scr_player_movement() {
             if (jumped_this_frame && _grounded_jump_this_step && !attacking) {
                 var _sj_dir = inputDir;
                 if (_sj_dir == 0) _sj_dir = last_direction;
-                if (_sj_dir != 0 && (key_sprint || _pre_sprinting || _pre_sprint_committed || sprint_jump_carry)) {
+                if (_sj_dir != 0 && (_pre_sprinting || _pre_sprint_committed)) {
                     sprint_committed = false;
                     sprint_burst_tick = 0;
-                    sprint_commit_dir = 0;
-                    sprint_hold_latched = false;
+                    if (!(key_sprint && _pre_sprint_hold_latched)) {
+                        sprint_commit_dir = 0;
+                        sprint_hold_latched = false;
+                    }
                     sprint_jump_carry = true;
                     sprint_air_trail = true;
                     var _carry_sp_j = runsp * (variable_instance_exists(id, "SPRINT_JUMP_CARRY_MULT") ? SPRINT_JUMP_CARRY_MULT : 1);
@@ -616,13 +671,15 @@ function scr_player_movement() {
                 }
             }
             if (jumped_this_frame) {
-                if (key_sprint && (_pre_sprinting || _pre_sprint_committed || sprint_hold_latched)) {
+                if (key_sprint && _pre_sprint_hold_latched && (_pre_sprinting || _pre_sprint_committed)) {
                     sprint_resume_hold = true;
                 }
                 sprint_committed = false;
                 sprint_burst_tick = 0;
-                sprint_commit_dir = 0;
-                sprint_hold_latched = false;
+                if (!(key_sprint && sprint_resume_hold)) {
+                    sprint_commit_dir = 0;
+                    sprint_hold_latched = false;
+                }
             }
             if (is_sprinting || sprint_air_trail) {
                 sprint_afterimage_tick++;
@@ -1547,7 +1604,7 @@ function scr_player_movement() {
 
     // §4 runs before 6c sets grounded — resume hold sprint same frame we land (Z still held, no re-press)
     if (!attacking && stunTimer <= 0 && grounded && vsp >= 0 && !jumped_this_frame
-        && key_sprint && sprint_resume_hold && !sprint_committed) {
+        && key_sprint && sprint_hold_latched && sprint_resume_hold && !sprint_committed) {
         var _inputDir_land = (key_right - key_left);
         if (_inputDir_land != 0) {
             var _burst_frames_land = (variable_instance_exists(id, "SPRINT_BURST_FRAMES") ? SPRINT_BURST_FRAMES : 10);
@@ -1732,10 +1789,6 @@ function scr_player_movement() {
         } else {
             sprint_reel_active = false;
             sprint_reel_pending = false;
-            sprint_committed = false;
-            sprint_burst_tick = 0;
-            sprint_commit_dir = 0;
-            sprint_hold_latched = false;
             // Air logic — wall cling / wall-jump pose (MMX wall_slide + wall_jump anim), then jump rise / peak / fall
             if (wall_jump_kick_hold_timer > 0) {
                 sprite_index = spr_mc_walljump;

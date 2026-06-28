@@ -22,3 +22,18 @@ if (instance_exists(obj_player)) {
     var _sy = clamp(floor(obj_player.y - _half_h - cam_h * 0.5), global.camera_min_y, global.camera_max_y - cam_h);
     camera_set_view_pos(cam, _sx, _sy);
 }
+
+// Parallax — mid_tiles rock wall only; horizontal drift only (no Y shift = no top/bottom gaps).
+parallax_ready = false;
+par_mid_x = 0.35;
+par_mid_y = 0;
+mid_start_x = 0;
+mid_start_y = 0;
+parallax_cam_origin_x = camera_get_view_x(cam);
+parallax_cam_origin_y = camera_get_view_y(cam);
+var _mid_layer = layer_get_id("mid_tiles");
+if (_mid_layer != -1) {
+    mid_start_x = layer_get_x(_mid_layer);
+    mid_start_y = layer_get_y(_mid_layer);
+    parallax_ready = true;
+}

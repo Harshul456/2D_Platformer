@@ -156,7 +156,9 @@ sprint_reel_active = false;     // spr_mc_reelback playing
 sprint_reel_pending = false;    // Armed after sprint ends — reel when direction released
 sprint_committed = false;       // Active sprint session (tap = burst only; hold Z = burst + sustain)
 sprint_hold_latched = false;    // True once Z stays held after first burst frame → sustained runsp
-sprint_resume_hold = false;     // Z held through sprint jump — resume sustain on landing without re-press
+sprint_resume_hold = false;     // Z held through hold-sprint jump — resume sustain on landing
+sprint_dir_gap = 0;             // Frames left to keep sprint during direction-key switch gap
+SPRINT_DIR_SWITCH_GAP = 6;      // Grace frames when swapping L/R while holding Z
 sprint_burst_tick = 0;          // Frames elapsed this commit (1..SPRINT_BURST_FRAMES = burst speed)
 sprint_commit_dir = 0;          // Direction locked in when sprint started (−1 / +1)
 SPRINT_BURST_FRAMES = 15;       // Tap-Z dash length; hold-Z also uses this before runsp sustain
@@ -166,6 +168,15 @@ SPRINT_AIR_DECAY = 0.003;       // Air lerp toward 0 while sprint_jump_carry (lo
 SPRINT_AIR_DECAY_TURN = 0.10;   // Extra decay when reversing direction in air during carry
 SPRINT_AIR_DECAY_HOLD = 0.001;  // Decay while holding Z + same direction in air (near-zero = coast)
 SPRINT_AIR_MIN = 4.25;          // End carry once |hsp| drops below this (between walksp and runsp)
+
+// Sprint activation game-feel (Z press commit in scr_player_movement §4)
+SPRINT_ACTIVATE_HITSTOP = 3;
+SPRINT_SQUASH_COIL_X = 1.2;
+SPRINT_SQUASH_COIL_Y = 0.8;
+SPRINT_SQUASH_LERP = 0.15;
+sprint_squash_x = 1;
+sprint_squash_y = 1;
+sprint_squash_coil_frames = 0; // Set to 1 on Z press — exactly one Step of coil before normal scale
 
 // --- COMBAT & DAMAGE ---
 obj_player_health = 100;

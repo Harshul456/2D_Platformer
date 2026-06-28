@@ -7,13 +7,19 @@ function scr_camera_control() {
     var _cam_x = camera_get_view_x(cam);
     var _cam_y = camera_get_view_y(cam);
 
+    var _player_moved = (abs(_p.x - camera_prev_player_x) > 0.001 || abs(_p.y - camera_prev_player_y) > 0.001);
+    // Hitstop freezes the player — don't drift the view toward look-ahead / min-scroll alone.
+    if (global.hitstop > 0 && !_player_moved) {
+        exit;
+    }
+
     // Wall slide: no horizontal look-ahead; still border-scroll to follow player (mostly vertical).
     var _wall_cling_cam = (!_p.grounded && _p.wall_side != 0 && _p.vsp > 0
         && _p.wall_jump_kick_hold_timer <= 0 && _p.wall_jump_extend_timer <= 0);
 
     if (_wall_cling_cam) {
         cam_look_ahead = lerp(cam_look_ahead, 0, 0.18);
-    } else {
+    } else if (global.hitstop <= 0) {
         // --- Look-ahead (state-based; does not lerp the view itself) ---
         var _look_target = 0;
         var _look_speed = 0.12;
@@ -67,8 +73,12 @@ function scr_camera_control() {
 
     var _dx = abs(_p.x - camera_prev_player_x);
     var _dy = abs(_p.y - camera_prev_player_y);
-    var _xspeed = max(_dx, global.camera_scroll_min_x);
-    var _yspeed = max(_dy, global.camera_scroll_min_y);
+    var _xspeed = _dx;
+    var _yspeed = _dy;
+    if (global.hitstop <= 0) {
+        _xspeed = max(_dx, global.camera_scroll_min_x);
+        _yspeed = max(_dy, global.camera_scroll_min_y);
+    }
     if (abs(_ox) > _xspeed) _ox = _xspeed * sign(_ox);
     if (abs(_oy) > _yspeed) _oy = _yspeed * sign(_oy);
 
@@ -83,4 +93,5 @@ function scr_camera_control() {
     if (_oy > 0 && (_cam_y + cam_h) <= _max_y) _new_y = min(_cam_y + _oy, _max_y - cam_h);
 
     camera_set_view_pos(cam, _new_x, _new_y);
+    scr_parallax_update();
 }
