@@ -49,6 +49,9 @@ global.dash_shader_decay_per_frame = 0.2; // 1.0 over 5 frames
 // Toggle reflections on/off (for before/after captures)
 global.reflections_enabled = false;
 
+// Bulb normal-map lighting (F8 toggles in-game via obj_bulb_controller)
+global.bulb_normal_maps_enabled = BULB_NORMAL_MAPS_ENABLED;
+
 // Borderless fullscreen (more reliable)
 window_set_fullscreen(true);
 

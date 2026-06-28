@@ -625,14 +625,20 @@ function scr_player_movement() {
                 sprint_air_trail = false;
             } else if (sprint_jump_carry) {
                 if (!jumped_this_frame) {
-                    var _sdec = (variable_instance_exists(id, "SPRINT_AIR_DECAY") ? SPRINT_AIR_DECAY : MOMENTUM_DECAY_NORMAL);
-                    var _sdec_turn = (variable_instance_exists(id, "SPRINT_AIR_DECAY_TURN") ? SPRINT_AIR_DECAY_TURN : MOMENTUM_DECAY_TURNING);
-                    if (key_sprint && inputDir != 0 && sign(inputDir) == sign(runMomentum)) {
-                        _sdec = (variable_instance_exists(id, "SPRINT_AIR_DECAY_HOLD") ? SPRINT_AIR_DECAY_HOLD : _sdec * 0.25);
-                    }
-                    runMomentum = lerp(runMomentum, 0, _sdec);
-                    if (inputDir != 0 && sign(inputDir) != sign(runMomentum)) {
-                        runMomentum = lerp(runMomentum, 0, _sdec_turn);
+                    if (inputDir == 0) {
+                        runMomentum = 0;
+                        sprint_jump_carry = false;
+                        sprint_air_trail = false;
+                    } else {
+                        var _sdec = (variable_instance_exists(id, "SPRINT_AIR_DECAY") ? SPRINT_AIR_DECAY : MOMENTUM_DECAY_NORMAL);
+                        var _sdec_turn = (variable_instance_exists(id, "SPRINT_AIR_DECAY_TURN") ? SPRINT_AIR_DECAY_TURN : MOMENTUM_DECAY_TURNING);
+                        if (key_sprint && sign(inputDir) == sign(runMomentum)) {
+                            _sdec = (variable_instance_exists(id, "SPRINT_AIR_DECAY_HOLD") ? SPRINT_AIR_DECAY_HOLD : _sdec * 0.25);
+                        }
+                        runMomentum = lerp(runMomentum, 0, _sdec);
+                        if (sign(inputDir) != sign(runMomentum)) {
+                            runMomentum = lerp(runMomentum, 0, _sdec_turn);
+                        }
                     }
                 }
                 hsp = runMomentum;
@@ -642,9 +648,13 @@ function scr_player_movement() {
                     sprint_jump_carry = false;
                 }
             } else if (abs(runMomentum) > walksp) {
-                runMomentum = lerp(runMomentum, 0, MOMENTUM_DECAY_NORMAL);
-                if (inputDir != 0 && sign(inputDir) != sign(runMomentum)) {
-                    runMomentum = lerp(runMomentum, 0, MOMENTUM_DECAY_TURNING);
+                if (inputDir == 0) {
+                    runMomentum = 0;
+                } else {
+                    runMomentum = lerp(runMomentum, 0, MOMENTUM_DECAY_NORMAL);
+                    if (sign(inputDir) != sign(runMomentum)) {
+                        runMomentum = lerp(runMomentum, 0, MOMENTUM_DECAY_TURNING);
+                    }
                 }
                 hsp = runMomentum;
                 if (abs(runMomentum) <= walksp + MOMENTUM_CUTOFF) runMomentum = 0;

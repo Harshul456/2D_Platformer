@@ -277,6 +277,9 @@ image_alpha      = 1;
 hair_flicker_counter = 0;       // Counter for hair animation flicker
 force_landing_crouch  = false;   // When true, landing crouch plays fully even if holding a direction
 
+// --- BULB LIGHTING ---
+bulb_light = undefined;
+
 // --- REFLECTION ---
 reflection_timer = 0;
 reflection_timer_max = 20;      // Frames to fade reflection when jumping away

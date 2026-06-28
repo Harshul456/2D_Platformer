@@ -287,6 +287,43 @@ if (attackCooldownTimer > 0) {
 }
 if (attack_recovery_grace > 0) attack_recovery_grace--;
 
+// Bulb player light (warm glow; follows each Step)
+if (variable_global_exists("bulb_renderer") && global.bulb_renderer != undefined) {
+    if (!BULB_PLAYER_TORCH_ENABLED) {
+        if (bulb_light != undefined) {
+            bulb_light.visible = false;
+        }
+    } else {
+        var _crystal = scr_bulb_player_crystal_influence(x, y - 16);
+
+        var _torch_warm = make_colour_rgb(255, 235, 190);
+
+        if (bulb_light == undefined) {
+            bulb_light = new BulbLight(global.bulb_renderer, sLight128, 0, x, y);
+            bulb_light.intensity = 1.0;
+            bulb_light.blend = _torch_warm;
+            bulb_light.penumbraSize = 0;
+            bulb_light.xscale = 1.35;
+            bulb_light.yscale = 1.35;
+            bulb_light.castShadows = false;
+            bulb_light.normalMap = global.bulb_normal_maps_enabled;
+            bulb_light.normalMapZ = 40;
+        } else {
+            bulb_light.visible = true;
+            bulb_light.x = x;
+            bulb_light.y = y - 12;
+            bulb_light.normalMap = global.bulb_normal_maps_enabled;
+            bulb_light.normalMapZ = 40;
+        }
+
+        bulb_light.xscale = 1.35;
+        bulb_light.yscale = 1.35;
+        bulb_light.castShadows = false;
+        bulb_light.intensity = lerp(1.0, 0.82, _crystal.strength);
+        bulb_light.blend = merge_colour(_torch_warm, _crystal.blend, _crystal.strength * 0.65);
+    }
+}
+
 // 5. VISUALS & CLEANUP
 scr_player_invincibility();
 _player_sprint_deform();

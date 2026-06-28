@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"scr_bulb_player_crystal_influence",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"scr_bulb_player_crystal_influence",
+  "parent":{
+    "name":"Scripts",
+    "path":"folders/Scripts.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

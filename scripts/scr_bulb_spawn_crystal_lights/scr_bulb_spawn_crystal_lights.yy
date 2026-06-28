@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"scr_bulb_spawn_crystal_lights",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"scr_bulb_spawn_crystal_lights",
+  "parent":{
+    "name":"Scripts",
+    "path":"folders/Scripts.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

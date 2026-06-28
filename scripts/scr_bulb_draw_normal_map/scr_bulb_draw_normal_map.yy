@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"scr_bulb_draw_normal_map",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"scr_bulb_draw_normal_map",
+  "parent":{
+    "name":"Scripts",
+    "path":"folders/Scripts.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

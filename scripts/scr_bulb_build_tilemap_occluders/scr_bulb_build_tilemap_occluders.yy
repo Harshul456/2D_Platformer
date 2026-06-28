@@ -1,0 +1,13 @@
+{
+  "$GMScript":"v1",
+  "%Name":"scr_bulb_build_tilemap_occluders",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"scr_bulb_build_tilemap_occluders",
+  "parent":{
+    "name":"Scripts",
+    "path":"folders/Scripts.yy",
+  },
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}
