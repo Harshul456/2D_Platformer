@@ -16,6 +16,7 @@
 // --- GLOBAL VARIABLES ---
 global.tilemap_collision_id = noone; 
 global.player_id = noone;
+global.player_gamepad_slot = -1; // First connected pad for scr_player_input (-1 = none)
 // One-way ledges (TileSet2 indices 1,5,34,35,36): bbox_bottom at start of Step; vsp after gravity (scr_player_movement sets each frame).
 global.player_ledge_bb_prev = -1000000;
 global.player_move_vsp = 0;

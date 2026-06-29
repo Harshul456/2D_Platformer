@@ -12,4 +12,4 @@ with (instance_find(obj_camera_zone, 0)) {
     zone_max_y = room_height;
 }
 
-audio_play_sound(s_alone, 1, true);
+audio_play_sound(s_cave_placeholder, 1, true);

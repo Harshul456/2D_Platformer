@@ -25,18 +25,9 @@ function scr_player_movement() {
     var p_right   = floor(bbox_right) - 1;
     var p_center  = floor((bbox_left + bbox_right) * 0.5);
 
-    // --- 1. INPUT ---
+    // --- 1. INPUT (keyboard + gamepad via scr_player_input) ---
     if (stunTimer <= 0) {
-        key_left      = keyboard_check(vk_left);
-        key_right     = keyboard_check(vk_right);
-        key_jump      = keyboard_check_pressed(vk_up);
-        key_jump_held = keyboard_check(vk_up); 
-        key_down      = keyboard_check(vk_down);
-        key_sprint    = keyboard_check(ord("Z"));
-        key_sprint_press = keyboard_check_pressed(ord("Z")); 
-        key_attack    = keyboard_check_pressed(ord("X"));
-        // Wall slide + wall jump: hold Shift at a wall (see obj_player Create). Left/right alone do not cling.
-        key_wall_cling = keyboard_check(vk_lshift) || keyboard_check(vk_rshift);
+        scr_player_input_poll();
 
         // Jump buffer (decay after §2c — can pause while sliding into wall with a live jump buffer, or hugging wall with air jump banked)
         if (key_jump) jump_buffer_timer = jump_buffer_max;
@@ -195,7 +186,7 @@ function scr_player_movement() {
     // Wall cling: Shift must be held in air for WALL_SHIFT_HOLD_FRAMES_REQUIRED consecutive Steps (see Create).
     var _wshr = (variable_instance_exists(id, "WALL_SHIFT_HOLD_FRAMES_REQUIRED") ? WALL_SHIFT_HOLD_FRAMES_REQUIRED : 14);
     if (_wshr < 1) _wshr = 1;
-    var _sk_air = (stunTimer <= 0) && (keyboard_check(vk_lshift) || keyboard_check(vk_rshift));
+    var _sk_air = (stunTimer <= 0) && key_wall_cling;
     if (stunTimer > 0) {
         wall_shift_hold_timer = 0;
     } else if (grounded || !_sk_air) {
@@ -828,7 +819,7 @@ function scr_player_movement() {
 
     cling_eff = false;
     if (stunTimer <= 0) {
-        var _sk_rs = (keyboard_check(vk_lshift) || keyboard_check(vk_rshift));
+        var _sk_rs = key_wall_cling;
         cling_eff = _sk_rs && (wall_shift_hold_timer >= _wshr);
     }
 
@@ -1690,7 +1681,7 @@ function scr_player_movement() {
 
     cling_eff = false;
     if (stunTimer <= 0) {
-        var _sk_anim = (keyboard_check(vk_lshift) || keyboard_check(vk_rshift));
+        var _sk_anim = key_wall_cling;
         cling_eff = _sk_anim && (wall_shift_hold_timer >= _wshr);
     }
 
