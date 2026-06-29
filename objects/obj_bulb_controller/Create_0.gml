@@ -20,3 +20,9 @@ application_surface_draw_enable(false);
 
 tilemap_occluders = [];
 occluders_built = false;
+
+lit_scene_surface = -1;
+
+scr_cave_dust_init(id);
+scr_ceiling_drip_init(id);
+scr_cave_atmosphere_init(id);

@@ -87,10 +87,12 @@ if (!attacking && stunTimer <= 0 && attack_lockout <= 0 && attack_recovery_grace
         sprint_air_trail = false;
         sprint_reel_active = false;
         sprint_reel_pending = false;
+        sprint_reel_dir_wait = 0;
         sprint_committed = false;
         sprint_burst_tick = 0;
         sprint_commit_dir = 0;
         sprint_hold_latched = false;
+        sprint_z_idle_charged = false;
         sprint_resume_hold = false;
         sprint_dir_gap = 0;
     }

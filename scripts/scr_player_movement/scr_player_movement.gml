@@ -513,22 +513,27 @@ function scr_player_movement() {
                 sprint_hold_latched = false;
                 sprint_resume_hold = false;
                 sprint_dir_gap = 0;
+                sprint_z_idle_charged = false;
             }
             var _sprint_start_ok = _sprint_sprite_ok || (sprint_resume_hold && key_sprint);
+            // Hold Z while idle → direction later starts sprint (same commit as Z+dir together)
+            if (key_sprint && inputDir == 0 && grounded && !jumped_this_frame && vsp >= 0
+                && _sprint_sprite_ok && !sprint_committed) {
+                sprint_z_idle_charged = true;
+            }
             // Tap Z = burst only. Hold Z (latched) = burst + sustain. Press starts a new session.
-            if (key_sprint_press && grounded && !jumped_this_frame && vsp >= 0 && inputDir != 0
+            var _sprint_from_idle_charge = (key_sprint && sprint_z_idle_charged && inputDir != 0);
+            if ((key_sprint_press || _sprint_from_idle_charge) && grounded && !jumped_this_frame && vsp >= 0 && inputDir != 0
                 && _sprint_sprite_ok && !sprint_committed) {
                 sprint_committed = true;
-                sprint_hold_latched = false;
+                sprint_hold_latched = _sprint_from_idle_charge;
                 sprint_burst_tick = 0;
                 sprint_commit_dir = inputDir;
                 sprint_reel_pending = false;
                 sprint_dir_gap = 0;
-                // Sprint activation game-feel (hitstop, squash coil, screen shader)
-                global.hitstop = SPRINT_ACTIVATE_HITSTOP;
+                sprint_z_idle_charged = false;
+                // Sprint activation game-feel (squash coil)
                 sprint_squash_coil_frames = 1;
-                global.dash_shader_active = true;
-                global.dash_shader_intensity = 1.0;
             }
             // Re-enter sustain: landed from hold-sprint jump, or turned around while Z still held
             if (key_sprint && sprint_hold_latched && grounded && !jumped_this_frame && vsp >= 0
@@ -566,9 +571,14 @@ function scr_player_movement() {
                     if (_leave_ground && key_sprint && sprint_hold_latched) {
                         sprint_resume_hold = true;
                     }
-                    if (grounded && !_leave_ground && (_tap_stop || _hold_stop) && !_z_released) {
+                    if (grounded && !_leave_ground && (_tap_stop || _hold_stop || _z_released)) {
                         sprint_reel_pending = true;
                         sprint_resume_hold = false;
+                        if (inputDir != 0) {
+                            sprint_reel_dir_wait = max(sprint_reel_dir_wait, SPRINT_REEL_DIR_WAIT_FRAMES);
+                        } else {
+                            sprint_reel_dir_wait = 0;
+                        }
                     }
                     sprint_committed = false;
                     sprint_burst_tick = 0;
@@ -699,17 +709,30 @@ function scr_player_movement() {
             } else {
                 sprint_afterimage_tick = 0;
             }
-            // Arm sprint reel-back when committed sprint ends on ground
+            // Arm / maintain sprint reel-back when committed sprint ends on ground
             if (is_sprinting || sprint_committed) {
                 sprint_reel_pending = false;
-            } else if ((_pre_sprinting || _pre_sprint_committed) && grounded && !jumped_this_frame && vsp >= 0
-                && !(key_left || key_right)) {
+                sprint_reel_dir_wait = 0;
+            } else if ((_pre_sprinting || _pre_sprint_committed) && grounded && !jumped_this_frame && vsp >= 0) {
                 sprint_reel_pending = true;
+                if ((key_left || key_right) && !key_sprint) {
+                    sprint_reel_dir_wait = max(sprint_reel_dir_wait, SPRINT_REEL_DIR_WAIT_FRAMES);
+                } else {
+                    sprint_reel_dir_wait = 0;
+                }
             } else if (sprint_reel_pending) {
                 if (!grounded || jumped_this_frame) {
                     sprint_reel_pending = false;
-                } else if (inputDir != 0) {
-                    sprint_reel_pending = false;
+                    sprint_reel_dir_wait = 0;
+                } else if (!key_sprint && !(key_left || key_right)) {
+                    sprint_reel_dir_wait = 0;
+                } else if (!key_sprint && (key_left || key_right)) {
+                    // Z up, direction still down — wait out staggered release before treating as walk
+                    if (sprint_reel_dir_wait > 0) {
+                        sprint_reel_dir_wait--;
+                    } else {
+                        sprint_reel_pending = false;
+                    }
                 }
             }
         }
@@ -1761,9 +1784,10 @@ function scr_player_movement() {
                 if (sprite_index != spr_mc_sprint) { sprite_index = spr_mc_sprint; image_index = 0; }
                 image_speed = 1;
             } else if (sprint_reel_active || sprite_index == spr_mc_reelback
-                || (sprint_reel_pending && _input_dir == 0)) {
+                || (sprint_reel_pending && !key_sprint && !(key_left || key_right))) {
                 sprint_reel_active = true;
                 sprint_reel_pending = false;
+                sprint_reel_dir_wait = 0;
                 if (sprite_index != spr_mc_reelback) {
                     sprite_index = spr_mc_reelback;
                     image_index = 0;
@@ -1786,6 +1810,14 @@ function scr_player_movement() {
                     sprite_index = spr_mc_idle;
                     image_index = 0;
                 }
+            } else if (sprint_reel_pending && !key_sprint && (key_left || key_right) && sprint_reel_dir_wait > 0) {
+                // Staggered key release — keep sprint pose until direction lets go or wait expires
+                sprint_reel_active = false;
+                if (sprite_index != spr_mc_sprint) {
+                    sprite_index = spr_mc_sprint;
+                    image_index = 0;
+                }
+                image_speed = 1;
             } else {
                 if (!sprint_reel_pending) sprint_reel_active = false;
                 // Normal ground movement (walk / idle — also exits spr_mc_sprint when Z is released)
@@ -1799,6 +1831,7 @@ function scr_player_movement() {
         } else {
             sprint_reel_active = false;
             sprint_reel_pending = false;
+            sprint_reel_dir_wait = 0;
             // Air logic — wall cling / wall-jump pose (MMX wall_slide + wall_jump anim), then jump rise / peak / fall
             if (wall_jump_kick_hold_timer > 0) {
                 sprite_index = spr_mc_walljump;

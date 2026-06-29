@@ -1,9 +1,9 @@
 {
   "$GMScript":"v1",
-  "%Name":"__BulbConfig",
+  "%Name":"scr_bulb_redraw_over_emissive_glow",
   "isCompatibility":false,
   "isDnD":false,
-  "name":"__BulbConfig",
+  "name":"scr_bulb_redraw_over_emissive_glow",
   "parent":{
     "name":"Scripts",
     "path":"folders/Scripts.yy",

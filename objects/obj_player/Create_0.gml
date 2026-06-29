@@ -154,8 +154,11 @@ sprint_jump_carry = false;      // Airborne horizontal speed from sprint jump / 
 sprint_air_trail = false;       // Afterimages in air after sprint jump until landing
 sprint_reel_active = false;     // spr_mc_reelback playing
 sprint_reel_pending = false;    // Armed after sprint ends — reel when direction released
+sprint_reel_dir_wait = 0;       // Frames to wait for direction to release after Z up before assuming walk intent
+SPRINT_REEL_DIR_WAIT_FRAMES = 14; // ~230ms @60fps — forgiving staggered key release when stopping from sprint
 sprint_committed = false;       // Active sprint session (tap = burst only; hold Z = burst + sustain)
 sprint_hold_latched = false;    // True once Z stays held after first burst frame → sustained runsp
+sprint_z_idle_charged = false;  // Z held while standing — next direction press starts sprint
 sprint_resume_hold = false;     // Z held through hold-sprint jump — resume sustain on landing
 sprint_dir_gap = 0;             // Frames left to keep sprint during direction-key switch gap
 SPRINT_DIR_SWITCH_GAP = 6;      // Grace frames when swapping L/R while holding Z
@@ -170,7 +173,6 @@ SPRINT_AIR_DECAY_HOLD = 0.001;  // Decay while holding Z + same direction in air
 SPRINT_AIR_MIN = 4.25;          // End carry once |hsp| drops below this (between walksp and runsp)
 
 // Sprint activation game-feel (Z press commit in scr_player_movement §4)
-SPRINT_ACTIVATE_HITSTOP = 3;
 SPRINT_SQUASH_COIL_X = 1.2;
 SPRINT_SQUASH_COIL_Y = 0.8;
 SPRINT_SQUASH_LERP = 0.15;

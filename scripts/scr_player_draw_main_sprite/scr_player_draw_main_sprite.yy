@@ -1,9 +1,9 @@
 {
   "$GMScript":"v1",
-  "%Name":"__BulbConfig",
+  "%Name":"scr_player_draw_main_sprite",
   "isCompatibility":false,
   "isDnD":false,
-  "name":"__BulbConfig",
+  "name":"scr_player_draw_main_sprite",
   "parent":{
     "name":"Scripts",
     "path":"folders/Scripts.yy",

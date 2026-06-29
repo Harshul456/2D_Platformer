@@ -10,3 +10,5 @@ tilemap_occluders = scr_bulb_build_room_occluders(renderer);
 
 occluders_built = true;
 
+scr_ceiling_drip_bake_emitters(id, BULB_CEILING_DRIP_LAYER);
+scr_cave_atmosphere_bind_fog_layer(id);

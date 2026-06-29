@@ -1,9 +1,9 @@
 {
   "$GMScript":"v1",
-  "%Name":"__BulbConfig",
+  "%Name":"scr_bulb_draw_glow_tile_layer",
   "isCompatibility":false,
   "isDnD":false,
-  "name":"__BulbConfig",
+  "name":"scr_bulb_draw_glow_tile_layer",
   "parent":{
     "name":"Scripts",
     "path":"folders/Scripts.yy",

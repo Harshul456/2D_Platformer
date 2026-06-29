@@ -117,9 +117,14 @@ function scr_bulb_crystal_light_init_pulse(_inst) {
         glow_time = random(360);
         glow_breathe_speed = 0.42 + random(0.18);
 
-        glow_scale_tight = 0.82;
-        glow_scale_wide = 1.12;
-        glow_intensity_tight = 0.95;
-        glow_intensity_wide = 1.08;
+        glow_scale_tight = BULB_CRYSTAL_PULSE_SCALE_TIGHT;
+        glow_scale_wide = BULB_CRYSTAL_PULSE_SCALE_WIDE;
+        glow_intensity_tight = BULB_CRYSTAL_PULSE_INTENSITY_TIGHT;
+        glow_intensity_wide = BULB_CRYSTAL_PULSE_INTENSITY_WIDE;
+
+        glow_pulse_t = 0.5;
+        glow_pulse_alpha = lerp(BULB_GLOW_PULSE_MIN, BULB_GLOW_PULSE_MAX, 0.5);
+
+        scr_crystal_spark_init(_inst);
     }
 }

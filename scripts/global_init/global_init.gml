@@ -41,11 +41,6 @@ display_reset(0, true);   // Forces VSync ON via code
 global.show_debug = false; // Renamed to avoid conflict with built-in variable
 global.hitstop = 0;       // Hitstop frames (impact freeze); decremented in scr_hitstop_handler
 
-// Sprint/dash game-feel (scr_player_movement activation)
-global.dash_shader_active = false;  // Screen-edge distortion pipeline trigger
-global.dash_shader_intensity = 0;   // 1.0 on dash activate; decays in obj_camera_controller
-global.dash_shader_decay_per_frame = 0.2; // 1.0 over 5 frames
-
 // Toggle reflections on/off (for before/after captures)
 global.reflections_enabled = false;
 

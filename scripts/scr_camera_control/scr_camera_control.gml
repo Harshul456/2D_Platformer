@@ -43,6 +43,9 @@ function scr_camera_control() {
     }
 
     var _half_h = (_p.bbox_bottom - _p.bbox_top) * 0.5;
+    // Squash coil scales the bbox — normalize so dash deform doesn't jerk the view.
+    var _squash_y = _p.image_yscale / _p.image_base_scale;
+    if (_squash_y > 0.01) _half_h /= _squash_y;
     var _px = floor(_p.x + cam_look_ahead);
     var _py = floor(_p.y - _half_h);
 
@@ -76,8 +79,9 @@ function scr_camera_control() {
     var _xspeed = _dx;
     var _yspeed = _dy;
     if (global.hitstop <= 0) {
-        _xspeed = max(_dx, global.camera_scroll_min_x);
-        _yspeed = max(_dy, global.camera_scroll_min_y);
+        // Min scroll only when the player actually moved on that axis (avoids vertical jitter on horizontal dash).
+        if (_dx > 0.001) _xspeed = max(_dx, global.camera_scroll_min_x);
+        if (_dy > 0.001) _yspeed = max(_dy, global.camera_scroll_min_y);
     }
     if (abs(_ox) > _xspeed) _ox = _xspeed * sign(_ox);
     if (abs(_oy) > _yspeed) _oy = _yspeed * sign(_oy);

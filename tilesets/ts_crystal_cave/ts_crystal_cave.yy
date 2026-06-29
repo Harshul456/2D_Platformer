@@ -1,13 +1,13 @@
 {
   "$GMTileSet":"v1",
-  "%Name":"TileSet2",
+  "%Name":"ts_crystal_cave",
   "autoTileSets":[],
   "macroPageTiles":{
     "SerialiseHeight":0,
     "SerialiseWidth":0,
     "TileSerialiseData":[],
   },
-  "name":"TileSet2",
+  "name":"ts_crystal_cave",
   "out_columns":11,
   "out_tilehborder":2,
   "out_tilevborder":2,
@@ -18,8 +18,8 @@
   "resourceType":"GMTileSet",
   "resourceVersion":"2.0",
   "spriteId":{
-    "name":"spr_test",
-    "path":"sprites/spr_test/spr_test.yy",
+    "name":"spr_crystal_cave",
+    "path":"sprites/spr_crystal_cave/spr_crystal_cave.yy",
   },
   "spriteNoExport":false,
   "textureGroupId":{

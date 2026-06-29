@@ -1,9 +1,9 @@
 {
   "$GMScript":"v1",
-  "%Name":"__BulbConfig",
+  "%Name":"scr_crystal_sparks",
   "isCompatibility":false,
   "isDnD":false,
-  "name":"__BulbConfig",
+  "name":"scr_crystal_sparks",
   "parent":{
     "name":"Scripts",
     "path":"folders/Scripts.yy",

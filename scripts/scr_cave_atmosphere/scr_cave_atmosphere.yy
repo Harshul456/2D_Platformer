@@ -1,9 +1,9 @@
 {
   "$GMScript":"v1",
-  "%Name":"__BulbConfig",
+  "%Name":"scr_cave_atmosphere",
   "isCompatibility":false,
   "isDnD":false,
-  "name":"__BulbConfig",
+  "name":"scr_cave_atmosphere",
   "parent":{
     "name":"Scripts",
     "path":"folders/Scripts.yy",

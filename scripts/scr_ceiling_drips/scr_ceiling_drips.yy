@@ -1,9 +1,9 @@
 {
   "$GMScript":"v1",
-  "%Name":"__BulbConfig",
+  "%Name":"scr_ceiling_drips",
   "isCompatibility":false,
   "isDnD":false,
-  "name":"__BulbConfig",
+  "name":"scr_ceiling_drips",
   "parent":{
     "name":"Scripts",
     "path":"folders/Scripts.yy",

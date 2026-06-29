@@ -48,3 +48,30 @@ function scr_bulb_draw_crystal_rim(_spr, _img, _dx, _dy, _xscale, _yscale, _crys
     draw_sprite_ext(_spr, _img, _dx + _ox, _dy + _oy, _xscale, _yscale, 0, _crystal.blend, _rim_alpha);
     gpu_set_blendmode(bm_normal);
 }
+
+/// @description Emissive alpha for a glow tile — synced to the nearest crystal BulbLight pulse.
+/// @param {Real} _px
+/// @param {Real} _py
+/// @param {Real} [_match_radius=24]
+/// @returns {Real}
+function scr_bulb_crystal_glow_alpha_at(_px, _py, _match_radius = 24) {
+    var _best_alpha = undefined;
+    var _best_dist = _match_radius;
+
+    with (obj_bulb_crystal_light) {
+        if (bulb_light == undefined) continue;
+        if (!variable_instance_exists(id, "glow_pulse_alpha")) continue;
+
+        var _d = point_distance(_px, _py, x, y);
+        if (_d >= _best_dist) continue;
+
+        _best_dist = _d;
+        _best_alpha = glow_pulse_alpha;
+    }
+
+    if (_best_alpha == undefined) {
+        return lerp(BULB_GLOW_PULSE_MIN, BULB_GLOW_PULSE_MAX, 0.5);
+    }
+
+    return _best_alpha;
+}

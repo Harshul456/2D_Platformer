@@ -1,6 +1,26 @@
+var _lit_scene = -1;
+
 if (renderer != undefined) {
-    BulbDrawLitSurface(renderer, application_surface);
+    var _emissive_overlays = BULB_GLOW_TILE_LAYER_ENABLED || BULB_CRYSTAL_SPARKS_ENABLED;
+
+    if (_emissive_overlays) {
+        _lit_scene = scr_bulb_draw_lit_scene(renderer);
+    } else {
+        BulbDrawLitSurface(renderer, application_surface);
+    }
 }
+scr_cave_dust_draw(id);
+scr_ceiling_drip_draw(id);
+
+// Low mist sits in front of parallax walls, behind player + emissive glow.
+scr_cave_fog_draw(id);
+
+// Emissive crystal/mushroom glow stickers — layer hidden in Room Editor, drawn additively here.
+scr_bulb_draw_glow_tile_layer();
+scr_crystal_spark_draw_all();
+scr_bulb_redraw_over_emissive_glow(_lit_scene);
+
+scr_cave_vignette_draw();
 
 if (normal_map_hud_timer > 0) {
     var _cam = view_camera[0];
