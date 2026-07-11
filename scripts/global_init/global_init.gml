@@ -17,9 +17,12 @@
 global.tilemap_collision_id = noone; 
 global.player_id = noone;
 global.player_gamepad_slot = -1; // First connected pad for scr_player_input (-1 = none)
-// One-way ledges (TileSet2 indices 1,5,34,35,36): bbox_bottom at start of Step; vsp after gravity (scr_player_movement sets each frame).
+// One-way ledges (TileSet2 indices 1,5,34,35,36): bbox_bottom at start of Step; vsp after gravity.
+// Player sets these each Step; enemies use tilecol_actor_* (same semantics) via scr_enemy_tile_movement.
 global.player_ledge_bb_prev = -1000000;
 global.player_move_vsp = 0;
+global.tilecol_actor_ledge_bb_prev = -1000000;
+global.tilecol_actor_vsp = 0;
 
 // Camera (MMX-style zones — obj_camera_zone + scr_camera_control)
 global.camera_current_zone = -1;
@@ -49,5 +52,5 @@ global.reflections_enabled = false;
 global.bulb_normal_maps_enabled = BULB_NORMAL_MAPS_ENABLED;
 
 // Borderless fullscreen (more reliable)
-window_set_fullscreen(true);
+window_set_fullscreen(false);
 

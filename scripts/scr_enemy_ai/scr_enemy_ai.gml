@@ -1,3 +1,10 @@
+/// @function scr_enemy_set_facing
+/// @description Match player convention: +xscale faces right. Always use abs(base_xscale) so random spawn sign cannot invert facing.
+function scr_enemy_set_facing(_move_dir) {
+    if (_move_dir == 0) return;
+    image_xscale = abs(base_xscale) * _move_dir;
+}
+
 /// @function scr_enemy_ai
 /// @description Hierarchical threat FSM: Melee band (half-widths + chase_stop_extra) + LoS + DCD==0
 ///             → THREAT_REACTION → optional THREAT_NEUTRAL (20%) → weighted branch (25/45/30 + velocity scaling).
@@ -27,7 +34,7 @@ function scr_enemy_ai() {
                 var _fy = bbox_bottom;
                 var _ok = scr_enemy_forward_ledge_ok_horiz(_dd);
                 if (!_ok) hsp = 0;
-                if (_dd != 0) image_xscale = base_xscale * _dd;
+                if (_dd != 0) scr_enemy_set_facing(_dd);
             } else {
                 hsp = 0;
             }
@@ -58,6 +65,8 @@ function scr_enemy_ai() {
         }
         return;
     }
+
+    tilecol_sync_actor_context(vsp, shelf_bb_bottom_prev);
 
     if (!instance_exists(obj_player)) {
         hsp = 0;
@@ -115,7 +124,7 @@ function scr_enemy_ai() {
                 patrol_dir = -patrol_dir;
                 patrol_pause_timer = irandom_range(patrol_edge_pause_min, patrol_edge_pause_max);
             }
-            if (patrol_dir != 0) image_xscale = base_xscale * patrol_dir;
+            if (patrol_dir != 0) scr_enemy_set_facing(patrol_dir);
             if (x <= _lbound + 2) {
                 patrol_dir = 1;
                 x = max(x, _lbound);
@@ -141,7 +150,7 @@ function scr_enemy_ai() {
             var _r_pin = (attack_cooldown <= 0 && _dist_x <= _rstop && scr_enemy_los_to_player()
                 && scr_enemy_horiz_channel_clear_feet());
 
-            if (_dir != 0) image_xscale = base_xscale * _dir;
+            if (_dir != 0) scr_enemy_set_facing(_dir);
 
             if (!_r_pin) {
                 state = scr_enemy_resolve_chase_or_patrol_wide();
@@ -180,7 +189,7 @@ function scr_enemy_ai() {
             var _n_pin = (attack_cooldown <= 0 && _dist_x <= _nstop && scr_enemy_los_to_player()
                 && scr_enemy_horiz_channel_clear_feet());
 
-            if (_dir != 0) image_xscale = base_xscale * _dir;
+            if (_dir != 0) scr_enemy_set_facing(_dir);
 
             if (!_n_pin) {
                 state = scr_enemy_resolve_chase_or_patrol_wide();
@@ -215,7 +224,7 @@ function scr_enemy_ai() {
             var _pin_threat = (attack_cooldown <= 0 && _dist_x <= _pstop && scr_enemy_los_to_player()
                 && scr_enemy_horiz_channel_clear_feet());
 
-            if (_dir != 0) image_xscale = base_xscale * _dir;
+            if (_dir != 0) scr_enemy_set_facing(_dir);
 
             if (!_pin_threat) {
                 state = scr_enemy_resolve_chase_or_patrol_wide();
@@ -251,7 +260,7 @@ function scr_enemy_ai() {
             } else {
                 hsp = 0;
             }
-            if (_away != 0) image_xscale = base_xscale * _away;
+            if (_away != 0) scr_enemy_set_facing(_away);
 
             retreat_intended_hsp = hsp;
 
@@ -290,7 +299,7 @@ function scr_enemy_ai() {
 
             if (decision_cooldown_timer > 0) hsp *= enemy_decision_cooldown_move_scale;
 
-            if (_dir != 0) image_xscale = base_xscale * _dir;
+            if (_dir != 0) scr_enemy_set_facing(_dir);
 
             var _path_ok = scr_enemy_horiz_channel_clear_feet();
             var _los_ok = scr_enemy_los_to_player();
@@ -362,7 +371,7 @@ function scr_enemy_ai() {
 
             if (decision_cooldown_timer > 0) hsp *= enemy_decision_cooldown_move_scale;
 
-            if (_dir != 0) image_xscale = base_xscale * _dir;
+            if (_dir != 0) scr_enemy_set_facing(_dir);
 
             var _path_ok2 = scr_enemy_horiz_channel_clear_feet();
             var _los_ok2 = scr_enemy_los_to_player();
@@ -615,9 +624,10 @@ function scr_enemy_los_to_player() {
 }
 
 /// @function scr_enemy_forward_ledge_ok_horiz
-/// @description Down-angled forward probe so dash/retreat does not walk off ledges (_dir_sign: -1 or +1).
+/// @description Down-angled forward probe — shelf caps (1/5/34/36) use walkable lx via check_tile_collision.
 function scr_enemy_forward_ledge_ok_horiz(_dir_sign) {
     if (_dir_sign == 0) return false;
+    tilecol_sync_actor_context(vsp, shelf_bb_bottom_prev);
     var _feet = bbox_bottom;
     var _lead = (_dir_sign > 0) ? bbox_right + 1 : bbox_left - 1;
     var _near = check_tile_collision(_lead, _feet + 1) || check_tile_collision(_lead, _feet + 4);

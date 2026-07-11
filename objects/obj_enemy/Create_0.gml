@@ -123,3 +123,14 @@ retaliation_range_x = 110;        // After finisher stun + still this close: ext
 // Telegraph draw offset (set in scr_enemy_ai during windup)
 telegraph_shake_x = 0;
 telegraph_shake_y = 0;
+
+// Tile movement (one-way shelves) + narrow foot probes for spr_enemy spike feet
+shelf_bb_bottom_prev = bbox_bottom;
+enemy_grounded = true;
+ENEMY_FOOT_PROBE_HALF_WIDTH = 3;
+
+// Visual hover bob + 8-frame breathing (collision y unchanged; see scr_enemy_floating_hover)
+enemy_is_floating = false;
+scr_enemy_floating_hover_init();
+
+enemy_ai_enabled = true;

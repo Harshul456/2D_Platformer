@@ -19,7 +19,7 @@ function scr_hitstop_handler() {
         return true; // Indicates we're in hitstop
     } else {
         with (obj_player) image_speed = 1;
-        with (obj_enemy) image_speed = 1;
+        // obj_enemy uses code-driven breath frames (scr_enemy_floating_hover), not image_speed
         return false;
     }
 }

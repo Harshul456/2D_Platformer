@@ -15,7 +15,7 @@ if (pressure_window_timer > 0) {
 }
 
 // Apply pending knockback after hitstop ends
-if (global.hitstop == 0 && (knockback_pending_x != 0 || knockback_pending_y != 0)) {
+if (enemy_ai_enabled && global.hitstop == 0 && (knockback_pending_x != 0 || knockback_pending_y != 0)) {
     // ALWAYS apply horizontal knockback
     knockbackX = knockback_pending_x;
     
@@ -34,7 +34,11 @@ if (global.hitstop == 0 && (knockback_pending_x != 0 || knockback_pending_y != 0
 }
 
 // 1. INPUT & VELOCITY LOGIC
-if (state == STATE_STUNNED) {
+if (!enemy_ai_enabled) {
+    hsp = 0;
+    vsp = 0;
+    knockbackX = 0;
+} else if (state == STATE_STUNNED) {
     stunTimer--;
     hsp = knockbackX;
     vsp += grv; 
@@ -65,34 +69,11 @@ if (state == STATE_STUNNED) {
     vsp += grv; 
 }
 
-// 2. ACTUAL TILE MOVEMENT (Pixel-Perfect Snap)
-// --- Horizontal Collision ---
-if (hsp != 0) {
-    var _bbox_side = (hsp > 0) ? bbox_right : bbox_left;
-    
-    // Check if the total movement is clear
-    if (!check_tile_collision(_bbox_side + hsp, bbox_top + 4) && 
-        !check_tile_collision(_bbox_side + hsp, bbox_bottom - 4)) {
-        x += hsp;
-    } else {
-        // Snap to wall: Move 1 pixel at a time until contact
-        var _step_h = sign(hsp);
-        repeat(abs(ceil(hsp))) {
-            _bbox_side = (_step_h > 0) ? bbox_right : bbox_left;
-            if (!check_tile_collision(_bbox_side + _step_h, bbox_top + 4) && 
-                !check_tile_collision(_bbox_side + _step_h, bbox_bottom - 4)) {
-                x += _step_h;
-            } else {
-                hsp = 0;
-                knockbackX = 0;
-                break;
-            }
-        }
-    }
-}
+// 2. TILEMAP MOVEMENT (one-way shelves / edge tiles — same rules as player)
+scr_enemy_tile_movement();
 
 // Cornered retreat: wanted horizontal retreat but wall zeroed hsp — snap to aggressive wind-up instead of burning timer.
-if (state == STATE_DEFENSIVE_RETREAT && retreat_timer > 0) {
+if (enemy_ai_enabled && state == STATE_DEFENSIVE_RETREAT && retreat_timer > 0) {
     if (abs(retreat_intended_hsp) > 0.05 && abs(hsp) < 0.05) {
         retreat_wall_stall++;
         if (retreat_wall_stall >= enemy_retreat_cornered_stall_frames) {
@@ -113,26 +94,6 @@ if (state == STATE_DEFENSIVE_RETREAT && retreat_timer > 0) {
     }
 } else {
     retreat_wall_stall = 0;
-}
-
-// --- Vertical Collision ---
-var _bbox_v = (vsp >= 0) ? bbox_bottom : bbox_top;
-if (!check_tile_collision(bbox_left + 2, _bbox_v + vsp) && 
-    !check_tile_collision(bbox_right - 2, _bbox_v + vsp)) {
-    y += vsp;
-} else {
-    // Snap to floor/ceiling 1 pixel at a time
-    var _step_v = sign(vsp);
-    repeat(abs(ceil(vsp))) {
-        _bbox_v = (_step_v >= 0) ? bbox_bottom : bbox_top;
-        if (!check_tile_collision(bbox_left + 2, _bbox_v + _step_v) && 
-            !check_tile_collision(bbox_right - 2, _bbox_v + _step_v)) {
-            y += _step_v;
-        } else {
-            vsp = 0;
-            break;
-        }
-    }
 }
 
 // --- ENEMY HIT BLINK ---
@@ -156,7 +117,7 @@ y = round(y);
 // Include first recovery frame — AI can move to phase 2 same frame as the last dash step.
 var _dash_hit_frame = (attack_phase == 1)
     || (attack_phase == 2 && attack_phase_timer == enemy_attack_recovery_frames);
-if (state == STATE_ATTACK && _dash_hit_frame && !attack_hit_dealt && instance_exists(obj_player)) {
+if (enemy_ai_enabled && state == STATE_ATTACK && _dash_hit_frame && !attack_hit_dealt && instance_exists(obj_player)) {
     var _yc = (bbox_top + bbox_bottom) * 0.5;
     var _contact = place_meeting(x, y, obj_player)
         || (collision_line(dash_sweep_prev_x, _yc, x, _yc, obj_player, true, true) != noone);
@@ -196,3 +157,6 @@ if (state == STATE_ATTACK && _dash_hit_frame && !attack_hit_dealt && instance_ex
         attack_hit_dealt = true;
     }
 }
+
+// Visual hover + breath frames (draw-only offset; runs even when AI is disabled)
+scr_enemy_floating_hover_step();

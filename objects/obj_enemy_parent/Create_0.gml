@@ -21,6 +21,7 @@ gnd_attack_vertical_overlap_min = 10;
 gnd_patrol_x1 = x - 140;
 gnd_patrol_x2 = x + 140;
 gnd_patrol_half_width = 140;
+shelf_bb_bottom_prev = bbox_bottom;
 gnd_facing = (random(1) < 0.5) ? -1 : 1;
 image_xscale = abs(image_xscale) * gnd_facing;
 

@@ -30,6 +30,43 @@
 #macro TILECOL_CAP_TL_H_FRAC      0.38
 #macro TILECOL_CAP_TL_USE_ELLIPSE 0
 
+function tilecol_actor_vsp_get() {
+    if (variable_global_exists("tilecol_actor_vsp")) return global.tilecol_actor_vsp;
+    return variable_global_exists("player_move_vsp") ? global.player_move_vsp : 0;
+}
+
+function tilecol_actor_ledge_bb_prev_get() {
+    if (variable_global_exists("tilecol_actor_ledge_bb_prev")) return global.tilecol_actor_ledge_bb_prev;
+    return variable_global_exists("player_ledge_bb_prev") ? global.player_ledge_bb_prev : -1000000;
+}
+
+/// @function tilecol_sync_actor_context
+/// @description Push per-actor vsp + prior bbox_bottom for one-way shelf tiles (indices 1,5,34,35,36).
+function tilecol_sync_actor_context(_vsp, _ledge_bb_prev) {
+    global.tilecol_actor_vsp = _vsp;
+    global.tilecol_actor_ledge_bb_prev = _ledge_bb_prev;
+}
+
+/// Shelf indices 1/5/34/35/36: true only when probe hits the walkable cap band (not empty lip in same cell).
+function tilemap_point_on_shelf_walkable_cap(_tm, _px, _py) {
+    if (_tm == noone || _tm == -1) return false;
+    var td = tilemap_get_at_pixel(_tm, _px, _py);
+    if (td == 0) return false;
+    var idx = tile_get_index(td);
+    if (!tilecol_one_way_shelf_tile_index(idx)) return false;
+    var tw = tilemap_get_tile_width(_tm);
+    var th = tilemap_get_tile_height(_tm);
+    var tcx = tilemap_get_cell_x_at_pixel(_tm, _px, _py);
+    var tcy = tilemap_get_cell_y_at_pixel(_tm, _px, _py);
+    var cell_left = tilemap_get_x(_tm) + tcx * tw;
+    var cell_top = tilemap_get_y(_tm) + tcy * th;
+    var lx = _px - cell_left;
+    var ly = _py - cell_top;
+    if (tile_get_mirror(td)) lx = tw - 1 - lx;
+    if (tile_get_flip(td)) ly = th - 1 - ly;
+    return tilecol_one_way_cap_shelf_hit(idx, lx, ly, tw, th);
+}
+
 function tilecol_shape_for_tile_index(_idx) {
     switch (_idx) {
         case 1: return TILECOL_SHAPE_CAP_TR;
@@ -106,6 +143,17 @@ function tilemap_shelf_index_at_pixel(_tm, _px, _probe_y) {
     if (td == 0) return -1;
     var ix = tile_get_index(td);
     return tilecol_one_way_shelf_tile_index(ix) ? ix : -1;
+}
+
+/// Toe-only shelf cap (indices 1/5/34/36) — ignores center probe so knockback off lip cannot hover.
+function tilemap_shelf_cap_under_toes(_tm, _pl, _pr, _feet_y) {
+    if (_tm == noone || _tm == -1) return false;
+    for (var _dj = -1; _dj <= 2; _dj++) {
+        var _py = _feet_y + _dj;
+        if (tilemap_point_on_shelf_walkable_cap(_tm, _pl, _py)) return true;
+        if (tilemap_point_on_shelf_walkable_cap(_tm, _pr, _py)) return true;
+    }
+    return false;
 }
 
 /// True when L/C/R feet probes hit the *cap* solid of a one-way shelf (not empty air in the same 32px cell).
@@ -274,9 +322,9 @@ function tilemap_point_solid(_tm, _px, _py) {
     var idx = tile_get_index(td);
     if (_ignore_shelf && tilecol_one_way_shelf_tile_index(idx)) return false;
     if (tilecol_one_way_shelf_tile_index(idx)) {
-        if (variable_global_exists("player_move_vsp") && global.player_move_vsp < 0) return false;
+        if (tilecol_actor_vsp_get() < 0) return false;
         if (!tilecol_one_way_cap_shelf_hit(idx, lx, ly, tw, th)) return false;
-        var _prevbb = variable_global_exists("player_ledge_bb_prev") ? global.player_ledge_bb_prev : -1000000;
+        var _prevbb = tilecol_actor_ledge_bb_prev_get();
         if (_prevbb >= cell_top + TILEMAP_LEDGE_ONEWAY_BELOW_SLACK) return false;
         return true;
     }
@@ -444,7 +492,7 @@ function tilemap_ledge_down_snap_dy(_tm, _pl, _pc, _pr, _probe_y, _bbox_bottom) 
     var th = tilemap_get_tile_height(_tm);
     var tmx = tilemap_get_x(_tm);
     var tmy = tilemap_get_y(_tm);
-    var _prevbb = variable_global_exists("player_ledge_bb_prev") ? global.player_ledge_bb_prev : -1000000;
+    var _prevbb = tilecol_actor_ledge_bb_prev_get();
     for (var _fi = 0; _fi < 3; _fi++) {
         var _px = (_fi == 0) ? _pl : ((_fi == 1) ? _pc : _pr);
         var td = tilemap_get_at_pixel(_tm, _px, _probe_y);

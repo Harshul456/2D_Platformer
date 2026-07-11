@@ -9,6 +9,7 @@ function scr_player_movement() {
     shelf_threshold_snap_this_step = false;
     global.player_ledge_bb_prev = shelf_bb_bottom_prev;
     global.player_move_vsp = vsp;
+    tilecol_sync_actor_context(vsp, shelf_bb_bottom_prev);
 
     if (DEBUG_LEDGE_AIR_STALL && !debug_ledge_hunt_announced) {
         debug_ledge_hunt_announced = true;
@@ -379,6 +380,8 @@ function scr_player_movement() {
             wall_jump_lock = WALL_JUMP_LOCK_FRAMES;
             wall_jump_extend_timer = WALL_JUMP_EXTEND_FRAMES;
             wall_jump_kick_hold_timer = WALL_JUMP_KICK_HOLD_FRAMES;
+            double_jump_anim_active = true;
+            double_jump_anim_tick = 0;
             is_sprinting = false;
             sprint_jump_carry = false;
             sprint_air_trail = false;
@@ -496,6 +499,10 @@ function scr_player_movement() {
         is_sprinting = false;
         if (!attacking) {
             var inputDir = (key_right - key_left);
+            // Prior-frame pose — blocks walk/sprint hsp while landing crouch is playing (incl. wall-cling land).
+            var _land_crouch_prev = force_landing_crouch
+                || (sprite_index == spr_mc_jump && image_index >= ANIM_LAND_CROUCH_START && image_index < ANIM_LAND_CROUCH_END)
+                || (sprite_index == spr_mc_walljump && vsp > 0 && wall_jump_kick_hold_timer <= 0 && wall_jump_extend_timer <= 0);
             var _sprint_sprite_ok = (sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
                 && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && !sprint_reel_active);
             var _burst_frames = (variable_instance_exists(id, "SPRINT_BURST_FRAMES") ? SPRINT_BURST_FRAMES : 10);
@@ -597,7 +604,7 @@ function scr_player_movement() {
                         sprint_commit_dir = 0;
                         sprint_resume_hold = false;
                         sprint_dir_gap = 0;
-                    } else {
+                    } else if (!_land_crouch_prev) {
                         is_sprinting = true;
                         sprint_jump_carry = false;
                         sprint_air_trail = false;
@@ -615,6 +622,10 @@ function scr_player_movement() {
             }
             if (!sprint_committed) {
                 if (grounded && !jumped_this_frame && vsp >= 0) {
+                if (_land_crouch_prev) {
+                    hsp = 0;
+                    runMomentum = 0;
+                } else {
                 var _walk_scale = 1;
                 if (post_attack_accel_timer > 0) {
                     _walk_scale = 1 - post_attack_accel_timer / POST_ATTACK_ACCEL_FRAMES;
@@ -622,6 +633,7 @@ function scr_player_movement() {
                 }
                 hsp = walksp * inputDir * _walk_scale;
                 runMomentum = 0;
+                }
                 sprint_jump_carry = false;
                 sprint_air_trail = false;
             } else if (sprint_jump_carry) {
@@ -659,6 +671,9 @@ function scr_player_movement() {
                 }
                 hsp = runMomentum;
                 if (abs(runMomentum) <= walksp + MOMENTUM_CUTOFF) runMomentum = 0;
+            } else if (_land_crouch_prev) {
+                hsp = 0;
+                runMomentum = 0;
             } else {
                 hsp = walksp * inputDir;
             }
@@ -739,6 +754,7 @@ function scr_player_movement() {
     }
 
     global.player_move_vsp = vsp;
+    tilecol_sync_actor_context(vsp, shelf_bb_bottom_prev);
 
     // --- 5. COLLISIONS (Horizontal) ---
     if (hsp != 0) {
@@ -970,6 +986,8 @@ function scr_player_movement() {
             wall_jump_lock = WALL_JUMP_LOCK_FRAMES;
             wall_jump_extend_timer = WALL_JUMP_EXTEND_FRAMES;
             wall_jump_kick_hold_timer = WALL_JUMP_KICK_HOLD_FRAMES;
+            double_jump_anim_active = true;
+            double_jump_anim_tick = 0;
             is_sprinting = false;
             sprint_jump_carry = false;
             sprint_air_trail = false;
@@ -1627,7 +1645,9 @@ function scr_player_movement() {
     if (grounded && vsp > 0.001 && stunTimer <= 0) vsp = 0;
 
     // §4 runs before 6c sets grounded — resume hold sprint same frame we land (Z still held, no re-press)
-    if (!attacking && stunTimer <= 0 && grounded && vsp >= 0 && !jumped_this_frame
+    var _land_crouch_resume_block = force_landing_crouch || (sprite_index == spr_mc_walljump && vsp > 0)
+        || (sprite_index == spr_mc_jump && image_index >= ANIM_LAND_CROUCH_START && image_index < ANIM_LAND_CROUCH_END);
+    if (!attacking && stunTimer <= 0 && grounded && vsp >= 0 && !jumped_this_frame && !_land_crouch_resume_block
         && key_sprint && sprint_hold_latched && sprint_resume_hold && !sprint_committed) {
         var _inputDir_land = (key_right - key_left);
         if (_inputDir_land != 0) {
@@ -1757,9 +1777,17 @@ function scr_player_movement() {
                     sprite_index = (is_sprinting || sprint_committed) ? spr_mc_sprint : spr_mc_jog;
                     image_index = 0;
                 } else if (image_index >= ANIM_LAND_CROUCH_END) {
-                    sprite_index = spr_mc_idle;
-                    image_index = 0;
                     force_landing_crouch = false;
+                    if ((key_sprint_press || (key_sprint && sprint_resume_hold)) && _input_dir != 0) {
+                        sprite_index = spr_mc_sprint;
+                        image_index = 0;
+                    } else if (_input_dir != 0) {
+                        sprite_index = spr_mc_jog;
+                        image_index = 0;
+                    } else {
+                        sprite_index = spr_mc_idle;
+                        image_index = 0;
+                    }
                 }
             } else if (sprite_index == spr_mc_walljump) {
                 image_speed = 1;
@@ -1829,21 +1857,6 @@ function scr_player_movement() {
                 image_index = 1;
                 image_speed = 0;
                 image_xscale = -wall_side * image_base_scale;
-            } else if (wall_jump_extend_timer > 0) {
-                sprite_index = spr_mc_jump;
-                image_speed = 1;
-                image_xscale = last_direction * image_base_scale;
-                if (vsp < JUMP_RISE_THRESHOLD) {
-                    image_index = 0;
-                } else if (vsp >= JUMP_PEAK_MIN && vsp <= JUMP_PEAK_MAX) {
-                    image_index = 2;
-                    image_speed = 0;
-                } else {
-                    image_speed = 0;
-                    hair_flicker_counter++;
-                    if (hair_flicker_counter >= ANIM_HAIR_FLICKER_INTERVAL) hair_flicker_counter = 0;
-                    image_index = (hair_flicker_counter < ANIM_HAIR_FLICKER_THRESHOLD) ? 5 : 6;
-                }
             } else if (wall_side != 0 && cling_eff && vsp > 0) {
                 sprite_index = spr_mc_walljump;
                 image_index = 0;
@@ -1929,6 +1942,17 @@ function scr_player_movement() {
     } else {
         // Keep attack swing animation at designed speed
         image_speed = 1; 
+    }
+
+    // --- 7b. LANDING CROUCH MOVEMENT LOCK (animation runs after §5 hsp — zero slide during crouch) ---
+    if (!attacking && stunTimer <= 0) {
+        var _land_crouch_now = force_landing_crouch
+            || (grounded && (sprite_index == spr_mc_jump || sprite_index == spr_mc_doublejump)
+                && image_index >= ANIM_LAND_CROUCH_START && image_index < ANIM_LAND_CROUCH_END);
+        if (_land_crouch_now) {
+            hsp = 0;
+            runMomentum = 0;
+        }
     }
 
     // --- 8. DIRECTION FLIPPING (with attack lock; wall jump / wall slide facing) ---
@@ -2029,13 +2053,13 @@ function scr_player_movement() {
     if (wall_jump_extend_timer > 0) wall_jump_extend_timer--;
     if (wall_jump_kick_hold_timer > 0) wall_jump_kick_hold_timer--;
     if (double_jump_anim_active) {
-        double_jump_anim_tick++;
-        var _dj_hold = (variable_instance_exists(id, "DOUBLE_JUMP_ANIM_HOLD_FRAMES") ? DOUBLE_JUMP_ANIM_HOLD_FRAMES : 6);
-        var _dj_n = sprite_get_number(spr_mc_doublejump);
-        if (double_jump_anim_tick >= _dj_n * _dj_hold) {
-            double_jump_anim_active = false;
-        } else if (vsp > JUMP_PEAK_MAX + 2 && double_jump_anim_tick >= _dj_hold * 2) {
-            double_jump_anim_active = false;
+        if (wall_jump_kick_hold_timer <= 0) {
+            double_jump_anim_tick++;
+            var _dj_hold = (variable_instance_exists(id, "DOUBLE_JUMP_ANIM_HOLD_FRAMES") ? DOUBLE_JUMP_ANIM_HOLD_FRAMES : 6);
+            var _dj_n = sprite_get_number(spr_mc_doublejump);
+            if (double_jump_anim_tick >= _dj_n * _dj_hold) {
+                double_jump_anim_active = false;
+            }
         }
     }
     if (wall_kick_cooldown > 0) wall_kick_cooldown--;

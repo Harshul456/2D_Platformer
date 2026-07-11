@@ -37,6 +37,10 @@ function scr_enemy_grounded_get_tm() {
 /// @function scr_enemy_grounded_tile_solid_pixel
 function scr_enemy_grounded_tile_solid_pixel(_tm, _px, _py) {
     if (_tm == -1 || _tm == noone) return false;
+    if (variable_instance_exists(id, "vsp")) {
+        var _prev = variable_instance_exists(id, "shelf_bb_bottom_prev") ? shelf_bb_bottom_prev : bbox_bottom;
+        tilecol_sync_actor_context(vsp, _prev);
+    }
     return tilemap_point_solid(_tm, _px, _py);
 }
 
@@ -49,6 +53,10 @@ function scr_enemy_grounded_body_foot_inset() {
 /// @description Solid tiles overlapping bbox excluding lowest strip (feet band) so floor tiles are not walls.
 function scr_enemy_grounded_body_bbox_tile_overlap(_tm, _x, _y) {
     if (_tm == -1 || _tm == noone) return false;
+    if (variable_instance_exists(id, "vsp")) {
+        var _prev = variable_instance_exists(id, "shelf_bb_bottom_prev") ? shelf_bb_bottom_prev : bbox_bottom;
+        tilecol_sync_actor_context(vsp, _prev);
+    }
     var inset = scr_enemy_grounded_body_foot_inset();
     var spr = sprite_index;
     var ox = sprite_get_xoffset(spr);
@@ -71,8 +79,13 @@ function scr_enemy_grounded_feet_bottom_in_solids(_tm, _x, _y) {
     var bl = _x - ox + sprite_get_bbox_left(spr) + 2;
     var br = _x - ox + sprite_get_bbox_right(spr) - 2;
     var bb = _y - oy + sprite_get_bbox_bottom(spr);
-    return tilemap_point_solid(_tm, bl, bb) || tilemap_point_solid(_tm, br, bb)
-        || tilemap_point_solid(_tm, (bl + br) * 0.5, bb);
+    if (variable_instance_exists(id, "vsp")) {
+        var _prev = variable_instance_exists(id, "shelf_bb_bottom_prev") ? shelf_bb_bottom_prev : bb;
+        tilecol_sync_actor_context(vsp, _prev);
+    }
+    return check_tile_collision(bl, bb, false, noone, false)
+        || check_tile_collision(br, bb, false, noone, false)
+        || check_tile_collision((bl + br) * 0.5, bb, false, noone, false);
 }
 
 /// @function scr_enemy_grounded_head_blocked
@@ -82,8 +95,13 @@ function scr_enemy_grounded_head_blocked(_tm, _x, _y) {
     var ox = sprite_get_xoffset(spr);
     var oy = sprite_get_yoffset(spr);
     var bt = _y - oy + sprite_get_bbox_top(spr);
+    var bb = _y - oy + sprite_get_bbox_bottom(spr);
     var mx = _x - ox + (sprite_get_bbox_left(spr) + sprite_get_bbox_right(spr)) * 0.5;
-    return tilemap_point_solid(_tm, mx, bt) || tilemap_point_solid(_tm, mx, bt - 1);
+    if (variable_instance_exists(id, "vsp")) {
+        var _prev = variable_instance_exists(id, "shelf_bb_bottom_prev") ? shelf_bb_bottom_prev : bb;
+        tilecol_sync_actor_context(vsp, _prev);
+    }
+    return check_tile_collision(mx, bt, true, bb) || check_tile_collision(mx, bt - 1, true, bb);
 }
 
 /// @function scr_enemy_grounded_core_center_in_solid
@@ -288,12 +306,26 @@ function scr_enemy_grounded_apply_hmove(_hsp) {
 /// @function scr_enemy_grounded_physics_gravity_vertical
 function scr_enemy_grounded_physics_gravity_vertical() {
     var _tm = scr_enemy_grounded_get_tm();
+    if (!variable_instance_exists(id, "shelf_bb_bottom_prev")) shelf_bb_bottom_prev = bbox_bottom;
     vsp += grav;
     var cap = 14;
     if (variable_instance_exists(id, "vsp_max_fall")) cap = vsp_max_fall;
     vsp = min(vsp, cap);
+    tilecol_sync_actor_context(vsp, shelf_bb_bottom_prev);
+    if (_tm != noone && _tm != -1 && vsp > 0) {
+        var _pl = floor(bbox_left) + 1;
+        var _pc = floor((bbox_left + bbox_right) * 0.5);
+        var _pr = floor(bbox_right) - 1;
+        var _face = scr_enemy_grounded_facing_sign();
+        var _snap = tilemap_shelf_threshold_land_dy(_tm, _pl, _pc, _pr, bbox_bottom, shelf_bb_bottom_prev, vsp, _face);
+        if (_snap != noone) {
+            y += _snap;
+            vsp = 0;
+        }
+    }
     scr_enemy_grounded_move_y_pixels(_tm, vsp);
     scr_enemy_grounded_snap_out_of_tiles(_tm);
+    shelf_bb_bottom_prev = bbox_bottom;
 }
 
 /// @function scr_enemy_grounded_patrol_reanchor_here

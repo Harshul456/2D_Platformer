@@ -81,7 +81,12 @@ function scr_camera_control() {
     if (global.hitstop <= 0) {
         // Min scroll only when the player actually moved on that axis (avoids vertical jitter on horizontal dash).
         if (_dx > 0.001) _xspeed = max(_dx, global.camera_scroll_min_x);
-        if (_dy > 0.001) _yspeed = max(_dy, global.camera_scroll_min_y);
+        if (_dy > 0.001) {
+            _yspeed = max(_dy, global.camera_scroll_min_y);
+        } else if (_p.grounded && abs(_oy) > 0.5) {
+            // After descending, walking flat at spawn won't move _dy — still re-center view on foot Y.
+            _yspeed = global.camera_scroll_min_y;
+        }
     }
     if (abs(_ox) > _xspeed) _ox = _xspeed * sign(_ox);
     if (abs(_oy) > _yspeed) _oy = _yspeed * sign(_oy);
