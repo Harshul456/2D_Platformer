@@ -203,7 +203,7 @@ ATTACK_LUNGE_CUTOFF   = 0.3;    // Zero hsp when below this
 // First subimage with an active hitbox (Step uses >= 1); enemies use this for startup priority / dash contact.
 ATTACK_HIT_ACTIVE_START_INDEX = 1;
 ATTACK_ON_HIT_HSLOW   = 0.5;    // Multiply hsp when attack hits (stop sliding through)
-ATTACK_ON_HIT_PUSHBACK = 0.5;   // Player pushback on hit (prevent overlap)
+ATTACK_ON_HIT_PUSHBACK = 2.5;   // Player pushback on hit (prevent overlap)
 
 // Damage/knockback when player is hit by enemy (Collision_obj_enemy)
 ENEMY_COLLISION_DAMAGE  = 10;   // Health lost per touch
@@ -217,8 +217,8 @@ COLLISION_SEPARATION_PUSH = 1.5; // Push player out of enemy when overlapping
 ATTACK_DAMAGE_PER_HIT   = 20;   // Damage per swing
 ATTACK_HIT_BLINK_FRAMES = 20;   // Enemy blink duration
 ATTACK_STUN_FRAMES      = 30;   // Enemy stun duration
-ATTACK_LIGHT_KNOCKBACK  = 1.5;  // Light hit horizontal
-ATTACK_LIGHT_HITSTOP    = 3;    // Light hit freeze frames
+ATTACK_LIGHT_KNOCKBACK  = 5;    // Light hit horizontal (enemy)
+ATTACK_LIGHT_HITSTOP    = 5;    // Light hit freeze frames (~83ms @60fps)
 ATTACK_FINISHER_KNOCKBACK_X = 6;  // Finisher horizontal
 ATTACK_FINISHER_KNOCKBACK_Y = -6; // Finisher vertical (launch)
 ATTACK_FINISHER_HITSTOP = 8;    // Finisher freeze frames
@@ -245,8 +245,8 @@ ATTACK_HITBOX_X_INSET = 4;
 ENEMY_HIT_PRESSURE_WINDOW_FRAMES = 45;
 HIT_PRESSURE_KB_PER_STACK = 0.08;
 HIT_PRESSURE_KB_MULT_CAP = 1.5;
-ENEMY_STUN_AFTER_HIT1 = 20;
-ENEMY_STUN_AFTER_HIT2 = 35;
+ENEMY_STUN_AFTER_HIT1 = 30;
+ENEMY_STUN_AFTER_HIT2 = 40;
 
 // --- COMBO SYSTEM ---
 comboCount      = 0;

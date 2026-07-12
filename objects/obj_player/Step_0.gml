@@ -137,8 +137,9 @@ if (attacking && stunTimer <= 0) {
     
     // --- HIT DETECTION ---
     var _is_swinging = (image_index >= 1 && image_index <= 3);
+    var _downward_strike = scr_player_is_downward_air_strike();
     
-    if (_is_swinging && !attack_has_hit) { 
+    if ((_is_swinging || _downward_strike) && !attack_has_hit) { 
         // HITBOX: use stable hurtbox (idle mask) and tuned reach/pads, not the sprite extents.
         var _reach = (comboCount >= 2) ? ATTACK_HITBOX_REACH_2 : ATTACK_HITBOX_REACH_1;
         var _top_pad = (comboCount >= 2) ? ATTACK_HITBOX_TOP_PAD_2 : ATTACK_HITBOX_TOP_PAD_1;
@@ -146,7 +147,13 @@ if (attacking && stunTimer <= 0) {
         var y1 = bbox_top + _top_pad;
         var y2 = bbox_bottom - _bot_pad;
         var x1, x2;
-        if (last_direction > 0) {
+        if (_downward_strike) {
+            // Down-strike probe: feet-first box for nail pogo
+            x1 = bbox_left + 6;
+            x2 = bbox_right - 6;
+            y1 = bbox_top;
+            y2 = bbox_bottom + 16;
+        } else if (last_direction > 0) {
             x1 = bbox_right - ATTACK_HITBOX_X_INSET;
             x2 = x1 + _reach;
         } else {
@@ -167,78 +174,27 @@ if (attacking && stunTimer <= 0) {
                 scr_enemy_grounded_apply_damage(other.ATTACK_DAMAGE_PER_HIT, other.x);
                 hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
             }
-            global.hitstop = ATTACK_LIGHT_HITSTOP;
+            var _hitstop_frames = (comboCount >= 2) ? ATTACK_FINISHER_HITSTOP : ATTACK_LIGHT_HITSTOP;
+            scr_hitstop_trigger(_hitstop_frames);
             hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
             if (comboCount >= 2) {
                 hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
             }
         } else if (_hit_enemy != noone) {
             attack_has_hit = true;
-            
-            // PUSH ENEMY BACK - balanced for combo follow-up
             with (_hit_enemy) {
-                hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
-                obj_enemy_health -= other.ATTACK_DAMAGE_PER_HIT;
-                
-                pressure_hit_count += 1;
-                pressure_window_timer = enemy_pressure_window_frames;
-                
-                var _armor_windup = (state == STATE_ATTACK && attack_phase == 0 && attack_phase_timer > 0
-                    && attack_phase_timer <= enemy_attack_windup_armor_last_frames);
-                var _armor_dash = (state == STATE_ATTACK && attack_phase == 1
-                    && attack_phase_timer > (enemy_attack_dash_frames - enemy_attack_dash_super_armor_frames));
-                
-                if (_armor_windup || _armor_dash) {
-                    if (state == STATE_ATTACK && attack_phase == 0) {
-                        telegraph_shake_x = 0;
-                        telegraph_shake_y = 0;
-                    }
-                    global.hitstop = other.ATTACK_LIGHT_HITSTOP;
-                } else {
-                    // Include STATE_ATTACK: punishing their swing must clear was_in_attack_threat_zone or
-                    // CHASE/AGGRESSIVE never re-enters threat while you stand still in the band (looks "stuck").
-                    var _interrupt = (state == STATE_ATTACK || state == STATE_PATIENT_WAIT || state == STATE_DEFENSIVE_RETREAT
-                        || state == STATE_THREAT_REACTION || state == STATE_THREAT_NEUTRAL);
-                    if (_interrupt) {
-                        decision_cooldown_timer = max(decision_cooldown_timer, enemy_interrupt_decision_cooldown_frames);
-                        threat_next_roll_retreat_bias = true;
-                        threat_commit_count = 0;
-                        was_in_attack_threat_zone = false;
-                    }
-                    
-                    if (state == STATE_ATTACK) {
-                        attack_hit_dealt = true;
-                    }
-                    image_blend = c_white;
-                    telegraph_shake_x = 0;
-                    telegraph_shake_y = 0;
-                    
-                    hit_pressure_hits = min(hit_pressure_hits + 1, 24);
-                    hit_pressure_timer = other.ENEMY_HIT_PRESSURE_WINDOW_FRAMES;
-                    var _mult = min(1 + max(0, hit_pressure_hits - 1) * other.HIT_PRESSURE_KB_PER_STACK,
-                        other.HIT_PRESSURE_KB_MULT_CAP);
-                    
-                    state = STATE_STUNNED;
-                    stunTimer = (other.comboCount >= 2) ? other.ENEMY_STUN_AFTER_HIT2 : other.ENEMY_STUN_AFTER_HIT1;
-                    last_hit_was_finisher = (other.comboCount >= 2);
-                    
-                    var _pcx = (other.bbox_left + other.bbox_right) * 0.5;
-                    var _ecx = (bbox_left + bbox_right) * 0.5;
-                    var _knockback_dir = sign(_ecx - _pcx);
-                    if (_knockback_dir == 0) _knockback_dir = other.last_direction;
-                    
-                    var _kx = _knockback_dir * other.ATTACK_LIGHT_KNOCKBACK * _mult;
-                    knockback_pending_x = _kx;
-                    knockback_pending_y = 0;
-                    knockback_pending_lift = false;
-                    knockbackX = _kx;
-                    global.hitstop = other.ATTACK_LIGHT_HITSTOP;
-                }
+                scr_enemy_on_player_hit(other.comboCount);
             }
+            var _hitstop_frames = (comboCount >= 2) ? ATTACK_FINISHER_HITSTOP : ATTACK_LIGHT_HITSTOP;
+            scr_hitstop_trigger(_hitstop_frames);
             
-            hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
-            if (comboCount >= 2) {
-                hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
+            if (scr_player_is_downward_air_strike() && bbox_bottom <= _hit_enemy.bbox_top + 28) {
+                scr_player_apply_nail_pogo();
+            } else {
+                hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
+                if (comboCount >= 2) {
+                    hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
+                }
             }
         }
     }

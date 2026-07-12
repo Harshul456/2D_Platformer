@@ -1,3 +1,75 @@
+/// @function scr_enemy_collision_tilemap
+/// @returns {Id.Tilemap} Collision tilemap for this enemy instance.
+function scr_enemy_collision_tilemap() {
+    if (global.tilemap_collision_id != noone) return global.tilemap_collision_id;
+    if (variable_instance_exists(id, "gnd_tilemap") && gnd_tilemap != -1 && gnd_tilemap != noone) {
+        return gnd_tilemap;
+    }
+    return noone;
+}
+
+/// @function scr_enemy_place_on_standable_floor
+/// @description Drop onto lay_collision (not background art). Room Y often lines up with visuals only.
+/// @param {Real} [_max_drop] Max pixels to scan downward.
+/// @returns {Bool} True if feet found standable support.
+function scr_enemy_place_on_standable_floor(_max_drop) {
+    if (argument_count < 1) _max_drop = 480;
+    if (scr_enemy_collision_tilemap() == noone) return false;
+
+    var _start_y = y;
+    var _landed_y = noone;
+
+    for (var _d = 0; _d <= _max_drop; _d++) {
+        y = _start_y + _d;
+        shelf_bb_bottom_prev = bbox_bottom;
+        tilecol_sync_actor_context(0, shelf_bb_bottom_prev);
+        if (scr_enemy_toes_have_standable_support()) {
+            _landed_y = y;
+            break;
+        }
+    }
+
+    if (_landed_y == noone) {
+        y = _start_y;
+        return false;
+    }
+
+    // Un-embed if the downward scan sunk feet into the tile body.
+    var _guard = 0;
+    while (_guard++ < 24) {
+        shelf_bb_bottom_prev = bbox_bottom;
+        tilecol_sync_actor_context(0, shelf_bb_bottom_prev);
+        var _fp = scr_enemy_foot_probes();
+        if (!check_tile_collision(_fp.center, bbox_bottom)
+            && !check_tile_collision(_fp.left, bbox_bottom)
+            && !check_tile_collision(_fp.right, bbox_bottom)) {
+            break;
+        }
+        y -= 1;
+    }
+
+    vsp = 0;
+    enemy_grounded = scr_enemy_resolve_grounded();
+    shelf_bb_bottom_prev = bbox_bottom;
+    scr_enemy_floating_hover_sync_anchor();
+    return true;
+}
+
+/// @function scr_enemy_snap_to_collision_floor
+/// @description Create + Room Start — land on collision tiles, never on background-only art.
+function scr_enemy_snap_to_collision_floor() {
+    if (scr_enemy_collision_tilemap() == noone) return false;
+    return scr_enemy_place_on_standable_floor(480);
+}
+
+/// @function scr_enemy_horizontal_lead_x
+/// @description Symmetric horizontal probe anchor from instance x (immune to bbox asymmetry / sprite flip).
+function scr_enemy_horizontal_lead_x(_h_step) {
+    if (_h_step == 0) return x;
+    var _half_w = (variable_instance_exists(id, "ENEMY_HMOVE_HALF_WIDTH") ? ENEMY_HMOVE_HALF_WIDTH : 14);
+    return (_h_step > 0) ? floor(x + _half_w) : floor(x - _half_w);
+}
+
 /// @function scr_enemy_foot_probes
 /// @description Narrow foot probes at spike tips — spr_enemy bbox is ~42px wide (shoulder wings) but feet are ~6px at center.
 function scr_enemy_foot_probes() {
@@ -202,13 +274,14 @@ function scr_enemy_tile_movement() {
         }
     }
 
-    // --- Horizontal (ledge-window side probes) ---
+    // --- Horizontal (player-equivalent ledge-window side probes) ---
     if (hsp != 0) {
+        if (variable_instance_exists(id, "enemy_hmove_blocked")) enemy_hmove_blocked = false;
         var _h_step = sign(hsp);
         var _bb_bot = bbox_bottom;
-        repeat (abs(ceil(hsp))) {
-            _fp = scr_enemy_foot_probes();
-            feet_y = _fp.feet_y;
+        // ceil(-0.85) == 0 in GML — must ceil abs(speed) or leftward sub-1px speeds never step.
+        repeat (ceil(abs(hsp))) {
+            feet_y = floor(bbox_bottom);
             head_y = floor(bbox_top);
             center_y = floor((bbox_top + bbox_bottom) * 0.5);
 
@@ -216,17 +289,39 @@ function scr_enemy_tile_movement() {
             var _wx = _target_side + _h_step;
             var _y_h = head_y + _wall_head_off;
             var _y_t = feet_y - _toe_inset;
+            var _use_head = !(variable_instance_exists(id, "ENEMY_HMOVE_USE_HEAD_PROBE") && !ENEMY_HMOVE_USE_HEAD_PROBE);
 
-            var _blk_h = tilemap_horizontal_side_probe_blocks(_tm, _wx, _y_h, _bb_bot, _ledge_win);
-            var _blk_c = tilemap_horizontal_side_probe_blocks(_tm, _wx, center_y, _bb_bot, _ledge_win);
-            var _blk_t = tilemap_horizontal_side_probe_blocks(_tm, _wx, _y_t, _bb_bot, _ledge_win);
+            var _ledge_y_a = _use_head ? min(_y_h, center_y, _y_t) : min(center_y, _y_t);
+            var _ledge_y_b = _use_head ? max(_y_h, center_y, _y_t) : max(center_y, _y_t);
+            var _ledge_mount = tilemap_horizontal_ledge_mount_priority(_tm, _wx, _bb_bot, _ledge_y_a, _ledge_y_b, _ledge_win);
+            var _air_fb_face = (!enemy_grounded) && (
+                (_use_head && tilemap_horizontal_full_block_side_face_at(_tm, _wx, _y_h, _bb_bot, _ledge_win)) ||
+                tilemap_horizontal_full_block_side_face_at(_tm, _wx, center_y, _bb_bot, _ledge_win) ||
+                tilemap_horizontal_full_block_side_face_at(_tm, _wx, _y_t, _bb_bot, _ledge_win));
 
-            if (!_blk_h && !_blk_c && !_blk_t) {
+            if (_ledge_mount && !_air_fb_face) {
                 x += _h_step;
             } else {
-                hsp = 0;
-                knockbackX = 0;
-                break;
+                var _blk_h = _use_head && tilemap_horizontal_side_probe_blocks(_tm, _wx, _y_h, _bb_bot, _ledge_win);
+                var _blk_c = tilemap_horizontal_side_probe_blocks(_tm, _wx, center_y, _bb_bot, _ledge_win);
+                var _blk_t = enemy_grounded
+                    && tilemap_horizontal_side_probe_blocks(_tm, _wx, _y_t, _bb_bot, _ledge_win);
+                var _clear = (!_blk_h && !_blk_c && !_blk_t);
+                if (_air_fb_face) _clear = false;
+
+                if (variable_instance_exists(id, "enemy_hmove_blocked")) {
+                    enemy_hmove_blocked = !_clear;
+                }
+
+                if (_clear) {
+                    x += _h_step;
+                } else {
+                    hsp = 0;
+                    if (!(variable_instance_exists(id, "state") && state == ENEMY_STATE.STUNNED)) {
+                        knockbackX = 0;
+                    }
+                    break;
+                }
             }
         }
     }
@@ -246,7 +341,7 @@ function scr_enemy_tile_movement() {
     // --- Vertical (player §6 branches: airborne fall vs grounded / shelf-cap) ---
     if (vsp != 0) {
         var _v_step = sign(vsp);
-        repeat (abs(ceil(vsp))) {
+        repeat (ceil(abs(vsp))) {
             _fp = scr_enemy_foot_probes();
             feet_y = _fp.feet_y;
             head_y = floor(bbox_top);

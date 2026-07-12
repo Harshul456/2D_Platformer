@@ -16,6 +16,7 @@ function scr_player_attack() {
     attack_has_hit = false;
     image_index = 0;
     comboTimer = comboCooldown;
+    attack_priority_timer = 14; // startup only — HK nail wins trades during enemy dash tell
 
     switch (comboCount) {
         case 1:
@@ -34,4 +35,44 @@ function scr_player_attack() {
             image_blend = c_aqua;
             break;
     }
+}
+
+/// @function scr_player_is_attack_active
+/// @description Active hitbox frames (subimages 1–3).
+function scr_player_is_attack_active() {
+    return attacking && image_index >= ATTACK_HIT_ACTIVE_START_INDEX && image_index <= 3;
+}
+
+/// @function scr_player_has_attack_priority
+/// @description True while swing should win trades vs enemy dash contact.
+function scr_player_has_attack_priority() {
+    return (attack_priority_timer > 0) || scr_player_is_attack_active();
+}
+
+/// @function scr_player_is_downward_air_strike
+/// @description True when airborne and falling (nail down-strike / pogo window).
+function scr_player_is_downward_air_strike() {
+    return !grounded && vsp > 0.25;
+}
+
+/// @function scr_player_apply_nail_pogo
+/// @description Hollow Knight nail-bounce: upward recoil + movement reset.
+function scr_player_apply_nail_pogo() {
+    vsp = -stomp_force;
+    hsp *= 0.35;
+    grounded = false;
+    jump_count = 0;
+    air_chain_jump_used = false;
+    coyote_time_timer = 0;
+    attacking = false;
+    attack_lockout = 0;
+    attack_buffer_timer = 0;
+    attack_chain_buffer_timer = 0;
+    attack_chain_latched = false;
+    attack_shift_remaining = 0;
+    attack_has_hit = true;
+    combo_buffer = false;
+    comboTimer = 0;
+    comboCount = 0;
+    debug_hitbox_active = false;
 }

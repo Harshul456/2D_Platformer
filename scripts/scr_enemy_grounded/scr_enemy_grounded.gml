@@ -1,7 +1,6 @@
 /// @file scr_enemy_grounded.gml
-/// @description Grounded FSM for obj_enemy_parent using **tilemap** collision (no place_meeting / obj_wall).
-///             Ledge / partial tiles: configure `TILECOL_*` macros in `check_tile_collision.gml`.
-///             Call scr_enemy_grounded_step() once per Step — gravity + vertical resolve run inside it.
+/// @description MMX / Mega Engine-style grounded enemy FSM — patrol, chase, attack wind-up + lunge, damaged, dead.
+///             Tilemap pixel-step physics (grav, ledge probe, wall block). See obj_enemy_parent Create for tuning.
 ///
 /// Instance variables (obj_enemy_parent Create):
 ///   gnd_tilemap — from layer_tilemap_get_id(layer_get_id("Collisions")); falls back to global.tilemap_collision_id
@@ -435,6 +434,7 @@ function scr_enemy_grounded_state_chase() {
 }
 
 /// @function scr_enemy_grounded_state_attack
+/// @description MMX pattern: face player → wind-up (timer high) → lunge (last N frames) → chase/patrol.
 function scr_enemy_grounded_state_attack() {
     if (instance_exists(obj_player)) {
         var _fd = sign(obj_player.x - x);
@@ -447,11 +447,29 @@ function scr_enemy_grounded_state_attack() {
     var _lunge = variable_instance_exists(id, "gnd_attack_lunge") ? gnd_attack_lunge : 0;
     var _lf = variable_instance_exists(id, "gnd_attack_lunge_frames") ? gnd_attack_lunge_frames : 8;
     _lf = min(_lf, _dur);
-    if (_lunge != 0 && gnd_attack_timer > _dur - _lf) {
+    var _in_lunge = (_lunge != 0 && gnd_attack_timer > _dur - _lf);
+
+    // Wind-up tell (crystal enemy telegraph_shake vars — optional on any child)
+    if (!_in_lunge && variable_instance_exists(id, "telegraph_shake_x")) {
+        telegraph_shake_x = random_range(-2.5, 2.5);
+        telegraph_shake_y = random_range(-1.5, 1.5);
+        image_blend = make_color_rgb(255, 72, 88);
+    } else if (variable_instance_exists(id, "telegraph_shake_x")) {
+        telegraph_shake_x = 0;
+        telegraph_shake_y = 0;
+        image_blend = c_white;
+    }
+
+    if (_in_lunge) {
         scr_enemy_grounded_apply_hmove(sign(image_xscale) * _lunge);
     }
     gnd_attack_timer--;
     if (gnd_attack_timer <= 0) {
+        if (variable_instance_exists(id, "telegraph_shake_x")) {
+            telegraph_shake_x = 0;
+            telegraph_shake_y = 0;
+            image_blend = c_white;
+        }
         if (scr_enemy_grounded_can_see_player()) {
             gnd_state = GND_STATE_CHASE;
         } else {

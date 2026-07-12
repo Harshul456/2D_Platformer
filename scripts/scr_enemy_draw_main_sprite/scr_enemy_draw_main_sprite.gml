@@ -8,6 +8,14 @@ function scr_enemy_draw_main_sprite() {
     var _draw_y = floor(y + _shake_y) + _hover_y;
 
     var _draw_col = image_blend;
+    if (variable_instance_exists(id, "gnd_state")) {
+        if (gnd_state == GND_STATE_CHASE) _draw_col = merge_color(_draw_col, c_yellow, 0.18);
+        else if (gnd_state == GND_STATE_ATTACK) _draw_col = merge_color(_draw_col, c_orange, 0.28);
+        else if (gnd_state == GND_STATE_DAMAGED) _draw_col = merge_color(_draw_col, c_aqua, 0.22);
+    }
+    if (variable_instance_exists(id, "hit_blink_timer") && hit_blink_timer > 0 && ((hit_blink_timer div 3) mod 2 == 0)) {
+        _draw_col = merge_color(_draw_col, c_red, 0.45);
+    }
     var _crystal = undefined;
     if (variable_global_exists("bulb_renderer") && global.bulb_renderer != undefined) {
         _crystal = scr_bulb_player_crystal_influence(x, y - 16);
@@ -18,16 +26,16 @@ function scr_enemy_draw_main_sprite() {
     }
 
     draw_sprite_ext(sprite_index, image_index, _draw_x, _draw_y,
-        image_xscale, image_yscale, image_angle, _draw_col, image_alpha);
+        scr_enemy_draw_xscale(), image_yscale, image_angle, _draw_col, image_alpha);
 
     if (_crystal != undefined && _crystal.strength > 0) {
         if (variable_global_exists("bulb_renderer") && global.bulb_renderer != undefined && global.bulb_renderer.normalMap) {
             var _wrap = { strength: _crystal.strength, blend: _crystal.blend, dir: (_crystal.dir + 180) mod 360 };
             scr_bulb_draw_crystal_rim(sprite_index, image_index, _draw_x, _draw_y,
-                image_xscale, image_yscale, _wrap, image_alpha * 0.32);
+                scr_enemy_draw_xscale(), image_yscale, _wrap, image_alpha * 0.32);
         } else {
             scr_bulb_draw_crystal_rim(sprite_index, image_index, _draw_x, _draw_y,
-                image_xscale, image_yscale, _crystal, image_alpha);
+                scr_enemy_draw_xscale(), image_yscale, _crystal, image_alpha);
         }
     }
 }

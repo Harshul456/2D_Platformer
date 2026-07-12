@@ -6,6 +6,8 @@ cam_h = camera_get_view_height(cam);
 cam_look_ahead = 0;
 camera_prev_player_x = 0;
 camera_prev_player_y = 0;
+cam_shake_mag = 0;
+cam_shake_timer = 0;
 
 // Zone bounds (obj_camera_zone updates globals; fallback = whole room)
 global.camera_current_zone = -1;

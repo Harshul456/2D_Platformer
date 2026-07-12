@@ -1,3 +1,14 @@
+/// @function scr_camera_trigger_shake
+/// @param {Real} _mag Peak pixel offset
+/// @param {Real} _dur Frames to shake
+function scr_camera_trigger_shake(_mag, _dur) {
+    if (!instance_exists(obj_camera_controller)) return;
+    with (obj_camera_controller) {
+        cam_shake_mag = max(cam_shake_mag, _mag);
+        cam_shake_timer = max(cam_shake_timer, _dur);
+    }
+}
+
 /// @function scr_camera_control
 /// @description MMX-style zone bounds + border scroll; state-based look-ahead only (no anchor/lerp follow).
 function scr_camera_control() {
@@ -101,6 +112,15 @@ function scr_camera_control() {
     if (_oy < 0 && _cam_y >= _min_y) _new_y = max(_cam_y + _oy, _min_y);
     if (_oy > 0 && (_cam_y + cam_h) <= _max_y) _new_y = min(_cam_y + _oy, _max_y - cam_h);
 
-    camera_set_view_pos(cam, _new_x, _new_y);
+    var _shake_x = 0;
+    var _shake_y = 0;
+    if (cam_shake_timer > 0) {
+        cam_shake_timer--;
+        _shake_x = random_range(-cam_shake_mag, cam_shake_mag);
+        _shake_y = random_range(-cam_shake_mag, cam_shake_mag);
+        if (cam_shake_timer <= 0) cam_shake_mag = 0;
+    }
+
+    camera_set_view_pos(cam, _new_x + _shake_x, _new_y + _shake_y);
     scr_parallax_update();
 }
