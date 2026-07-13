@@ -24,6 +24,7 @@ walksp          = 3.5;          // Standard walk speed
 runsp           = 5.0;          // Sprint speed (hold Z; slightly above walksp)
 jumpsp          = 9.0;          // Jump power
 jump_count      = 0;            // 0 = fresh from ground; 1 = one air jump left; 2 = no jumps until land (incl. after wall jump / walk-off).
+jumped_this_frame = false;      // Set true in scr_player_movement when a jump fires (footsteps land check reads this).
 // True after spending the second air jump (or walk-off single-jump mode). Cleared on land. Wall jump sets both this and jump_count=2.
 air_chain_jump_used = false;
 last_direction  = 1;            // Facing: 1 = Right, -1 = Left
@@ -35,6 +36,49 @@ JUMP_RISE_THRESHOLD = -1;       // vsp threshold for rising animation
 JUMP_PEAK_MIN = -1;             // vsp range for peak animation start
 JUMP_PEAK_MAX = 1;              // vsp range for peak animation end
 MOVEMENT_THRESHOLD = 0.5;       // hsp threshold to trigger run animation
+
+// Cave footsteps (snd_cave_footstep1–3) — animation contact frames on spr_mc_jog / spr_mc_sprint.
+FOOTSTEP_CAVE_ENABLED = true;
+FOOTSTEP_JOG_CONTACT_FRAMES = [2, 6];     // Tune to match foot-down frames in jog cycle
+FOOTSTEP_SPRINT_CONTACT_FRAMES = [2, 6];
+FOOTSTEP_PITCH_MIN = 0.88;
+FOOTSTEP_PITCH_MAX = 1.12;
+FOOTSTEP_PITCH_JITTER = 0.04;
+FOOTSTEP_VOL_MIN = 0.55;
+FOOTSTEP_VOL_MAX = 0.9;
+FOOTSTEP_MIN_INTERVAL = 4;                // Frames between steps (anti-double-trigger safety)
+FOOTSTEP_AUDIO_PRIORITY = 8;
+// Landing thud — assign snd_cave_land when you import a dedicated land clip.
+FOOTSTEP_LAND_SOUND = snd_cave_footstep1;
+FOOTSTEP_LAND_PITCH_MIN = 0.72;
+FOOTSTEP_LAND_PITCH_MAX = 0.95;
+FOOTSTEP_LAND_VOL_MIN = 0.65;
+FOOTSTEP_LAND_VOL_MAX = 1.0;
+LAND_SOUND_MIN_VSP = 2.5;                 // Ignore micro-grounding blips / tiny falls
+LAND_SOUND_VSP_REF = 8;                   // Fall speed that plays a full-impact land
+LAND_SOUND_MIN_AIR_FRAMES = 4;            // Must be airborne this many frames before land SFX
+FOOTSTEP_LAND_STEP_COOLDOWN = 8;          // Block jog step right after land thud
+FOOTSTEP_REELBACK_CONTACT_FRAMES = [1, 2]; // Skid frames in spr_mc_reelback (3-frame cycle)
+// Ground debris — purple kick-up at feet (walk, run, reel-back, land).
+GROUND_DEBRIS_ENABLED = true;
+GROUND_DEBRIS_MAX = 80;
+GROUND_DEBRIS_GRAVITY = 0.2;
+GROUND_DEBRIS_DRAG = 0.9;
+GROUND_DEBRIS_COLORS = [
+    make_color_rgb(94, 74, 102),   // #5E4A66 — ground mid-tone
+    make_color_rgb(74, 59, 82),    // #4A3B52 — ground base
+    make_color_rgb(46, 36, 51),    // #2E2433 — ground shadow
+    make_color_rgb(125, 101, 133)  // #7D6585 — tile edge highlight
+];
+ground_debris_list = [];
+footstep_anim_prev_index = 0;
+footstep_last_clip = -1;
+footstep_cooldown = 0;
+footstep_track_sprite = -1;
+footstep_was_grounded = true;
+footstep_fall_vsp = 0;
+footstep_airborne_frames = 0;
+
 ANIM_LAND_CROUCH_START = 8;     // Jump sprite: first frame of landing crouch (8–10)
 ANIM_LAND_CROUCH_END = 10;      // Jump sprite: last frame of landing crouch (then go idle)
 ANIM_HAIR_FLICKER_INTERVAL = 5; // Frames between hair flicker (falling) frame switch
@@ -129,6 +173,9 @@ double_jump_anim_tick = 0;     // Steps elapsed in current double-jump sequence
 wall_kick_cooldown = 0;         // >0: ignore kicked wall column + enforce away hsp
 wall_kick_from_side = 0;       // Wall side we last kicked from (−1 / +1)
 wall_shift_hold_timer = 0;     // Consecutive airborne Steps with Shift held; wall cling needs WALL_SHIFT_HOLD_FRAMES_REQUIRED
+wall_cling_debris_active = false;
+wall_cling_debris_scrape_timer = 0;
+WALL_CLING_DEBRIS_SCRAPE_INTERVAL = 8;
 LEDGE_STEP_MAX = 2;
 LEDGE_TOE_INSET = 2;
 HORIZONTAL_LEDGE_WINDOW_PX = 6; // Side collision ignored when bbox_bottom is this close to tile top (mount / corner clip).

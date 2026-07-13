@@ -1,4 +1,4 @@
-"""Create GameMaker normal-map sprites (spr_mc_idle_n, etc.) from import/laigter/normals.
+"""Create GameMaker normal-map sprites (spr_mc_idle_n, spr_enemy_n, etc.) from import/laigter/normals.
 
 Usage:
   python tools/import_laigter_normal_sprites.py
@@ -27,6 +27,7 @@ DEFAULT_SPRITES = [
     "spr_mc_doublejump",
     "spr_mc_reelback",
     "spr_mc_attack2",
+    "spr_enemy",
 ]
 
 

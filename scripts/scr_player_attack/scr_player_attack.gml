@@ -1,3 +1,12 @@
+/// @description Apply held left/right to facing when a new swing starts (allows 1→2 turn-around).
+function scr_player_apply_attack_facing() {
+    var _dir = key_right - key_left;
+    if (_dir != 0) {
+        last_direction = _dir;
+        image_xscale = last_direction * image_base_scale;
+    }
+}
+
 function scr_player_attack() {
     if (!grounded) return;
 
@@ -10,13 +19,15 @@ function scr_player_attack() {
     if (comboTimer > 0 && comboCount == 1) comboCount = 2;
     else comboCount = 1;
 
+    scr_player_apply_attack_facing();
+
     attacking = true;
     combo_buffer = false;
     attack_chain_latched = false;
     attack_has_hit = false;
     image_index = 0;
     comboTimer = comboCooldown;
-    attack_priority_timer = 14; // startup only — HK nail wins trades during enemy dash tell
+    attack_priority_timer = 14; // Startup priority — does not beat enemy telegraph armor or super-armor dash
 
     switch (comboCount) {
         case 1:

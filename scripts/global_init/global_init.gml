@@ -43,6 +43,7 @@ gpu_set_texfilter(false); // Disables "Interpolate Colors" (already done, but sa
 display_reset(0, true);   // Forces VSync ON via code
 
 global.show_debug = false; // Renamed to avoid conflict with built-in variable
+global.debug_enemy_raycast = false; // F3 — enemy LOS / patrol probe overlay
 global.hitstop = 0;       // Hitstop frames (impact freeze); decremented in scr_hitstop_handler
 
 // Toggle reflections on/off (for before/after captures)
@@ -52,5 +53,5 @@ global.reflections_enabled = false;
 global.bulb_normal_maps_enabled = BULB_NORMAL_MAPS_ENABLED;
 
 // Borderless fullscreen (more reliable)
-window_set_fullscreen(false);
+window_set_fullscreen(true);
 

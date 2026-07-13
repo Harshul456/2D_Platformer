@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"snd_cave_footstep2",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":0.1840136,
+  "exportDir":"",
+  "name":"snd_cave_footstep2",
+  "parent":{
+    "name":"cave_footsteps",
+    "path":"folders/Sounds/sfx/footsteps/cave_footsteps.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"snd_cave_footstep2.wav",
+  "volume":1.0,
+}

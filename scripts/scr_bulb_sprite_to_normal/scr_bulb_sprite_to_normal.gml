@@ -12,6 +12,7 @@ function scr_bulb_sprite_to_normal(_diffuse) {
         case spr_mc_doublejump: return spr_mc_doublejump_n;
         case spr_mc_reelback:   return spr_mc_reelback_n;
         case spr_mc_attack2:    return spr_mc_attack2_n;
+        case spr_enemy:         return spr_enemy_n;
         default:                return -1;
     }
 }

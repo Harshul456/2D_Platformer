@@ -36,8 +36,15 @@ if (keyboard_check_pressed(vk_f2)) {
     global.reflections_enabled = !global.reflections_enabled;
 }
 
-// 1. PROCESS NORMAL MOVEMENT 
+// Toggle enemy LOS / raycast overlay (F3)
+if (keyboard_check_pressed(vk_f3)) {
+    scr_enemy_raycast_debug_toggle();
+}
+
+// 1. PROCESS NORMAL MOVEMENT
 scr_player_movement();
+scr_player_ground_debris_step();
+scr_player_footsteps_step();
 
 // Hits can land after attack Step (collision order) or same frame as knockback — never keep swing physics while stunned.
 if (stunTimer > 0 && attacking) {
@@ -122,16 +129,21 @@ if (attacking && stunTimer <= 0) {
     if (!attack_no_lunge && attack_shift_remaining > 0) {
         var _step = (last_direction != 0) ? last_direction : (image_xscale >= 0 ? 1 : -1);
         var _n = min(ATTACK_SHIFT_PX_PER_FRAME, attack_shift_remaining);
+        var _shifted = 0;
         repeat (_n) {
             var _cy = floor((bbox_top + bbox_bottom) * 0.5);
             var _side = (_step > 0) ? floor(bbox_right) : floor(bbox_left);
             if (!check_tile_collision(_side + _step, _cy)) {
                 x += _step;
                 attack_shift_remaining -= 1;
+                _shifted += 1;
             } else {
                 attack_shift_remaining = 0;
                 break;
             }
+        }
+        if (_shifted > 0) {
+            scr_player_ground_debris_on_attack_shift(_shifted);
         }
     }
     
@@ -181,19 +193,41 @@ if (attacking && stunTimer <= 0) {
                 hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
             }
         } else if (_hit_enemy != noone) {
-            attack_has_hit = true;
+            var _hit_result = { landed: false, intercepted: false, armored_chip: false, super_armor: false };
             with (_hit_enemy) {
-                scr_enemy_on_player_hit(other.comboCount);
+                _hit_result = scr_enemy_on_player_hit(other.comboCount);
             }
-            var _hitstop_frames = (comboCount >= 2) ? ATTACK_FINISHER_HITSTOP : ATTACK_LIGHT_HITSTOP;
-            scr_hitstop_trigger(_hitstop_frames);
-            
-            if (scr_player_is_downward_air_strike() && bbox_bottom <= _hit_enemy.bbox_top + 28) {
-                scr_player_apply_nail_pogo();
-            } else {
-                hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
-                if (comboCount >= 2) {
-                    hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
+
+            attack_has_hit = true;
+
+            if (_hit_result.intercepted) {
+                if (_hit_result.super_armor) {
+                    // Super armor dash — disrespect punished; enemy keeps slicing.
+                    scr_hitstop_trigger(4);
+                    hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK * 1.4;
+                    attack_shift_remaining = 0;
+                    attack_lockout = max(attack_lockout, 12);
+                    combo_buffer = false;
+                    attack_chain_latched = false;
+                } else {
+                    scr_hitstop_trigger(1);
+                    hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK * 0.35;
+                }
+            } else if (_hit_result.armored_chip) {
+                // Regular armor telegraph — chip damage only, tell continues.
+                scr_hitstop_trigger(1);
+                hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK * 0.15;
+            } else if (_hit_result.landed) {
+                var _hitstop_frames = (comboCount >= 2) ? ATTACK_FINISHER_HITSTOP : ATTACK_LIGHT_HITSTOP;
+                scr_hitstop_trigger(_hitstop_frames);
+
+                if (scr_player_is_downward_air_strike() && bbox_bottom <= _hit_enemy.bbox_top + 28) {
+                    scr_player_apply_nail_pogo();
+                } else {
+                    hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
+                    if (comboCount >= 2) {
+                        hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
+                    }
                 }
             }
         }
@@ -283,6 +317,7 @@ if (variable_global_exists("bulb_renderer") && global.bulb_renderer != undefined
 }
 
 // 5. VISUALS & CLEANUP
+scr_player_footsteps_cooldown_tick();
 scr_player_invincibility();
 _player_sprint_deform();
 

@@ -2,6 +2,7 @@
 
 enum ENEMY_STATE {
     PATROL,
+    NOTICE,
     CHASE,
     TELEGRAPH,
     ATTACK,
@@ -61,19 +62,41 @@ function scr_enemy_hgap_to_player() {
     return 0;
 }
 
+/// @function scr_enemy_attack_dash_reach_px
+/// @returns {Real} Horizontal travel during the ATTACK dash (hsp * frames).
+function scr_enemy_attack_dash_reach_px() {
+    var _hsp = (variable_instance_exists(id, "enemy_attack_dash_hsp") ? enemy_attack_dash_hsp : 3.6);
+    var _frames = (variable_instance_exists(id, "enemy_attack_dash_frames") ? enemy_attack_dash_frames : 14);
+    return _hsp * _frames;
+}
+
+/// @function scr_enemy_melee_telegraph_hgap_max
+/// @description Max bbox-edge gap to start telegraph — must be close enough for dash to connect.
+/// @returns {Real}
+function scr_enemy_melee_telegraph_hgap_max() {
+    if (variable_instance_exists(id, "chase_telegraph_hgap_max")) {
+        return chase_telegraph_hgap_max;
+    }
+    var _buf = (variable_instance_exists(id, "chase_telegraph_hgap_buffer") ? chase_telegraph_hgap_buffer : 12);
+    return max(6, scr_enemy_attack_dash_reach_px() - _buf);
+}
+
+/// @function scr_enemy_melee_approach_slow_hgap
+/// @description Wider edge-gap zone to creep slower while closing — not attack range.
+function scr_enemy_melee_approach_slow_hgap() {
+    return (variable_instance_exists(id, "chase_approach_slow_hgap") ? chase_approach_slow_hgap : 48);
+}
+
 /// @function scr_enemy_melee_band
-/// @returns {Real} Horizontal standoff distance before melee telegraph.
+/// @returns {Real} @deprecated Use scr_enemy_melee_telegraph_hgap_max — kept for callers.
 function scr_enemy_melee_band() {
-    if (!instance_exists(obj_player)) return 9999;
-    var _ehw = (bbox_right - bbox_left) * 0.5;
-    var _phw = (obj_player.bbox_right - obj_player.bbox_left) * 0.5;
-    return (_ehw + _phw) + chase_stop_extra;
+    return scr_enemy_melee_telegraph_hgap_max();
 }
 
 /// @function scr_enemy_player_in_melee_band
 function scr_enemy_player_in_melee_band() {
     if (!instance_exists(obj_player)) return false;
-    return abs(obj_player.x - x) <= scr_enemy_melee_band();
+    return scr_enemy_hgap_to_player() <= scr_enemy_melee_telegraph_hgap_max();
 }
 
 /// @function scr_enemy_touching_solid_wall
@@ -83,26 +106,111 @@ function scr_enemy_touching_solid_wall() {
     return check_tile_collision(bbox_left - 1, _cy) || check_tile_collision(bbox_right + 1, _cy);
 }
 
+/// @function scr_enemy_melee_vertical_overlap_px
+/// @returns {Real} Vertical bbox overlap with player (negative when on different heights).
+function scr_enemy_melee_vertical_overlap_px() {
+    if (!instance_exists(obj_player)) return -99999;
+    return min(bbox_bottom, obj_player.bbox_bottom) - max(bbox_top, obj_player.bbox_top);
+}
+
+/// @function scr_enemy_player_vertically_aligned_for_melee
+/// @description True when player shares enough vertical band for a fair melee telegraph/dash.
+function scr_enemy_player_vertically_aligned_for_melee() {
+    var _min = (variable_instance_exists(id, "chase_melee_vertical_overlap_min")
+        ? chase_melee_vertical_overlap_min : 10);
+    return scr_enemy_melee_vertical_overlap_px() >= _min;
+}
+
+/// @function scr_enemy_player_above_unreachable
+/// @description Player is on a higher ledge — horizontal chase cannot reach them for melee.
+function scr_enemy_player_above_unreachable() {
+    if (!instance_exists(obj_player)) return false;
+    if (scr_enemy_player_vertically_aligned_for_melee()) return false;
+    var _band = (variable_instance_exists(id, "chase_above_unreachable_px") ? chase_above_unreachable_px : 12);
+    return obj_player.bbox_bottom < bbox_top + _band;
+}
+
+/// @function scr_enemy_begin_notice
+/// @description HK threat reaction — freeze, face player, blue alert tint, then commit to chase.
+function scr_enemy_begin_notice() {
+    state = ENEMY_STATE.NOTICE;
+    state_timer = (variable_instance_exists(id, "enemy_notice_frames") ? enemy_notice_frames : 30);
+    hsp = 0;
+    lost_los_timer = 0;
+    chase_path_blocked_timer = 0;
+    chase_wall_stuck_timer = 0;
+    if (instance_exists(obj_player)) {
+        scr_enemy_set_facing(scr_enemy_dir_toward_player());
+    }
+    scr_enemy_notice_visuals();
+}
+
+/// @function scr_enemy_notice_visuals
+function scr_enemy_notice_visuals() {
+    var _pulse = ((current_time div 90) mod 2 == 0);
+    image_blend = _pulse ? make_color_rgb(72, 140, 255) : make_color_rgb(108, 168, 255);
+    telegraph_shake_x = 0;
+    telegraph_shake_y = 0;
+}
+
+/// @function scr_enemy_hit_armor_policy
+/// @description Active armor intercept rules for committed enemy phases.
+/// @returns {Struct} { intercept, take_damage, take_stun, take_knockback, damage_mult }
+function scr_enemy_hit_armor_policy() {
+    switch (state) {
+        case ENEMY_STATE.NOTICE:
+            return { intercept: true, take_damage: false, take_stun: false, take_knockback: false, damage_mult: 0 };
+        case ENEMY_STATE.ATTACK:
+            // Super armor — active dash slices through nail hits.
+            return { intercept: true, take_damage: false, take_stun: false, take_knockback: false, damage_mult: 0 };
+        case ENEMY_STATE.RECOIL:
+            if (variable_instance_exists(id, "attack_hit_dealt") && attack_hit_dealt) {
+                return { intercept: true, take_damage: false, take_stun: false, take_knockback: false, damage_mult: 0 };
+            }
+            return { intercept: false, take_damage: true, take_stun: true, take_knockback: true, damage_mult: 1 };
+        case ENEMY_STATE.TELEGRAPH:
+            // Regular armor — chip damage during red tell; windup is not interruptible.
+            return { intercept: false, take_damage: true, take_stun: false, take_knockback: false, damage_mult: 1 };
+        default:
+            return { intercept: false, take_damage: true, take_stun: true, take_knockback: true, damage_mult: 1 };
+    }
+}
+
+/// @function scr_enemy_armor_deflect_feedback
+/// @description Clang feedback when a swing is absorbed — no damage/stun.
+function scr_enemy_armor_deflect_feedback() {
+    if (!variable_instance_exists(id, "impact_spark_list")) impact_spark_list = [];
+    repeat (3) {
+        array_push(impact_spark_list, scr_crystal_spark_create(x, y - 8));
+    }
+}
+
 /// @function scr_enemy_begin_telegraph
-/// @description Contact braking → mandatory 15-frame warning (no damage sweep).
+/// @description Contact braking → committed warning; dash direction locked at start (anti-bait).
 function scr_enemy_begin_telegraph() {
+    var _commit_dir = scr_enemy_facing_sign();
+    if (instance_exists(obj_player)) {
+        var _toward = scr_enemy_dir_toward_player();
+        if (_toward != 0) _commit_dir = _toward;
+    }
+
+    telegraph_commit_dir = _commit_dir;
     state = ENEMY_STATE.TELEGRAPH;
     state_timer = enemy_telegraph_frames;
     hsp = 0;
     attack_hit_dealt = false;
     attack_frame = 0;
     dash_sweep_prev_x = x;
-    if (instance_exists(obj_player)) {
-        scr_enemy_set_facing(scr_enemy_dir_toward_player());
-    }
+    scr_enemy_set_facing(_commit_dir);
     scr_enemy_attack_windup_visuals();
 }
 
 /// @function scr_enemy_begin_attack_dash
-/// @description Locked launch after telegraph expires — dash hsp + sweep armed next Step.
+/// @description Locked launch after telegraph — uses committed direction, not live player bait.
 function scr_enemy_begin_attack_dash() {
-    var _dir = instance_exists(obj_player) ? scr_enemy_dir_toward_player() : scr_enemy_facing_sign();
-    if (_dir == 0) _dir = scr_enemy_facing_sign();
+    var _dir = (variable_instance_exists(id, "telegraph_commit_dir") && telegraph_commit_dir != 0)
+        ? telegraph_commit_dir : scr_enemy_facing_sign();
+    if (_dir == 0) _dir = 1;
     state = ENEMY_STATE.ATTACK;
     attack_hit_dealt = false;
     attack_frame = 0; // sweep gated until Step increments (no TELEGRAPH/CHASE damage)
@@ -173,62 +281,122 @@ function scr_enemy_resolve_attack_player_contact() {
 }
 
 /// @function scr_enemy_post_stun_recovery
-/// @description HK-style punish: back off to CHASE with re-engage cooldown (no instant counter-telegraph).
+/// @description Recover from stun — poise window lets enemy close through light mash hits.
 function scr_enemy_post_stun_recovery() {
     knockbackX = 0;
     hsp = 0;
-    state = ENEMY_STATE.CHASE;
-    lost_los_timer = 0;
-    chase_path_blocked_timer = 0;
     attack_hit_dealt = false;
     attack_frame = 0;
     image_blend = c_white;
     telegraph_shake_x = 0;
     telegraph_shake_y = 0;
-    attack_cooldown = enemy_post_hit_cooldown_frames;
+    lost_los_timer = 0;
+    chase_path_blocked_timer = 0;
+    state = ENEMY_STATE.CHASE;
+
+    var _poise = (variable_instance_exists(id, "enemy_poise_frames") ? enemy_poise_frames : 48);
+    enemy_poise_timer = _poise;
 }
 
 /// @function scr_enemy_chase_hsp_for_distance
-/// @description Slower creep inside approach zone — aggro outside nail range (HK bait spacing).
-function scr_enemy_chase_hsp_for_distance(_hgap, _dir, _melee_band) {
-    if (_dir == 0 || _hgap <= _melee_band) return 0;
+/// @description Full speed until approach zone; creep when close; stop only at telegraph range.
+function scr_enemy_chase_hsp_for_distance(_hgap, _dir) {
+    if (_dir == 0) return 0;
+
+    var _telegraph_hgap = scr_enemy_melee_telegraph_hgap_max();
+    if (_hgap <= _telegraph_hgap) return 0;
+
     var _hsp = _dir * moveSpeed;
-    if (_hgap < _melee_band * enemy_approach_slow_mult) {
+    var _approach_hgap = scr_enemy_melee_approach_slow_hgap();
+    if (_hgap < _approach_hgap) {
         _hsp *= enemy_approach_slow_factor;
     }
     return _hsp;
 }
 
 /// @function scr_enemy_on_player_hit
-/// @description Armor + stun resolution when the player attack connects (call inside with enemy).
+/// @description Armor intercept + stun resolution when the player attack connects.
 /// @param {Real} _combo_count Player combo step (1 or 2).
+/// @returns {Struct} { landed, intercepted, armored_chip }
 function scr_enemy_on_player_hit(_combo_count) {
+    var _policy = scr_enemy_hit_armor_policy();
+    var _was_telegraph = (state == ENEMY_STATE.TELEGRAPH);
+    var _was_attack = (state == ENEMY_STATE.ATTACK);
+
+    // Super armor — dash phase; no damage, full intercept.
+    if (_policy.intercept) {
+        var _cd = (variable_instance_exists(id, "armor_deflect_cooldown") ? armor_deflect_cooldown : 0);
+        if (_cd <= 0) {
+            var _cd_max = (variable_instance_exists(id, "armor_deflect_cooldown_frames")
+                ? armor_deflect_cooldown_frames : 10);
+            armor_deflect_cooldown = _cd_max;
+            scr_enemy_armor_deflect_feedback();
+        }
+        return { landed: false, intercepted: true, armored_chip: false, super_armor: _was_attack };
+    }
+
     hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
-    obj_enemy_health -= other.ATTACK_DAMAGE_PER_HIT;
+    obj_enemy_health -= other.ATTACK_DAMAGE_PER_HIT * _policy.damage_mult;
 
-    // Super armor — finish dash sweep; no stun, no knockback.
-    if (state == ENEMY_STATE.ATTACK) return;
+    // Regular armor — telegraph chips but cannot be interrupted or shoved.
+    if (!_policy.take_stun && !_policy.take_knockback) {
+        if (_was_telegraph) {
+            scr_enemy_attack_windup_visuals();
+        }
+        return { landed: true, intercepted: false, armored_chip: true, super_armor: false };
+    }
 
-    // TELEGRAPH is punishable — HK-style: nail into the tell wins the exchange.
+    if (!_was_telegraph) {
+        image_blend = c_white;
+        telegraph_shake_x = 0;
+        telegraph_shake_y = 0;
+    }
 
-    image_blend = c_white;
-    telegraph_shake_x = 0;
-    telegraph_shake_y = 0;
+    if (_policy.take_stun) {
+        if (state == ENEMY_STATE.STUNNED && stunTimer > 0) {
+            return { landed: true, intercepted: false, armored_chip: false, super_armor: false };
+        }
 
-    state = ENEMY_STATE.STUNNED;
-    stunTimer = (_combo_count >= 2) ? other.ENEMY_STUN_AFTER_HIT2 : other.ENEMY_STUN_AFTER_HIT1;
+        var _poise_on = (variable_instance_exists(id, "enemy_poise_timer") && enemy_poise_timer > 0
+            && state != ENEMY_STATE.TELEGRAPH && state != ENEMY_STATE.ATTACK);
+        if (_poise_on && _combo_count < 2) {
+            return { landed: true, intercepted: false, armored_chip: true, super_armor: false };
+        }
 
-    var _pcx = (other.bbox_left + other.bbox_right) * 0.5;
-    var _ecx = (bbox_left + bbox_right) * 0.5;
-    var _knockback_dir = sign(_ecx - _pcx);
-    if (_knockback_dir == 0) _knockback_dir = other.last_direction;
+        enemy_poise_timer = 0;
+        state = ENEMY_STATE.STUNNED;
+        stunTimer = (_combo_count >= 2) ? other.ENEMY_STUN_AFTER_HIT2 : other.ENEMY_STUN_AFTER_HIT1;
 
-    var _kb = (_combo_count >= 2) ? other.ATTACK_FINISHER_KNOCKBACK_X : other.ATTACK_LIGHT_KNOCKBACK;
-    knockback_pending_x = _knockback_dir * _kb;
-    knockback_pending_y = 0;
-    knockback_pending_lift = false;
-    knockbackX = knockback_pending_x;
-    hsp = knockbackX;
+        if (_combo_count >= 2) {
+            attack_cooldown = max(attack_cooldown, enemy_post_hit_cooldown_frames);
+        } else {
+            var _light_cd = (variable_instance_exists(id, "enemy_post_hit_cooldown_light")
+                ? enemy_post_hit_cooldown_light : 8);
+            attack_cooldown = max(attack_cooldown, _light_cd);
+        }
+    }
+
+    if (_policy.take_knockback) {
+        var _poise_kb = (variable_instance_exists(id, "enemy_poise_timer") && enemy_poise_timer > 0
+            && state != ENEMY_STATE.TELEGRAPH && state != ENEMY_STATE.ATTACK);
+        if (_poise_kb && _combo_count < 2) {
+            return { landed: true, intercepted: false, armored_chip: true, super_armor: false };
+        }
+
+        var _pcx = (other.bbox_left + other.bbox_right) * 0.5;
+        var _ecx = (bbox_left + bbox_right) * 0.5;
+        var _knockback_dir = sign(_ecx - _pcx);
+        if (_knockback_dir == 0) _knockback_dir = other.last_direction;
+
+        var _kb = (_combo_count >= 2) ? other.ATTACK_FINISHER_KNOCKBACK_X : other.ATTACK_LIGHT_KNOCKBACK;
+        knockback_pending_x = _knockback_dir * _kb;
+        knockback_pending_y = 0;
+        knockback_pending_lift = false;
+        knockbackX = knockback_pending_x;
+        hsp = knockbackX;
+    }
+
+    return { landed: true, intercepted: false, armored_chip: false, super_armor: false };
 }
 
 /// @function scr_enemy_attack_windup_visuals
@@ -300,12 +468,35 @@ function scr_enemy_ai() {
     var _dir = scr_enemy_dir_toward_player();
     var _hgap = scr_enemy_hgap_to_player();
     var _dist_total = point_distance(x, y, obj_player.x, obj_player.y);
-    var _melee_band = scr_enemy_melee_band();
+    var _melee_band = scr_enemy_melee_telegraph_hgap_max();
 
     switch (state) {
         case ENEMY_STATE.PATROL:
             scr_enemy_ai_patrol_core();
             break;
+
+        case ENEMY_STATE.NOTICE: {
+            hsp = 0;
+            vsp = 0;
+            image_yscale = base_yscale;
+            scr_enemy_notice_visuals();
+            if (_dir != 0) scr_enemy_set_facing(_dir);
+
+            var _los_clear = scr_enemy_dual_los_clear();
+            if (!_los_clear || _dist_total > chaseRange * 1.2) {
+                scr_enemy_patrol_drop_aggro();
+                break;
+            }
+
+            state_timer--;
+            if (state_timer <= 0) {
+                state = ENEMY_STATE.CHASE;
+                image_blend = c_white;
+                lost_los_timer = 0;
+                chase_path_blocked_timer = 0;
+                hsp = 0;
+            }
+        } break;
 
         case ENEMY_STATE.CHASE: {
             scr_enemy_ai_patrol_core();
@@ -313,38 +504,49 @@ function scr_enemy_ai() {
 
             image_blend = c_white;
 
-            // Contact braking — entering melee band: stop, then telegraph (never same-frame hit).
+            // Contact braking — only telegraph when dash can actually reach the player.
             if (_hgap <= _melee_band) {
                 hsp = 0;
-                if (attack_cooldown <= 0 && scr_enemy_dual_los_clear()) {
+                if (attack_cooldown <= 0 && scr_enemy_dual_los_clear()
+                    && !scr_enemy_player_above_unreachable()) {
                     scr_enemy_begin_telegraph();
                 }
                 break;
             }
 
-            // Approach slow inside bait zone (patrol_core sets full speed; taper near nail range).
+            // Keep closing until tight telegraph range (don't stop in the wide approach zone).
             if (_dir != 0) {
-                hsp = scr_enemy_chase_hsp_for_distance(_hgap, _dir, _melee_band);
+                hsp = scr_enemy_chase_hsp_for_distance(_hgap, _dir);
+                if (variable_instance_exists(id, "enemy_poise_timer") && enemy_poise_timer > 0) {
+                    var _mult = (variable_instance_exists(id, "enemy_poise_chase_mult") ? enemy_poise_chase_mult : 1.35);
+                    hsp *= _mult;
+                }
             }
         } break;
 
         case ENEMY_STATE.TELEGRAPH: {
-            // 2. Telegraph warning — frozen feet, red flash, shake; zero damage.
+            // Fully committed tell — baiting (circle, jump, brief LOS) cannot cancel the windup.
             hsp = 0;
             image_yscale = base_yscale;
             scr_enemy_attack_windup_visuals();
-            if (_dir != 0) scr_enemy_set_facing(_dir);
+            var _commit = (variable_instance_exists(id, "telegraph_commit_dir") && telegraph_commit_dir != 0)
+                ? telegraph_commit_dir : scr_enemy_facing_sign();
+            if (_commit != 0) scr_enemy_set_facing(_commit);
 
             state_timer--;
             if (state_timer <= 0) {
-                // 3. Locked attack launch — dash + sweep only from this frame onward.
                 scr_enemy_begin_attack_dash();
             }
         } break;
 
         case ENEMY_STATE.ATTACK: {
             image_yscale = base_yscale;
-            if (_dir != 0) scr_enemy_set_facing(sign(hsp) != 0 ? sign(hsp) : _dir);
+            var _dash_face = sign(hsp);
+            if (_dash_face == 0) {
+                _dash_face = (variable_instance_exists(id, "telegraph_commit_dir") && telegraph_commit_dir != 0)
+                    ? telegraph_commit_dir : scr_enemy_facing_sign();
+            }
+            if (_dash_face != 0) scr_enemy_set_facing(_dash_face);
         } break;
 
         case ENEMY_STATE.RECOIL: {

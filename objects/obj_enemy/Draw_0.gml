@@ -1,5 +1,6 @@
 scr_enemy_draw_main_sprite();
 scr_enemy_impact_spark_draw();
+scr_enemy_raycast_debug_draw();
 
 // Debug Draw Collision Points
 if (global.show_debug) {

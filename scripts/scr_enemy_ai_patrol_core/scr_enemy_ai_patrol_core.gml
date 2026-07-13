@@ -87,7 +87,7 @@ function scr_enemy_patrol_drop_aggro(_patrol_dir) {
     image_blend = c_white;
     telegraph_shake_x = 0;
     telegraph_shake_y = 0;
-    if (argument_count > 0 && _patrol_dir != 0) {
+    if (!is_undefined(_patrol_dir) && _patrol_dir != 0) {
         patrol_dir = sign(_patrol_dir);
         scr_enemy_set_facing(patrol_dir);
     }
@@ -97,7 +97,7 @@ function scr_enemy_patrol_drop_aggro(_patrol_dir) {
 /// @description Runs PATROL or CHASE movement + dual-raycast aggro acquire/drop. Call from scr_enemy_ai.
 function scr_enemy_ai_patrol_core() {
     if (!instance_exists(obj_player)) {
-        if (state == ENEMY_STATE.CHASE) scr_enemy_patrol_drop_aggro();
+        if (state == ENEMY_STATE.CHASE || state == ENEMY_STATE.NOTICE) scr_enemy_patrol_drop_aggro();
         else hsp = 0;
         return;
     }
@@ -116,12 +116,9 @@ function scr_enemy_ai_patrol_core() {
             telegraph_shake_x = 0;
             telegraph_shake_y = 0;
 
-            // Aggro: player inside range AND LOS clear (cooldown prevents stuck-drop flip-flop).
+            // Spot player → threat reaction (freeze + blue alert) before chase commit.
             if (_dist_total < chaseRange && _los_clear && chase_reaggro_cooldown <= 0) {
-                state = ENEMY_STATE.CHASE;
-                lost_los_timer = 0;
-                chase_path_blocked_timer = 0;
-                hsp = 0;
+                scr_enemy_begin_notice();
                 break;
             }
 
@@ -175,6 +172,10 @@ function scr_enemy_ai_patrol_core() {
             // Always close horizontally — tile movement resolves walls (no asymmetric wall-ray gate).
             if (_dir != 0) {
                 hsp = moveSpeed * _dir;
+                // Player on a higher ledge — don't keep walking into the wall underneath them.
+                if (scr_enemy_player_above_unreachable() && scr_enemy_patrol_wall_ahead(_dir)) {
+                    hsp = 0;
+                }
             } else {
                 hsp = 0;
             }

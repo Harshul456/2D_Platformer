@@ -305,6 +305,24 @@ function scr_player_movement() {
         if (wall_side != 0 && !cling_eff) wall_side = 0;
     }
 
+    // Wall cling / slide debris — hand + foot on the wall face (same particles as ground footsteps).
+    if (cling_eff && wall_side != 0 && stunTimer <= 0) {
+        if (!wall_cling_debris_active) {
+            wall_cling_debris_active = true;
+            scr_player_ground_debris_on_wall_cling(false);
+        } else if (vsp > 0) {
+            if (wall_cling_debris_scrape_timer > 0) {
+                wall_cling_debris_scrape_timer--;
+            } else {
+                scr_player_ground_debris_on_wall_cling(true);
+                wall_cling_debris_scrape_timer = (variable_instance_exists(id, "WALL_CLING_DEBRIS_SCRAPE_INTERVAL")
+                    ? WALL_CLING_DEBRIS_SCRAPE_INTERVAL : 8);
+            }
+        }
+    } else {
+        wall_cling_debris_active = false;
+    }
+
     // --- 2c. WALL-JUMP DEFER SCAN (§3 runs before horizontal; wall_side can be 0 until we scrape the wall) ---
     var _wall_jump_defer = false;
     if (!grounded && global.tilemap_collision_id != noone && wall_side == 0 && jump_buffer_timer > 0 && stunTimer <= 0) {
@@ -342,7 +360,7 @@ function scr_player_movement() {
     var _pre_sprinting = is_sprinting;
     var _pre_sprint_committed = sprint_committed;
     var _pre_sprint_hold_latched = sprint_hold_latched;
-    var jumped_this_frame = false;
+    jumped_this_frame = false;
     var _grounded_jump_this_step = false;
     if (stunTimer <= 0 && jump_buffer_timer > 0 && !attacking) {
         var _head_room_ok = !check_tile_collision(p_center, head_y - WALL_JUMP_CEIL_CLEAR, true, feet_y);
@@ -371,6 +389,8 @@ function scr_player_movement() {
             last_direction = -wall_side;
             jump_buffer_timer = 0;
             jumped_this_frame = true;
+            scr_player_ground_debris_on_wall_jump();
+            wall_cling_debris_active = false;
             jump_count = 2;
             air_chain_jump_used = true;
             coyote_time_timer = 0;
@@ -977,6 +997,8 @@ function scr_player_movement() {
             last_direction = -wall_side;
             jump_buffer_timer = 0;
             jumped_this_frame = true;
+            scr_player_ground_debris_on_wall_jump();
+            wall_cling_debris_active = false;
             jump_count = 2;
             air_chain_jump_used = true;
             coyote_time_timer = 0;

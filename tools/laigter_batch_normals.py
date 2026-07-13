@@ -1,4 +1,4 @@
-"""Export player frames and batch-generate normal maps with Laigter CLI.
+"""Export sprite frames and batch-generate normal maps with Laigter CLI.
 
 Usage (from project root):
   python tools/laigter_batch_normals.py
@@ -37,6 +37,7 @@ DEFAULT_SPRITES = [
     "spr_mc_doublejump",
     "spr_mc_reelback",
     "spr_mc_attack2",
+    "spr_enemy",
 ]
 
 LAIGTER_SEARCH_PATHS = [
@@ -180,7 +181,7 @@ def run_laigter_on_sprite(laigter: Path, sprite_name: str, preset: Path | None) 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Batch-generate Laigter normal maps for player sprites.")
+    parser = argparse.ArgumentParser(description="Batch-generate Laigter normal maps for diffuse sprites.")
     parser.add_argument("--sprites", nargs="*", default=DEFAULT_SPRITES)
     parser.add_argument("--laigter", default=None, help="Path to laigter.exe")
     parser.add_argument("--preset", default=None, help="Laigter preset file (save from GUI after tuning one frame)")
