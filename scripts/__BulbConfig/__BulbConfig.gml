@@ -54,6 +54,15 @@
 
 // Crisp white sparkles orbiting crystals (additive shimmer, not rising embers).
 #macro BULB_CRYSTAL_SPARKS_ENABLED           true
+
+// Moving crystal enemies — self-emissive light + additive glow overlay (same pipeline as tile crystals).
+#macro BULB_ENEMY_CRYSTAL_LIGHT_ENABLED        true
+#macro BULB_ENEMY_GLOW_ENABLED                 true
+#macro BULB_ENEMY_GLOW_SPRITE                  spr_enemy_glow  // Outline-free fill overlay (like ts_foreground_glow)
+#macro BULB_ENEMY_GLOW_ALPHA                   1.0    // Scales pulse alpha (tile glow uses art color + pulse only)
+#macro BULB_ENEMY_LIGHT_SCALE                  0.88   // Bulb circle vs tile crystal lights
+#macro BULB_ENEMY_LIGHT_Y_OFFSET               -14    // Light anchor above feet (sprite center mass)
+
 #macro BULB_CRYSTAL_SPARK_MAX                8
 #macro BULB_CRYSTAL_SPARK_RATE_MIN           0.03
 #macro BULB_CRYSTAL_SPARK_RATE_MAX           0.14

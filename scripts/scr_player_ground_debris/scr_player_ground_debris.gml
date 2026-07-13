@@ -34,6 +34,7 @@ function scr_player_ground_debris_pick_color() {
 
 /// @function scr_player_ground_debris_create
 function scr_player_ground_debris_create(_px, _py, _vx, _vy, _life, _size, _col) {
+    var _half = max(1, _size * 0.5);
     return {
         x: _px,
         y: _py,
@@ -42,9 +43,12 @@ function scr_player_ground_debris_create(_px, _py, _vx, _vy, _life, _size, _col)
         life: _life,
         max_life: _life,
         size: _size,
+        rx: _half * random_range(0.82, 1.12),
+        ry: _half * random_range(0.68, 0.98), // Slightly flattened pebbles
         col: _col,
         spin: random_range(-8, 8),
         rot: random(360),
+        rock_seed: irandom(9999),
         kind: 0
     };
 }
@@ -239,6 +243,38 @@ function scr_player_ground_debris_step() {
     }
 }
 
+/// @function scr_player_ground_debris_draw_pebble
+/// @description Irregular rounded rock — triangle-fan blob, not blocky squares.
+function scr_player_ground_debris_draw_pebble(_cx, _cy, _p, _fade) {
+    var _n = 7;
+    var _seed = (variable_struct_exists(_p, "rock_seed") ? _p.rock_seed : 0);
+    var _rot = _p.rot;
+    var _rx = (variable_struct_exists(_p, "rx") ? _p.rx : max(1, _p.size * 0.5));
+    var _ry = (variable_struct_exists(_p, "ry") ? _p.ry : max(1, _p.size * 0.42));
+
+    draw_set_color(_p.col);
+    draw_set_alpha(_fade);
+
+    draw_primitive_begin(pr_trianglefan);
+    draw_vertex(_cx, _cy);
+    for (var _v = 0; _v <= _n; _v++) {
+        var _ang = (_v / _n) * 360 + _rot;
+        var _jit = 0.62 + ((_seed + _v * 41) mod 100) / 100 * 0.38;
+        var _rad = degtorad(_ang);
+        draw_vertex(_cx + cos(_rad) * _rx * _jit, _cy + sin(_rad) * _ry * _jit);
+    }
+    draw_primitive_end();
+
+    if (_p.size >= 3) {
+        draw_set_color(make_color_rgb(125, 101, 133));
+        draw_set_alpha(_fade * 0.5);
+        var _hx = _cx - _rx * 0.28;
+        var _hy = _cy - _ry * 0.32;
+        var _hr = max(0.6, min(_rx, _ry) * 0.38);
+        draw_circle(_hx, _hy, _hr, false);
+    }
+}
+
 /// @function scr_player_ground_debris_draw
 function scr_player_ground_debris_draw() {
     if (!variable_instance_exists(id, "ground_debris_list")) return;
@@ -258,17 +294,9 @@ function scr_player_ground_debris_draw() {
         var _fade = min(1, _t * 4) * min(1, (1 - _t) * 3);
         if (_fade <= 0.01) continue;
 
-        draw_set_color(_p.col);
-        draw_set_alpha(_fade);
-        var _px = floor(_p.x);
-        var _py = floor(_p.y);
-        var _s = _p.size;
-        draw_rectangle(_px, _py, _px + _s - 1, _py + _s - 1, false);
-        if (_s >= 3) {
-            draw_set_color(make_color_rgb(125, 101, 133));
-            draw_set_alpha(_fade * 0.7);
-            draw_rectangle(_px + 1, _py + 1, _px + _s - 2, _py + _s - 2, false);
-        }
+        var _cx = _p.x + _p.size * 0.5;
+        var _cy = _p.y + _p.size * 0.5;
+        scr_player_ground_debris_draw_pebble(_cx, _cy, _p, _fade);
     }
 
     gpu_set_texfilter(_old_tex);

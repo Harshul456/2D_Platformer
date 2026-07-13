@@ -289,6 +289,54 @@ ATTACK_HITBOX_TOP_PAD_2 = 10;
 ATTACK_HITBOX_BOT_PAD_1 = 14;
 ATTACK_HITBOX_BOT_PAD_2 = 14;
 ATTACK_HITBOX_X_INSET = 4;
+
+// Blue saber trail — grip/tip keyframes follow full swing (waist↔head↔feet).
+SABER_TRAIL_ENABLED = true;
+SABER_TRAIL_MAX = 120;
+SABER_TRAIL_BODY_PIVOT_OX = 6;     // Waist pivot for curved frame bridges
+SABER_TRAIL_BODY_PIVOT_OY = -32;
+SABER_TRAIL_ARC_SAMPLES = 5;       // Bridge samples between frames (atk1)
+SABER_TRAIL_ARC_SAMPLES_ATK2 = 7;  // Finisher bridge density
+SABER_TRAIL_BLADE_SAMPLES = 4;     // Samples along blade per frame
+SABER_TRAIL_LIFE_MIN = 4;
+SABER_TRAIL_LIFE_MAX = 10;
+SABER_TRAIL_SPEED = 1.6;
+SABER_TRAIL_DRAG = 0.82;
+// Facing-right local offsets from player feet (x, y). [ox, oy] per active subimage 1–3.
+// Atk1: waist/front → back of head.
+SABER_TRAIL_ATK1_GRIP = [
+    [14, -30],   // subimage 1 — hand at waist
+    [10, -36],   // subimage 2 — rising
+    [-6, -54]    // subimage 3 — hand behind head
+];
+SABER_TRAIL_ATK1_TIP = [
+    [38, -12],   // subimage 1 — blade low in front (thigh)
+    [24, -46],   // subimage 2 — mid arc through chest
+    [-24, -62]   // subimage 3 — tip above/behind head
+];
+// Atk2: back of head → feet.
+SABER_TRAIL_ATK2_GRIP = [
+    [-4, -56],   // subimage 1 — continues atk1 end pose
+    [8, -42],    // subimage 2 — chopping through
+    [18, -24]    // subimage 3 — hand low
+];
+SABER_TRAIL_ATK2_TIP = [
+    [-22, -48],  // subimage 1 — blade behind head
+    [42, -18],   // subimage 2 — mid-down in front
+    [48, 2]      // subimage 3 — tip at feet
+];
+SABER_TRAIL_COLORS_ATK1 = [
+    make_colour_rgb(90, 175, 255),
+    make_colour_rgb(70, 150, 255),
+    make_colour_rgb(160, 215, 255)
+];
+saber_trail_list = [];
+saber_trail_arc_idx = -1;
+saber_trail_arc_combo = 0;
+saber_trail_has_prev_tip = false;
+saber_trail_prev_tip_x = 0;
+saber_trail_prev_tip_y = 0;
+
 ENEMY_HIT_PRESSURE_WINDOW_FRAMES = 45;
 HIT_PRESSURE_KB_PER_STACK = 0.08;
 HIT_PRESSURE_KB_MULT_CAP = 1.5;

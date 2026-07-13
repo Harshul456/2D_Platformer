@@ -136,6 +136,7 @@ if (global.reflections_enabled && reflection_timer > 0 && global.tilemap_collisi
 
 // --- 2. MAIN RENDERING ---
 scr_player_draw_main_sprite();
+scr_player_saber_trail_draw();
 scr_player_ground_debris_draw();
 
 // --- LEDGE STALL HUNT (works in exported .exe; show_debug_message often does not) ---

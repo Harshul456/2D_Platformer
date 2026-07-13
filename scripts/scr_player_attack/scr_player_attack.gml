@@ -29,6 +29,7 @@ function scr_player_attack() {
     image_index = 0;
     comboTimer = comboCooldown;
     attack_priority_timer = 14; // Startup priority — does not beat enemy telegraph armor or super-armor dash
+    scr_player_saber_trail_clear();
 
     switch (comboCount) {
         case 1:

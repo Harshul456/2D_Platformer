@@ -1,7 +1,7 @@
 var _lit_scene = -1;
 
 if (renderer != undefined) {
-    var _emissive_overlays = BULB_GLOW_TILE_LAYER_ENABLED || BULB_CRYSTAL_SPARKS_ENABLED;
+    var _emissive_overlays = BULB_GLOW_TILE_LAYER_ENABLED || BULB_CRYSTAL_SPARKS_ENABLED || BULB_ENEMY_GLOW_ENABLED;
 
     if (_emissive_overlays) {
         _lit_scene = scr_bulb_draw_lit_scene(renderer);
@@ -17,8 +17,10 @@ scr_cave_fog_draw(id);
 
 // Emissive crystal/mushroom glow stickers — layer hidden in Room Editor, drawn additively here.
 scr_bulb_draw_glow_tile_layer();
-scr_crystal_spark_draw_all();
 scr_bulb_redraw_over_emissive_glow(_lit_scene);
+// Enemy glow AFTER lit redraw — same as tiles_glow sitting on top of crystal tiles (not buried under body).
+scr_bulb_draw_enemy_emissive_glow_all();
+scr_crystal_spark_draw_all();
 
 scr_cave_vignette_draw();
 

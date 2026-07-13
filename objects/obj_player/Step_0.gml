@@ -44,6 +44,7 @@ if (keyboard_check_pressed(vk_f3)) {
 // 1. PROCESS NORMAL MOVEMENT
 scr_player_movement();
 scr_player_ground_debris_step();
+scr_player_saber_trail_step();
 scr_player_footsteps_step();
 
 // Hits can land after attack Step (collision order) or same frame as knockback — never keep swing physics while stunned.
@@ -60,6 +61,7 @@ if (stunTimer > 0 && attacking) {
     attack_recovery_cut = false;
     comboTimer = 0;
     comboCount = 0;
+    scr_player_saber_trail_clear();
     image_blend = c_white;
     debug_hitbox_active = false;
     attack_priority_timer = 0;
@@ -152,33 +154,22 @@ if (attacking && stunTimer <= 0) {
         }
     }
     
-    // --- HIT DETECTION ---
-    var _is_swinging = (image_index >= 1 && image_index <= 3);
-    var _downward_strike = scr_player_is_downward_air_strike();
-    
-    if ((_is_swinging || _downward_strike) && !attack_has_hit) { 
-        // HITBOX: use stable hurtbox (idle mask) and tuned reach/pads, not the sprite extents.
-        var _reach = (comboCount >= 2) ? ATTACK_HITBOX_REACH_2 : ATTACK_HITBOX_REACH_1;
-        var _top_pad = (comboCount >= 2) ? ATTACK_HITBOX_TOP_PAD_2 : ATTACK_HITBOX_TOP_PAD_1;
-        var _bot_pad = (comboCount >= 2) ? ATTACK_HITBOX_BOT_PAD_2 : ATTACK_HITBOX_BOT_PAD_1;
-        var y1 = bbox_top + _top_pad;
-        var y2 = bbox_bottom - _bot_pad;
-        var x1, x2;
-        if (_downward_strike) {
-            // Down-strike probe: feet-first box for nail pogo
-            x1 = bbox_left + 6;
-            x2 = bbox_right - 6;
-            y1 = bbox_top;
-            y2 = bbox_bottom + 16;
-        } else if (last_direction > 0) {
-            x1 = bbox_right - ATTACK_HITBOX_X_INSET;
-            x2 = x1 + _reach;
-        } else {
-            x2 = bbox_left + ATTACK_HITBOX_X_INSET;
-            x1 = x2 - _reach;
-        }
-        // Store for debug draw (exact coords used by collision)
-        debug_hitbox_x1 = x1; debug_hitbox_y1 = y1; debug_hitbox_x2 = x2; debug_hitbox_y2 = y2; debug_hitbox_active = true;
+    // --- HIT DETECTION + SABER TRAIL ---
+    var _hb = scr_player_attack_compute_hitbox();
+    if (_hb.active) {
+        debug_hitbox_x1 = _hb.x1;
+        debug_hitbox_y1 = _hb.y1;
+        debug_hitbox_x2 = _hb.x2;
+        debug_hitbox_y2 = _hb.y2;
+        debug_hitbox_active = true;
+        scr_player_saber_trail_spawn_edge(_hb);
+    }
+
+    if (_hb.active && !attack_has_hit) {
+        var x1 = _hb.x1;
+        var y1 = _hb.y1;
+        var x2 = _hb.x2;
+        var y2 = _hb.y2;
         var _hit_enemy = collision_rectangle(x1, y1, x2, y2, obj_enemy, false, true);
         var _hit_parent = noone;
         if (_hit_enemy == noone) {
@@ -241,7 +232,7 @@ if (attacking && stunTimer <= 0) {
             }
         }
     }
-    if (!_is_swinging) debug_hitbox_active = false;
+    if (!_hb.active) debug_hitbox_active = false;
 
     // Atk2 commit lock — heavy finisher holds player in the swing (no dash cancel).
     if (attack_commit_lock > 0) {

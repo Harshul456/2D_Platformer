@@ -87,6 +87,8 @@ if (gnd_tilemap != -1 && gnd_tilemap != noone && global.tilemap_collision_id == 
 scr_enemy_floating_hover_init();
 enemy_is_floating = false;
 
+scr_enemy_crystal_light_init();
+
 // Room Y often matches background art, not lay_collision — snap down to real floor.
 scr_enemy_snap_to_collision_floor();
 home_x = x;

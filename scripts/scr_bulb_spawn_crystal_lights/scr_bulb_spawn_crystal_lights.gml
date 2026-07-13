@@ -105,6 +105,25 @@ function scr_bulb_crystal_light_apply(_inst, _scale_mul = 1.0) {
     }
 }
 
+/// @description Subtle dim breathe — circle scale, Bulb intensity, and tile glow alpha share one phase.
+/// @param {Id.Instance} _inst obj_bulb_crystal_light or obj_enemy with bulb_light + glow_* vars
+function scr_bulb_crystal_light_pulse_step(_inst) {
+    with (_inst) {
+        if (bulb_light == undefined) return;
+
+        glow_time += glow_breathe_speed;
+        var _t = (dsin(glow_time) + 1) * 0.5;
+        glow_pulse_t = _t;
+        glow_pulse_alpha = lerp(BULB_GLOW_PULSE_MIN, BULB_GLOW_PULSE_MAX, _t);
+
+        var _scale = lerp(glow_scale_tight, glow_scale_wide, _t);
+        bulb_light.xscale = glow_base_scale * _scale;
+        bulb_light.yscale = glow_base_scale * _scale;
+        bulb_light.intensity = glow_base_intensity * lerp(glow_intensity_tight, glow_intensity_wide, _t);
+        bulb_light.blend = glow_base_blend;
+    }
+}
+
 /// @description Subtle dim breathe — tiny scale/intensity wobble, color stays muted.
 function scr_bulb_crystal_light_init_pulse(_inst) {
     with (_inst) {

@@ -11,6 +11,12 @@ function scr_bulb_set_normal_maps_enabled(_enabled) {
         if (bulb_light != undefined) bulb_light.normalMap = _enabled;
     }
 
+    with (obj_enemy) {
+        if (variable_instance_exists(id, "bulb_light") && bulb_light != undefined) {
+            bulb_light.normalMap = _enabled;
+        }
+    }
+
     with (obj_player) {
         if (bulb_light != undefined) bulb_light.normalMap = _enabled;
     }

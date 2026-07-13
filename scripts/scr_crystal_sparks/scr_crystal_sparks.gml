@@ -43,6 +43,10 @@ function scr_crystal_spark_step(_inst) {
         var _pulse = variable_instance_exists(id, "glow_pulse_t") ? glow_pulse_t : 0.5;
         var _cx = x;
         var _cy = y + BULB_CRYSTAL_SPARK_CENTER_Y;
+        if (object_index == obj_enemy && bulb_light != undefined) {
+            _cx = bulb_light.x;
+            _cy = bulb_light.y;
+        }
 
         var _i = array_length(spark_list) - 1;
         while (_i >= 0) {
@@ -103,6 +107,27 @@ function scr_crystal_spark_draw_all() {
         if (!variable_instance_exists(id, "spark_list")) continue;
 
         var _pulse = variable_instance_exists(id, "glow_pulse_alpha") ? glow_pulse_alpha : 1;
+
+        for (var _i = 0; _i < array_length(spark_list); _i++) {
+            var _p = spark_list[_i];
+            var _life_t = _p.life / _p.max_life;
+            var _fade_in = min(1, (1 - _life_t) * 6);
+            var _fade_out = min(1, _life_t * 3);
+            var _twinkle = 0.45 + 0.55 * ((dsin(_p.twinkle_phase) + 1) * 0.5);
+            var _a = _fade_in * _fade_out * _pulse * _twinkle * BULB_CRYSTAL_SPARK_ALPHA;
+            if (_a <= 0.01) continue;
+
+            draw_set_alpha(_a);
+            var _px = floor(_p.x);
+            var _py = floor(_p.y);
+            draw_rectangle(_px, _py, _px, _py, false);
+        }
+    }
+
+    with (obj_enemy) {
+        if (!variable_instance_exists(id, "spark_list")) continue;
+
+        var _pulse = scr_enemy_glow_pulse_alpha();
 
         for (var _i = 0; _i < array_length(spark_list); _i++) {
             var _p = spark_list[_i];

@@ -141,3 +141,5 @@ if (!_hitstop_frozen) {
         if (enemy_grounded) vsp = 0;
     }
 }
+
+scr_enemy_crystal_light_step();
