@@ -249,6 +249,8 @@ function scr_enemy_resolve_attack_player_contact() {
             stunTimer = ENEMY_STUN_FRAMES;
             attacking = false;
             attack_lockout = 0;
+            attack_commit_lock = 0;
+            attack_recovery_lock = 0;
             attackCooldownTimer = 0;
             attack_buffer_timer = 0;
             attack_chain_buffer_timer = 0;

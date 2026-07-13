@@ -50,11 +50,14 @@ scr_player_footsteps_step();
 if (stunTimer > 0 && attacking) {
     attacking = false;
     attack_lockout = 0;
+    attack_commit_lock = 0;
+    attack_recovery_lock = 0;
     attack_buffer_timer = 0;
     attack_chain_buffer_timer = 0;
     attack_chain_latched = false;
     combo_buffer = false;
     attack_shift_remaining = 0;
+    attack_recovery_cut = false;
     comboTimer = 0;
     comboCount = 0;
     image_blend = c_white;
@@ -76,7 +79,9 @@ function _attack_step_shift() {
 // Skip if attacking — let combo transition handle chaining.
 // Skip if attack_lockout > 0: prevents starting before current attack finishes.
 // Skip if attack_recovery_grace > 0: prevents restarting attack 1 immediately after it ends (see ATTACK_RECOVERY_GRACE)
-if (!attacking && stunTimer <= 0 && attack_lockout <= 0 && attack_recovery_grace <= 0 && attack_buffer_timer > 0 && attackCooldownTimer <= 0 && grounded) {
+// Skip if attack_recovery_lock > 0: atk2 finisher recovery — no new attack until lock expires
+if (!attacking && stunTimer <= 0 && attack_lockout <= 0 && attack_recovery_grace <= 0
+    && attack_recovery_lock <= 0 && attack_buffer_timer > 0 && attackCooldownTimer <= 0 && grounded) {
     scr_player_attack(); 
     
     // Start the forward slide on attack 1.
@@ -191,6 +196,8 @@ if (attacking && stunTimer <= 0) {
             hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
             if (comboCount >= 2) {
                 hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
+            } else if (comboCount == 1) {
+                scr_player_attack1_prepare_retreat();
             }
         } else if (_hit_enemy != noone) {
             var _hit_result = { landed: false, intercepted: false, armored_chip: false, super_armor: false };
@@ -227,36 +234,41 @@ if (attacking && stunTimer <= 0) {
                     hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
                     if (comboCount >= 2) {
                         hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
+                    } else if (comboCount == 1) {
+                        scr_player_attack1_prepare_retreat();
                     }
                 }
             }
         }
     }
     if (!_is_swinging) debug_hitbox_active = false;
-    
-    // --- COMBO TRANSITION (1→2): attack_chain_latched from any X press during swing 1 ---
-    if (image_index >= image_number - 1) {
-        if (attack_chain_latched && comboCount < 2 && comboTimer > 0) {
-            attacking = false;
-            attack_lockout = 0;
-            attack_buffer_timer = 0;
-            attack_chain_buffer_timer = 0;
-            attack_chain_latched = false;
-            scr_player_attack();
-            _attack_step_shift();
-        } else {
-            // Swing over without 1→2 chain (incl. atk2 finisher) — reset so buffer can't spawn atk3/extra atk1.
-            attacking = false;
-            attack_lockout = 0;
-            image_blend = c_white;
-            attack_recovery_grace = ATTACK_RECOVERY_GRACE;
-            attack_buffer_timer = 0;
-            attack_chain_buffer_timer = 0;
-            attack_chain_latched = false;
-            comboCount = 0;
-            comboTimer = 0;
-            post_attack_accel_timer = POST_ATTACK_ACCEL_FRAMES;
+
+    // Atk2 commit lock — heavy finisher holds player in the swing (no dash cancel).
+    if (attack_commit_lock > 0) {
+        attack_commit_lock--;
+        hsp = lerp(hsp, 0, 0.45);
+        if (abs(hsp) < 0.4) hsp = 0;
+    }
+
+    // Atk1 early endlag — poke-and-run after solo hit.
+    if (attack_recovery_cut && comboCount == 1) {
+        var _cancel_after = (variable_instance_exists(id, "ATTACK1_HIT_CANCEL_AFTER_INDEX")
+            ? ATTACK1_HIT_CANCEL_AFTER_INDEX : 2);
+        if (image_index > _cancel_after) {
+            var _post_accel = (variable_instance_exists(id, "ATTACK1_HIT_POST_ACCEL_FRAMES")
+                ? ATTACK1_HIT_POST_ACCEL_FRAMES : 4);
+            scr_player_attack_end_swing(_post_accel);
         }
+    } else if (image_index >= image_number - 1) {
+        var _post_accel = POST_ATTACK_ACCEL_FRAMES;
+        if (attack_has_hit && comboCount == 1) {
+            _post_accel = (variable_instance_exists(id, "ATTACK1_HIT_POST_ACCEL_FRAMES")
+                ? ATTACK1_HIT_POST_ACCEL_FRAMES : 4);
+        } else if (attack_has_hit && comboCount >= 2) {
+            _post_accel = (variable_instance_exists(id, "ATTACK2_HIT_POST_ACCEL_FRAMES")
+                ? ATTACK2_HIT_POST_ACCEL_FRAMES : 12);
+        }
+        scr_player_attack_end_swing(_post_accel);
     }
 }
 
@@ -266,6 +278,8 @@ if (!attacking) {
 }
 
 // 4. DECREMENT TIMERS
+if (attack_commit_lock > 0 && !attacking) attack_commit_lock = 0;
+if (attack_recovery_lock > 0) attack_recovery_lock--;
 if (comboTimer > 0) {
     comboTimer--;
     if (comboTimer <= 0) {

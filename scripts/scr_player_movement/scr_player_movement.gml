@@ -33,9 +33,10 @@ function scr_player_movement() {
         // Jump buffer (decay after §2c — can pause while sliding into wall with a live jump buffer, or hugging wall with air jump banked)
         if (key_jump) jump_buffer_timer = jump_buffer_max;
         
-        // Attack buffer: idle only (not during recovery — avoids extra atk1 after atk2 when mashing).
+        // Attack buffer: idle only (not during atk2 recovery — avoids mashing through finisher lock).
         if (key_attack) {
-            if (!attacking && attack_recovery_grace <= 0) attack_buffer_timer = attack_buffer_max;
+            var _recovery_locked = scr_player_attack_is_recovery_locked();
+            if (!_recovery_locked && !attacking && attack_recovery_grace <= 0) attack_buffer_timer = attack_buffer_max;
             else if (attacking && comboCount == 1) {
                 attack_chain_latched = true;
                 attack_chain_buffer_timer = attack_chain_buffer_max;
@@ -517,6 +518,15 @@ function scr_player_movement() {
         knockBackX *= knockback_friction; knockBackY += grv; 
     } else {
         is_sprinting = false;
+        var _recovery_locked = scr_player_attack_is_recovery_locked();
+        // Atk1 poke-and-run — Z+direction cancels atk1 into sprint; atk2 finisher is committed.
+        if (!_recovery_locked && attacking && key_sprint_press && grounded && !jumped_this_frame && vsp >= 0) {
+            var _dc_dir = key_right - key_left;
+            if (_dc_dir == 0) _dc_dir = last_direction;
+            if (_dc_dir != 0 && scr_player_attack_can_dodge_cancel()) {
+                scr_player_attack_dodge_cancel(_dc_dir);
+            }
+        }
         if (!attacking) {
             var inputDir = (key_right - key_left);
             // Prior-frame pose — blocks walk/sprint hsp while landing crouch is playing (incl. wall-cling land).
@@ -535,13 +545,13 @@ function scr_player_movement() {
             }
             var _sprint_start_ok = _sprint_sprite_ok || (sprint_resume_hold && key_sprint);
             // Hold Z while idle → direction later starts sprint (same commit as Z+dir together)
-            if (key_sprint && inputDir == 0 && grounded && !jumped_this_frame && vsp >= 0
+            if (!_recovery_locked && key_sprint && inputDir == 0 && grounded && !jumped_this_frame && vsp >= 0
                 && _sprint_sprite_ok && !sprint_committed) {
                 sprint_z_idle_charged = true;
             }
             // Tap Z = burst only. Hold Z (latched) = burst + sustain. Press starts a new session.
             var _sprint_from_idle_charge = (key_sprint && sprint_z_idle_charged && inputDir != 0);
-            if ((key_sprint_press || _sprint_from_idle_charge) && grounded && !jumped_this_frame && vsp >= 0 && inputDir != 0
+            if (!_recovery_locked && (key_sprint_press || _sprint_from_idle_charge) && grounded && !jumped_this_frame && vsp >= 0 && inputDir != 0
                 && _sprint_sprite_ok && !sprint_committed) {
                 sprint_committed = true;
                 sprint_hold_latched = _sprint_from_idle_charge;
@@ -554,7 +564,7 @@ function scr_player_movement() {
                 sprint_squash_coil_frames = 1;
             }
             // Re-enter sustain: landed from hold-sprint jump, or turned around while Z still held
-            if (key_sprint && sprint_hold_latched && grounded && !jumped_this_frame && vsp >= 0
+            if (!_recovery_locked && key_sprint && sprint_hold_latched && grounded && !jumped_this_frame && vsp >= 0
                 && inputDir != 0 && !sprint_committed && _sprint_start_ok) {
                 sprint_committed = true;
                 sprint_burst_tick = _burst_frames + 1;
@@ -1670,6 +1680,7 @@ function scr_player_movement() {
     var _land_crouch_resume_block = force_landing_crouch || (sprite_index == spr_mc_walljump && vsp > 0)
         || (sprite_index == spr_mc_jump && image_index >= ANIM_LAND_CROUCH_START && image_index < ANIM_LAND_CROUCH_END);
     if (!attacking && stunTimer <= 0 && grounded && vsp >= 0 && !jumped_this_frame && !_land_crouch_resume_block
+        && attack_recovery_lock <= 0
         && key_sprint && sprint_hold_latched && sprint_resume_hold && !sprint_committed) {
         var _inputDir_land = (key_right - key_left);
         if (_inputDir_land != 0) {
@@ -1834,7 +1845,7 @@ function scr_player_movement() {
                     image_index = 0;
                 }
                 image_speed = 1;
-                if (key_sprint_press && _input_dir != 0) {
+                if (key_sprint_press && _input_dir != 0 && attack_recovery_lock <= 0) {
                     sprint_reel_active = false;
                     sprint_committed = true;
                     sprint_hold_latched = key_sprint;

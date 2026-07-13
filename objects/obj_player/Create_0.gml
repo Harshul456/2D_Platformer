@@ -306,6 +306,23 @@ hitstop_timer   = 0;            // For that "weighty" feel
 ATTACK_RECOVERY_GRACE = 8;      // Frames of protection after attack ends (covers 3rd attack windup)
 attack_recovery_grace = 0;      // Countdown; set when attack ends without combo
 attack_lockout = 0;             // Blocks new attack from section 2 until current attack finishes
+attack_commit_lock = 0;         // Atk2 swing lock — no dash cancel mid-finisher
+attack_recovery_lock = 0;       // Post-atk2 lock — blocks sprint/dash after finisher
+attack_recovery_cut = false;    // Atk1 early endlag after solo hit (poke-and-run)
+
+// Atk1 poke — low commitment (Hollow Knight / MMX-style probe)
+ATTACK1_HIT_CANCEL_AFTER_INDEX = 2;   // End swing early after this subimage on solo hit
+ATTACK1_HIT_POST_ACCEL_FRAMES = 4;    // Minimal recovery after atk1 poke
+ATTACK1_HIT_RETREAT_HSP = 4;          // Step back on solo atk1 hit
+ATTACK_COMBO_CONTINUE_HSP = 3.5;      // Lean forward when chaining into atk2
+
+// Atk2 finisher — heavy commitment (punishes blind combo into telegraphs)
+ATTACK2_HIT_CANCEL_AFTER_INDEX = 99;  // Never cut atk2 short — full swing + recovery
+ATTACK2_HIT_POST_ACCEL_FRAMES = 12;
+ATTACK2_COMMIT_LOCK_FRAMES = 28;      // Locked in place during finisher swing
+ATTACK2_RECOVERY_LOCK_FRAMES = 18;    // No sprint/dash after finisher ends
+ATTACK2_COMBO_LUNGE_HSP = 5.5;
+DODGE_CANCEL_MIN_INDEX = 1;           // Earliest atk1 subimage that can cancel into dash
 
 // --- INVINCIBILITY & FEEDBACK ---
 invincible      = false;

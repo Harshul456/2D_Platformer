@@ -19,6 +19,8 @@ if (!invincible && _enemy_attack_active) {
     obj_player_health -= ENEMY_COLLISION_DAMAGE;
     attacking = false;
     attack_lockout = 0;
+    attack_commit_lock = 0;
+    attack_recovery_lock = 0;
     attackCooldownTimer = 0;
     attack_buffer_timer = 0;
     attack_chain_buffer_timer = 0;
