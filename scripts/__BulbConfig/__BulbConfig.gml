@@ -30,8 +30,26 @@
 #macro BULB_NORMAL_MAPS_ENABLED       true
 #macro BULB_NORMAL_MAP_TOGGLE_KEY     vk_f8
 
+// HDR bloom — off by default; press F9 in-game to toggle on.
+#macro BULB_HDR_BLOOM_DEFAULT_ON        false
+#macro BULB_HDR_BLOOM_INTENSITY         0.04
+#macro BULB_HDR_BLOOM_ITERATIONS        2
+#macro BULB_HDR_BLOOM_THRESHOLD_MIN     0.72
+#macro BULB_HDR_BLOOM_THRESHOLD_MAX     0.94
+#macro BULB_HDR_EXPOSURE                1.16
+#macro BULB_HDR_BLOOM_TOGGLE_KEY        vk_f9
+
+// Cave ambient — dark mood, but high enough to read platforms between lights.
+#macro BULB_AMBIENT_R                   22
+#macro BULB_AMBIENT_G                   26
+#macro BULB_AMBIENT_B                   40
+
 // Player torch BulbLight (warm glow centered on the player).
-#macro BULB_PLAYER_TORCH_ENABLED  true
+#macro BULB_PLAYER_TORCH_ENABLED        true
+#macro BULB_PLAYER_TORCH_INTENSITY      1.2
+#macro BULB_PLAYER_TORCH_SCALE          1.58
+#macro BULB_PLAYER_TORCH_Y_OFFSET       -12
+#macro BULB_PLAYER_TORCH_CRYSTAL_DIM    0.94
 
 // Crystal light height for normal-map shading. Side-mounted crystals need a LOWER Z than an
 // on-body torch — high Z makes the light come from almost straight above, so Lambert dot(N,L)
@@ -108,6 +126,20 @@
 #macro BULB_CEILING_DRIP_ALPHA               0.82
 #macro BULB_CEILING_DRIP_SPLASH_ALPHA        0.7
 #macro BULB_CEILING_DRIP_SPLASH_FRAME_LEN    4
+
+// Drip splash SFX — quiet cave ambience; plays when splash is in camera view.
+#macro BULB_CEILING_DRIP_SFX_ENABLED         true
+#macro BULB_CEILING_DRIP_SFX_VIEW_PAD         32
+#macro BULB_CEILING_DRIP_SFX_HEAR_RADIUS     200
+#macro BULB_CEILING_DRIP_SFX_PITCH_MIN        0.62
+#macro BULB_CEILING_DRIP_SFX_PITCH_MAX        0.88
+#macro BULB_CEILING_DRIP_SFX_PITCH_JITTER     0.05
+#macro BULB_CEILING_DRIP_SFX_PITCH_CAVE       0.84
+#macro BULB_CEILING_DRIP_SFX_VOL_MIN          0.08
+#macro BULB_CEILING_DRIP_SFX_VOL_MAX          0.34
+#macro BULB_CEILING_DRIP_SFX_VIEW_VOL         0.26
+#macro BULB_CEILING_DRIP_SFX_AUDIO_PRIORITY   5
+#macro BULB_CEILING_DRIP_SFX_COOLDOWN         6
 
 // Cave atmosphere — drifting mist (behind player) + screen-edge vignette.
 #macro BULB_CAVE_FOG_ENABLED                 false

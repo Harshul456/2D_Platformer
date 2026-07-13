@@ -54,15 +54,21 @@ function scr_player_footstep_play_cave(_speed_norm) {
     }
     footstep_last_clip = _pick;
 
-    var _pitch_lo = (variable_instance_exists(id, "FOOTSTEP_PITCH_MIN") ? FOOTSTEP_PITCH_MIN : 0.88);
-    var _pitch_hi = (variable_instance_exists(id, "FOOTSTEP_PITCH_MAX") ? FOOTSTEP_PITCH_MAX : 1.12);
-    var _pitch_jit = (variable_instance_exists(id, "FOOTSTEP_PITCH_JITTER") ? FOOTSTEP_PITCH_JITTER : 0.04);
+    var _pitch_lo = (variable_instance_exists(id, "FOOTSTEP_PITCH_MIN") ? FOOTSTEP_PITCH_MIN : 0.50);
+    var _pitch_hi = (variable_instance_exists(id, "FOOTSTEP_PITCH_MAX") ? FOOTSTEP_PITCH_MAX : 0.70);
+    var _pitch_jit = (variable_instance_exists(id, "FOOTSTEP_PITCH_JITTER") ? FOOTSTEP_PITCH_JITTER : 0.03);
+    var _pitch_cave = (variable_instance_exists(id, "FOOTSTEP_PITCH_CAVE") ? FOOTSTEP_PITCH_CAVE : 0.76);
+    var _pitch_bias = (variable_instance_exists(id, "FOOTSTEP_PITCH_BIAS") ? FOOTSTEP_PITCH_BIAS : 1.5);
 
-    var _vol_lo = (variable_instance_exists(id, "FOOTSTEP_VOL_MIN") ? FOOTSTEP_VOL_MIN : 0.55);
-    var _vol_hi = (variable_instance_exists(id, "FOOTSTEP_VOL_MAX") ? FOOTSTEP_VOL_MAX : 0.9);
+    var _vol_lo = (variable_instance_exists(id, "FOOTSTEP_VOL_MIN") ? FOOTSTEP_VOL_MIN : 0.20);
+    var _vol_hi = (variable_instance_exists(id, "FOOTSTEP_VOL_MAX") ? FOOTSTEP_VOL_MAX : 0.38);
+    var _vol_cave = (variable_instance_exists(id, "FOOTSTEP_VOL_CAVE") ? FOOTSTEP_VOL_CAVE : 0.88);
 
-    var _pitch = lerp(_pitch_lo, _pitch_hi, _speed_norm) * random_range(1 - _pitch_jit, 1 + _pitch_jit);
-    var _gain = lerp(_vol_lo, _vol_hi, _speed_norm) * random_range(0.94, 1.02);
+    // Skew pitch low — distant cave steps read deeper and softer (same trick as drip SFX).
+    var _pitch_t = power(random(1), _pitch_bias);
+    var _pitch = lerp(_pitch_lo, _pitch_hi, _pitch_t) * _pitch_cave
+        * random_range(1 - _pitch_jit, 1 + _pitch_jit);
+    var _gain = lerp(_vol_lo, _vol_hi, _speed_norm) * _vol_cave * random_range(0.9, 1.0);
 
     var _bus = (variable_instance_exists(id, "FOOTSTEP_AUDIO_PRIORITY") ? FOOTSTEP_AUDIO_PRIORITY : 8);
     var _snd_id = audio_play_sound(_sounds[_pick], _bus, false);
@@ -79,13 +85,17 @@ function scr_player_footstep_play_land(_impact_vsp) {
     var _ref = (variable_instance_exists(id, "LAND_SOUND_VSP_REF") ? LAND_SOUND_VSP_REF : 8);
     var _impact_norm = clamp(_impact_vsp / max(0.01, _ref), 0.25, 1);
 
-    var _pitch_lo = (variable_instance_exists(id, "FOOTSTEP_LAND_PITCH_MIN") ? FOOTSTEP_LAND_PITCH_MIN : 0.72);
-    var _pitch_hi = (variable_instance_exists(id, "FOOTSTEP_LAND_PITCH_MAX") ? FOOTSTEP_LAND_PITCH_MAX : 0.95);
-    var _vol_lo = (variable_instance_exists(id, "FOOTSTEP_LAND_VOL_MIN") ? FOOTSTEP_LAND_VOL_MIN : 0.65);
-    var _vol_hi = (variable_instance_exists(id, "FOOTSTEP_LAND_VOL_MAX") ? FOOTSTEP_LAND_VOL_MAX : 1.0);
+    var _pitch_lo = (variable_instance_exists(id, "FOOTSTEP_LAND_PITCH_MIN") ? FOOTSTEP_LAND_PITCH_MIN : 0.44);
+    var _pitch_hi = (variable_instance_exists(id, "FOOTSTEP_LAND_PITCH_MAX") ? FOOTSTEP_LAND_PITCH_MAX : 0.58);
+    var _pitch_cave = (variable_instance_exists(id, "FOOTSTEP_LAND_PITCH_CAVE") ? FOOTSTEP_LAND_PITCH_CAVE : 0.74);
+    var _vol_lo = (variable_instance_exists(id, "FOOTSTEP_LAND_VOL_MIN") ? FOOTSTEP_LAND_VOL_MIN : 0.28);
+    var _vol_hi = (variable_instance_exists(id, "FOOTSTEP_LAND_VOL_MAX") ? FOOTSTEP_LAND_VOL_MAX : 0.48);
+    var _vol_cave = (variable_instance_exists(id, "FOOTSTEP_VOL_CAVE") ? FOOTSTEP_VOL_CAVE : 0.88);
+    var _pitch_bias = (variable_instance_exists(id, "FOOTSTEP_PITCH_BIAS") ? FOOTSTEP_PITCH_BIAS : 1.5);
 
-    var _pitch = lerp(_pitch_lo, _pitch_hi, _impact_norm) * random_range(0.96, 1.04);
-    var _gain = lerp(_vol_lo, _vol_hi, _impact_norm) * random_range(0.94, 1.02);
+    var _pitch_t = power(random(1), _pitch_bias);
+    var _pitch = lerp(_pitch_lo, _pitch_hi, _pitch_t) * _pitch_cave * random_range(0.96, 1.02);
+    var _gain = lerp(_vol_lo, _vol_hi, _impact_norm) * _vol_cave * random_range(0.9, 1.0);
 
     var _bus = (variable_instance_exists(id, "FOOTSTEP_AUDIO_PRIORITY") ? FOOTSTEP_AUDIO_PRIORITY : 8);
     var _snd_id = audio_play_sound(_snd, _bus, false);

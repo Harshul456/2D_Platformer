@@ -41,6 +41,11 @@ if (keyboard_check_pressed(vk_f3)) {
     scr_enemy_raycast_debug_toggle();
 }
 
+// Toggle borderless fullscreen (F11)
+if (keyboard_check_pressed(DISPLAY_BORDERLESS_TOGGLE_KEY)) {
+    scr_display_toggle_borderless();
+}
+
 // 1. PROCESS NORMAL MOVEMENT
 scr_player_movement();
 scr_player_ground_debris_step();
@@ -297,26 +302,26 @@ if (variable_global_exists("bulb_renderer") && global.bulb_renderer != undefined
 
         if (bulb_light == undefined) {
             bulb_light = new BulbLight(global.bulb_renderer, sLight128, 0, x, y);
-            bulb_light.intensity = 1.0;
+            bulb_light.intensity = BULB_PLAYER_TORCH_INTENSITY;
             bulb_light.blend = _torch_warm;
             bulb_light.penumbraSize = 0;
-            bulb_light.xscale = 1.35;
-            bulb_light.yscale = 1.35;
+            bulb_light.xscale = BULB_PLAYER_TORCH_SCALE;
+            bulb_light.yscale = BULB_PLAYER_TORCH_SCALE;
             bulb_light.castShadows = false;
             bulb_light.normalMap = global.bulb_normal_maps_enabled;
             bulb_light.normalMapZ = 40;
         } else {
             bulb_light.visible = true;
             bulb_light.x = x;
-            bulb_light.y = y - 12;
+            bulb_light.y = y + BULB_PLAYER_TORCH_Y_OFFSET;
             bulb_light.normalMap = global.bulb_normal_maps_enabled;
             bulb_light.normalMapZ = 40;
         }
 
-        bulb_light.xscale = 1.35;
-        bulb_light.yscale = 1.35;
+        bulb_light.xscale = BULB_PLAYER_TORCH_SCALE;
+        bulb_light.yscale = BULB_PLAYER_TORCH_SCALE;
         bulb_light.castShadows = false;
-        bulb_light.intensity = lerp(1.0, 0.82, _crystal.strength);
+        bulb_light.intensity = lerp(BULB_PLAYER_TORCH_INTENSITY, BULB_PLAYER_TORCH_INTENSITY * BULB_PLAYER_TORCH_CRYSTAL_DIM, _crystal.strength);
         bulb_light.blend = merge_colour(_torch_warm, _crystal.blend, _crystal.strength * 0.65);
     }
 }

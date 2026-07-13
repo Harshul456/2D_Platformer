@@ -52,6 +52,11 @@ global.reflections_enabled = false;
 // Bulb normal-map lighting (F8 toggles in-game via obj_bulb_controller)
 global.bulb_normal_maps_enabled = BULB_NORMAL_MAPS_ENABLED;
 
-// Borderless fullscreen (more reliable)
-window_set_fullscreen(true);
+// Borderless fullscreen toggle (F11) — starts windowed.
+global.display_borderless = false;
+global.display_windowed_w = 1280;
+global.display_windowed_h = 720;
+global.display_windowed_x = -1;
+global.display_windowed_y = -1;
+window_set_fullscreen(false);
 

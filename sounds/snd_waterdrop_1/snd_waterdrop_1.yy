@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"snd_waterdrop_1",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":1.1912925,
+  "exportDir":"",
+  "name":"snd_waterdrop_1",
+  "parent":{
+    "name":"waterdrops",
+    "path":"folders/Sounds/sfx/waterdrops.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"snd_waterdrop_1.wav",
+  "volume":1.0,
+}

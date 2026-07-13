@@ -64,6 +64,66 @@ function scr_ceiling_drip_init(_controller) {
         drip_list = [];
         splash_list = [];
         drip_emitters = [];
+        drip_sfx_cooldown = 0;
+        drip_sfx_last_clip = -1;
+    }
+}
+
+/// @description Randomized drip splash SFX — when splash is in camera view (louder near player).
+/// @param {Real} _x
+/// @param {Real} _y
+function scr_ceiling_drip_play_splash_sound(_x, _y) {
+    if (!BULB_CEILING_DRIP_SFX_ENABLED) return;
+
+    var _view = scr_cave_dust_get_view();
+    var _pad = BULB_CEILING_DRIP_SFX_VIEW_PAD;
+    if (_x < _view.x - _pad || _x > _view.x + _view.w + _pad ||
+        _y < _view.y - _pad || _y > _view.y + _view.h + _pad) {
+        return;
+    }
+
+    var _controller = instance_find(obj_bulb_controller, 0);
+    if (_controller != noone) {
+        with (_controller) {
+            if (variable_instance_exists(id, "drip_sfx_cooldown") && drip_sfx_cooldown > 0) return;
+        }
+    }
+
+    var _sounds = [snd_waterdrop_1, snd_waterdrop_2, snd_waterdrop_3];
+    var _pick = irandom(array_length(_sounds) - 1);
+    if (_controller != noone) {
+        with (_controller) {
+            if (variable_instance_exists(id, "drip_sfx_last_clip")
+                && _pick == drip_sfx_last_clip && random(1) < 0.65) {
+                _pick = (_pick + 1 + irandom(1)) mod array_length(_sounds);
+            }
+            drip_sfx_last_clip = _pick;
+            drip_sfx_cooldown = BULB_CEILING_DRIP_SFX_COOLDOWN;
+        }
+    }
+
+    // In view = audible; boost volume when the player is close to the splash.
+    var _vol_t = BULB_CEILING_DRIP_SFX_VIEW_VOL;
+    if (instance_exists(obj_player)) {
+        var _hear_r = BULB_CEILING_DRIP_SFX_HEAR_RADIUS;
+        var _dist = point_distance(_x, _y, obj_player.x, obj_player.y);
+        if (_dist <= _hear_r) {
+            _vol_t = max(_vol_t, (1 - (_dist / max(1, _hear_r))) * 0.72);
+        }
+    }
+
+    // Skew pitch low — distant cave drips read deeper and softer.
+    var _pitch_t = power(random(1), 1.35);
+    var _pitch = lerp(BULB_CEILING_DRIP_SFX_PITCH_MIN, BULB_CEILING_DRIP_SFX_PITCH_MAX, _pitch_t)
+        * BULB_CEILING_DRIP_SFX_PITCH_CAVE
+        * random_range(1 - BULB_CEILING_DRIP_SFX_PITCH_JITTER, 1 + BULB_CEILING_DRIP_SFX_PITCH_JITTER);
+    var _gain = lerp(BULB_CEILING_DRIP_SFX_VOL_MIN, BULB_CEILING_DRIP_SFX_VOL_MAX, _vol_t)
+        * random_range(0.9, 1.02);
+
+    var _snd_id = audio_play_sound(_sounds[_pick], BULB_CEILING_DRIP_SFX_AUDIO_PRIORITY, false);
+    if (_snd_id != -1) {
+        audio_sound_pitch(_snd_id, _pitch);
+        audio_sound_gain(_snd_id, _gain, 0);
     }
 }
 
@@ -116,6 +176,10 @@ function scr_ceiling_drip_step(_controller) {
             drip_emitters = [];
         }
 
+        if (variable_instance_exists(id, "drip_sfx_cooldown") && drip_sfx_cooldown > 0) {
+            drip_sfx_cooldown--;
+        }
+
         var _view = scr_cave_dust_get_view();
         var _pad = BULB_CEILING_DRIP_VIEW_PAD;
 
@@ -152,6 +216,7 @@ function scr_ceiling_drip_step(_controller) {
             _d.y += _d.vy;
 
             if (_d.y >= _d.floor_y) {
+                scr_ceiling_drip_play_splash_sound(_d.x, _d.floor_y);
                 if (array_length(splash_list) < BULB_CEILING_DRIP_MAX_SPLASH) {
                     array_push(splash_list, scr_ceiling_drip_spawn_splash(_d.x, _d.floor_y, _d.color));
                 }
