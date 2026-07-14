@@ -143,3 +143,26 @@ if (!_hitstop_frozen) {
 }
 
 scr_enemy_crystal_light_step();
+
+// Procedural lean — state-driven tilt before the draw pass.
+if (enemy_ai_enabled) {
+    switch (state) {
+        case ENEMY_STATE.PATROL:
+            target_angle = -patrol_dir * lean_max_patrol;
+            break;
+
+        case ENEMY_STATE.CHASE:
+            if (hsp != 0) {
+                target_angle = -sign(hsp) * lean_max_chase;
+            } else {
+                target_angle = 0;
+            }
+            break;
+
+        default:
+            target_angle = 0;
+            break;
+    }
+
+    lean_angle = lerp(lean_angle, target_angle, lean_lerp_speed);
+}

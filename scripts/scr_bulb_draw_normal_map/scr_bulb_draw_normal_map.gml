@@ -79,7 +79,7 @@ function scr_bulb_draw_normal_map(_renderer) {
             floor(y + _shake_y) + _hover_y,
             scr_enemy_draw_xscale(),
             image_yscale,
-            image_angle
+            scr_enemy_draw_lean_angle()
         );
 
     }

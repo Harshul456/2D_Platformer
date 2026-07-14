@@ -95,3 +95,10 @@ home_x = x;
 spawn_x = home_x;
 
 enemy_ai_enabled = true;
+
+// Procedural lean — state-driven body tilt (applied in draw via lean_angle).
+lean_angle = 0;
+target_angle = 0;
+lean_max_patrol = 3;
+lean_max_chase = 12;
+lean_lerp_speed = 0.15;

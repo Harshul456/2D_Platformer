@@ -39,6 +39,13 @@ function scr_enemy_glow_pulse_alpha() {
     return lerp(BULB_GLOW_PULSE_MIN, BULB_GLOW_PULSE_MAX, 0.5);
 }
 
+/// @function scr_enemy_draw_lean_angle
+/// @description Active procedural lean for draw calls (falls back to image_angle).
+function scr_enemy_draw_lean_angle() {
+    if (variable_instance_exists(id, "lean_angle")) return lean_angle;
+    return image_angle;
+}
+
 /// @description Additive emissive overlay — spr_enemy_glow on top of spr_enemy (tiles_glow parity).
 function scr_enemy_draw_emissive_glow() {
     if (!BULB_ENEMY_GLOW_ENABLED) return;
@@ -56,6 +63,7 @@ function scr_enemy_draw_emissive_glow() {
     var _draw_x = floor(x + _shake_x);
     var _draw_y = floor(y + _shake_y) + _hover_y;
     var _xscale = scr_enemy_draw_xscale();
+    var _lean = scr_enemy_draw_lean_angle();
 
     // Align glow origin to body sprite (spr_enemy_glow may use a different origin in the IDE).
     var _gx = _draw_x + sprite_get_xoffset(sprite_index) - sprite_get_xoffset(_glow_spr);
@@ -64,7 +72,7 @@ function scr_enemy_draw_emissive_glow() {
 
     draw_set_alpha(_alpha);
     draw_sprite_ext(_glow_spr, _glow_img, _gx, _gy,
-        _xscale, image_yscale, image_angle, c_white, _alpha);
+        _xscale, image_yscale, _lean, c_white, _alpha);
 }
 
 /// @description Draw all obj_enemy emissive overlays in Post Draw (after lit body redraw).
@@ -124,17 +132,20 @@ function scr_enemy_draw_main_sprite() {
         }
     }
 
+    var _xscale = scr_enemy_draw_xscale();
+    var _lean = scr_enemy_draw_lean_angle();
+
     draw_sprite_ext(sprite_index, image_index, _draw_x, _draw_y,
-        scr_enemy_draw_xscale(), image_yscale, image_angle, _draw_col, image_alpha);
+        _xscale, image_yscale, _lean, _draw_col, image_alpha);
 
     if (_crystal != undefined && _crystal.strength > 0) {
         if (variable_global_exists("bulb_renderer") && global.bulb_renderer != undefined && global.bulb_renderer.normalMap) {
             var _wrap = { strength: _crystal.strength, blend: _crystal.blend, dir: (_crystal.dir + 180) mod 360 };
             scr_bulb_draw_crystal_rim(sprite_index, image_index, _draw_x, _draw_y,
-                scr_enemy_draw_xscale(), image_yscale, _wrap, image_alpha * 0.32);
+                _xscale, image_yscale, _wrap, image_alpha * 0.32);
         } else {
             scr_bulb_draw_crystal_rim(sprite_index, image_index, _draw_x, _draw_y,
-                scr_enemy_draw_xscale(), image_yscale, _crystal, image_alpha);
+                _xscale, image_yscale, _crystal, image_alpha);
         }
     }
 }

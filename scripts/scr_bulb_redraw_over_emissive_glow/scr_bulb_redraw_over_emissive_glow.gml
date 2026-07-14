@@ -68,7 +68,7 @@ function scr_bulb_draw_enemy_lit_sprite(_lit_surface, _cam) {
     var _shake_y = (variable_instance_exists(id, "telegraph_shake_y") ? telegraph_shake_y : 0);
     var _hover_y = scr_enemy_floating_hover_draw_offset_y();
     scr_bulb_draw_lit_sprite_ext(_lit_surface, _cam, floor(x + _shake_x), floor(y + _shake_y) + _hover_y,
-        sprite_index, image_index, scr_enemy_draw_xscale(), image_yscale, image_angle, image_alpha);
+        sprite_index, image_index, scr_enemy_draw_xscale(), image_yscale, scr_enemy_draw_lean_angle(), image_alpha);
 }
 
 /// @description Restore the already-lit obj_enemy_parent sprite over emissive overlays.
