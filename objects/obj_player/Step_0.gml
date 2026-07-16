@@ -111,6 +111,7 @@ if (!attacking && stunTimer <= 0 && attack_lockout <= 0 && attack_recovery_grace
         sprint_burst_tick = 0;
         sprint_commit_dir = 0;
         sprint_hold_latched = false;
+        sprint_dash_standstill = false;
         sprint_z_idle_charged = false;
         sprint_resume_hold = false;
         sprint_dir_gap = 0;
@@ -118,7 +119,7 @@ if (!attacking && stunTimer <= 0 && attack_lockout <= 0 && attack_recovery_grace
 }
 
 // 3. PROCESS THE ATTACK STATE & PHYSICS (stunned = knockback only; no lunge / combo in air)
-if (attacking && stunTimer <= 0) {
+if (attacking && stunTimer <= 0 && !sprint_committed) {
     // --- STRONGER LUNGE FRICTION ---
     hsp = lerp(hsp, 0, ATTACK_LUNGE_FRICTION);
     if (abs(hsp) < ATTACK_LUNGE_CUTOFF) hsp = 0;

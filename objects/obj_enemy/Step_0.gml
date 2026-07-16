@@ -166,3 +166,8 @@ if (enemy_ai_enabled) {
 
     lean_angle = lerp(lean_angle, target_angle, lean_lerp_speed);
 }
+
+// Combat pose swap + manual scrub — after attack_frame / state_timer updates.
+if (!_hitstop_frozen) {
+    scr_enemy_update_combat_sprite();
+}

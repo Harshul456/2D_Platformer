@@ -38,6 +38,8 @@ DEFAULT_SPRITES = [
     "spr_mc_reelback",
     "spr_mc_attack2",
     "spr_enemy",
+    "spr_enemy_windup",
+    "spr_enemy_attack",
 ]
 
 LAIGTER_SEARCH_PATHS = [

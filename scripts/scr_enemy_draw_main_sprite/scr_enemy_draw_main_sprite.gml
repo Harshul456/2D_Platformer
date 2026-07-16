@@ -50,7 +50,7 @@ function scr_enemy_draw_lean_angle() {
 function scr_enemy_draw_emissive_glow() {
     if (!BULB_ENEMY_GLOW_ENABLED) return;
 
-    var _glow_spr = BULB_ENEMY_GLOW_SPRITE;
+    var _glow_spr = scr_enemy_get_glow_sprite();
     if (!sprite_exists(_glow_spr)) return;
 
     // Same alpha source as scr_bulb_draw_glow_tile_layer → scr_bulb_crystal_glow_alpha_at.

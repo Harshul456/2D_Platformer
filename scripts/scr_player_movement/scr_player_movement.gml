@@ -361,6 +361,7 @@ function scr_player_movement() {
     var _pre_sprinting = is_sprinting;
     var _pre_sprint_committed = sprint_committed;
     var _pre_sprint_hold_latched = sprint_hold_latched;
+    var _pre_sprint_dash_standstill = sprint_dash_standstill;
     jumped_this_frame = false;
     var _grounded_jump_this_step = false;
     if (stunTimer <= 0 && jump_buffer_timer > 0 && !attacking) {
@@ -412,6 +413,7 @@ function scr_player_movement() {
             sprint_burst_tick = 0;
             sprint_commit_dir = 0;
             sprint_hold_latched = false;
+            sprint_dash_standstill = false;
         } else if (!_wall_jump_defer && (coyote_time_timer > 0 || jump_count < 2)) {
             // Don't burn jump buffer on air jump same frame we intend wall tech (§5b-post can wall jump after H-resolve).
             var _block_air_for_wall = (cling_eff && !grounded && wall_side != 0 && key_jump);
@@ -442,7 +444,9 @@ function scr_player_movement() {
                 if (_pre_sprinting || _pre_sprint_committed) {
                     sprint_jump_carry = true;
                     sprint_air_trail = true;
-                    var _carry_sp = runsp * (variable_instance_exists(id, "SPRINT_JUMP_CARRY_MULT") ? SPRINT_JUMP_CARRY_MULT : 1);
+                    var _carry_sp = _pre_sprint_dash_standstill
+                        ? (variable_instance_exists(id, "DASH_SPEED") ? DASH_SPEED : 8.5)
+                        : runsp * (variable_instance_exists(id, "SPRINT_JUMP_CARRY_MULT") ? SPRINT_JUMP_CARRY_MULT : 1);
                     runMomentum = _carry_sp * _jd;
                     hsp = runMomentum;
                 } else if (abs(_pre_hsp) > walksp + 0.01) {
@@ -458,6 +462,7 @@ function scr_player_movement() {
                 }
                 sprint_committed = false;
                 sprint_burst_tick = 0;
+                sprint_dash_standstill = false;
                 if (!(key_sprint && sprint_resume_hold)) {
                     sprint_commit_dir = 0;
                     sprint_hold_latched = false;
@@ -478,7 +483,9 @@ function scr_player_movement() {
                 if (_pre_sprinting || _pre_sprint_committed) {
                     sprint_jump_carry = true;
                     sprint_air_trail = true;
-                    var _carry_sp_off = runsp * (variable_instance_exists(id, "SPRINT_JUMP_CARRY_MULT") ? SPRINT_JUMP_CARRY_MULT : 1);
+                    var _carry_sp_off = _pre_sprint_dash_standstill
+                        ? (variable_instance_exists(id, "DASH_SPEED") ? DASH_SPEED : 8.5)
+                        : runsp * (variable_instance_exists(id, "SPRINT_JUMP_CARRY_MULT") ? SPRINT_JUMP_CARRY_MULT : 1);
                     runMomentum = _carry_sp_off * _jd_off;
                 } else {
                     sprint_jump_carry = false;
@@ -514,139 +521,167 @@ function scr_player_movement() {
         sprint_burst_tick = 0;
         sprint_commit_dir = 0;
         sprint_hold_latched = false;
+        sprint_dash_standstill = false;
+        sprint_z_idle_charged = false;
+        sprint_resume_hold = false;
+        sprint_dir_gap = 0;
         hsp = knockBackX; vsp = knockBackY;
         knockBackX *= knockback_friction; knockBackY += grv; 
     } else {
         is_sprinting = false;
         var _recovery_locked = scr_player_attack_is_recovery_locked();
-        // Atk1 poke-and-run — Z+direction cancels atk1 into sprint; atk2 finisher is committed.
-        if (!_recovery_locked && attacking && key_sprint_press && grounded && !jumped_this_frame && vsp >= 0) {
-            var _dc_dir = key_right - key_left;
-            if (_dc_dir == 0) _dc_dir = last_direction;
-            if (_dc_dir != 0 && scr_player_attack_can_dodge_cancel()) {
-                scr_player_attack_dodge_cancel(_dc_dir);
-            }
+        var _dash_buffer_max = (variable_instance_exists(id, "DASH_INPUT_BUFFER_FRAMES") ? DASH_INPUT_BUFFER_FRAMES : 0);
+        if (dash_lock_timer > 0) dash_lock_timer--;
+        if (key_sprint_press) {
+            dash_input_buffer = _dash_buffer_max;
+        }
+        if (!sprint_committed) {
+            scr_player_sprint_try_begin(false);
         }
         if (!attacking) {
             var inputDir = (key_right - key_left);
-            // Prior-frame pose — blocks walk/sprint hsp while landing crouch is playing (incl. wall-cling land).
             var _land_crouch_prev = force_landing_crouch
                 || (sprite_index == spr_mc_jump && image_index >= ANIM_LAND_CROUCH_START && image_index < ANIM_LAND_CROUCH_END)
                 || (sprite_index == spr_mc_walljump && vsp > 0 && wall_jump_kick_hold_timer <= 0 && wall_jump_extend_timer <= 0);
-            var _sprint_sprite_ok = (sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
-                && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && !sprint_reel_active);
+            var _reel_blocked = sprint_reel_active || sprint_reel_pending || (sprite_index == spr_mc_reelback);
             var _burst_frames = (variable_instance_exists(id, "SPRINT_BURST_FRAMES") ? SPRINT_BURST_FRAMES : 10);
+            var _burst_speed = (variable_instance_exists(id, "SPRINT_BURST_SPEED") ? SPRINT_BURST_SPEED : runsp);
+            var _dash_frames = (variable_instance_exists(id, "DASH_FRAMES") ? DASH_FRAMES : 8);
+            var _dash_speed = (variable_instance_exists(id, "DASH_SPEED") ? DASH_SPEED : 8.5);
+            var _dash_lock = (variable_instance_exists(id, "dash_lock_timer") ? dash_lock_timer : 0);
+            var _dash_lock_max = (variable_instance_exists(id, "DASH_LOCK_FRAMES") ? DASH_LOCK_FRAMES : 0);
             var _switch_gap = (variable_instance_exists(id, "SPRINT_DIR_SWITCH_GAP") ? SPRINT_DIR_SWITCH_GAP : 6);
+
             if (!key_sprint) {
                 sprint_hold_latched = false;
                 sprint_resume_hold = false;
                 sprint_dir_gap = 0;
                 sprint_z_idle_charged = false;
             }
-            var _sprint_start_ok = _sprint_sprite_ok || (sprint_resume_hold && key_sprint);
-            // Hold Z while idle → direction later starts sprint (same commit as Z+dir together)
+
+            // Hold Z while idle — direction later starts sprint (not standstill dash)
             if (!_recovery_locked && key_sprint && inputDir == 0 && grounded && !jumped_this_frame && vsp >= 0
-                && _sprint_sprite_ok && !sprint_committed) {
+                && (sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
+                && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && !sprint_reel_active)
+                && !sprint_committed) {
                 sprint_z_idle_charged = true;
             }
-            // Tap Z = burst only. Hold Z (latched) = burst + sustain. Press starts a new session.
-            var _sprint_from_idle_charge = (key_sprint && sprint_z_idle_charged && inputDir != 0);
-            if (!_recovery_locked && (key_sprint_press || _sprint_from_idle_charge) && grounded && !jumped_this_frame && vsp >= 0 && inputDir != 0
-                && _sprint_sprite_ok && !sprint_committed) {
-                sprint_committed = true;
-                sprint_hold_latched = _sprint_from_idle_charge;
-                sprint_burst_tick = 0;
-                sprint_commit_dir = inputDir;
-                sprint_reel_pending = false;
-                sprint_dir_gap = 0;
-                sprint_z_idle_charged = false;
-                // Sprint activation game-feel (squash coil)
-                sprint_squash_coil_frames = 1;
-            }
+
             // Re-enter sustain: landed from hold-sprint jump, or turned around while Z still held
             if (!_recovery_locked && key_sprint && sprint_hold_latched && grounded && !jumped_this_frame && vsp >= 0
-                && inputDir != 0 && !sprint_committed && _sprint_start_ok) {
+                && inputDir != 0 && !sprint_committed
+                && ((sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
+                    && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && !sprint_reel_active)
+                    || (sprint_resume_hold && key_sprint))) {
                 sprint_committed = true;
+                sprint_dash_standstill = false;
                 sprint_burst_tick = _burst_frames + 1;
                 sprint_commit_dir = inputDir;
+                last_direction = inputDir;
                 sprint_reel_pending = false;
                 sprint_dir_gap = 0;
                 if (sprint_resume_hold) sprint_resume_hold = false;
+                hsp = runsp * inputDir;
+                runMomentum = hsp;
+                is_sprinting = true;
             }
+            if (dash_input_buffer > 0 && !sprint_committed) dash_input_buffer--;
+
             if (sprint_committed) {
-                var _dir_held = (key_left || key_right);
-                if (inputDir != 0) {
-                    if (sprint_commit_dir != 0 && inputDir != sprint_commit_dir) {
-                        sprint_dir_gap = _switch_gap;
-                    }
-                    sprint_commit_dir = inputDir;
-                }
-                var _move_dir = inputDir != 0 ? inputDir : sprint_commit_dir;
-                var _dir_ok = _dir_held;
-                if (!_dir_held && key_sprint && sprint_hold_latched && sprint_commit_dir != 0) {
-                    if (sprint_dir_gap <= 0) sprint_dir_gap = _switch_gap;
-                    else sprint_dir_gap--;
-                    _dir_ok = (sprint_dir_gap > 0);
-                    if (_dir_ok) _move_dir = sprint_commit_dir;
-                } else if (_dir_held) {
-                    sprint_dir_gap = 0;
-                }
-                var _leave_ground = (!grounded || jumped_this_frame);
-                var _tap_stop = (!sprint_hold_latched && !_dir_ok);
-                var _hold_stop = (sprint_hold_latched && !_dir_ok && sprint_dir_gap <= 0);
-                var _z_released = (!key_sprint && sprint_hold_latched);
-                if (attacking || _leave_ground || _z_released || _tap_stop || _hold_stop) {
-                    if (_leave_ground && key_sprint && sprint_hold_latched) {
-                        sprint_resume_hold = true;
-                    }
-                    if (grounded && !_leave_ground && (_tap_stop || _hold_stop || _z_released)) {
-                        sprint_reel_pending = true;
-                        sprint_resume_hold = false;
-                        if (inputDir != 0) {
-                            sprint_reel_dir_wait = max(sprint_reel_dir_wait, SPRINT_REEL_DIR_WAIT_FRAMES);
-                        } else {
+                if (sprint_dash_standstill) {
+                    var _stand_done = (attacking || !grounded || jumped_this_frame || sprint_burst_tick >= _dash_frames);
+                    if (_stand_done) {
+                        if (grounded && !jumped_this_frame && sprint_burst_tick >= _dash_frames) {
+                            dash_input_buffer = 0;
+                            dash_lock_timer = _dash_lock_max;
+                            // Reel right away — don't wait for Z release (standstill dash often ends while Z is still held)
+                            sprint_reel_pending = true;
+                            sprint_reel_active = true;
                             sprint_reel_dir_wait = 0;
                         }
-                    }
-                    sprint_committed = false;
-                    sprint_burst_tick = 0;
-                    var _keep_hold = (_leave_ground && key_sprint && sprint_hold_latched);
-                    var _hold_paused = (_hold_stop && key_sprint);
-                    if (!_keep_hold && !_hold_paused) {
-                        sprint_hold_latched = false;
-                        sprint_commit_dir = 0;
-                        sprint_dir_gap = 0;
-                        if (!_leave_ground) sprint_resume_hold = false;
-                    } else if (_hold_paused) {
-                        sprint_commit_dir = 0;
-                        sprint_dir_gap = 0;
-                        sprint_resume_hold = false;
-                    }
-                } else {
-                    sprint_burst_tick++;
-                    if (sprint_burst_tick > 1 && key_sprint) sprint_hold_latched = true;
-                    var _in_burst = (sprint_burst_tick <= _burst_frames);
-                    var _burst_done = (sprint_burst_tick > _burst_frames);
-                    if (_burst_done && !sprint_hold_latched) {
                         sprint_committed = false;
-                        sprint_hold_latched = false;
                         sprint_burst_tick = 0;
                         sprint_commit_dir = 0;
-                        sprint_resume_hold = false;
-                        sprint_dir_gap = 0;
-                    } else if (!_land_crouch_prev) {
-                        is_sprinting = true;
-                        sprint_jump_carry = false;
-                        sprint_air_trail = false;
-                        var _walk_scale = 1;
-                        if (post_attack_accel_timer > 0) {
-                            _walk_scale = 1 - post_attack_accel_timer / POST_ATTACK_ACCEL_FRAMES;
-                            if (_walk_scale < 0.35) _walk_scale = 0.35;
+                        sprint_dash_standstill = false;
+                        is_sprinting = false;
+                    } else {
+                        sprint_burst_tick++;
+                        if (!_land_crouch_prev) {
+                            is_sprinting = true;
+                            hsp = _dash_speed * sprint_commit_dir;
+                            runMomentum = hsp;
                         }
-                        var _burst_sp = (variable_instance_exists(id, "SPRINT_BURST_SPEED") ? SPRINT_BURST_SPEED : runsp);
-                        var _sprint_sp = _in_burst ? _burst_sp : runsp;
-                        hsp = _sprint_sp * _move_dir * _walk_scale;
-                        runMomentum = hsp;
+                    }
+                } else {
+                    var _dir_held = (key_left || key_right);
+                    if (inputDir != 0) {
+                        if (sprint_commit_dir != 0 && inputDir != sprint_commit_dir) {
+                            sprint_dir_gap = _switch_gap;
+                        }
+                        sprint_commit_dir = inputDir;
+                        last_direction = inputDir;
+                    }
+                    var _move_dir = inputDir != 0 ? inputDir : sprint_commit_dir;
+                    var _dir_ok = _dir_held;
+                    if (!_dir_held && key_sprint && sprint_hold_latched && sprint_commit_dir != 0) {
+                        if (sprint_dir_gap <= 0) sprint_dir_gap = _switch_gap;
+                        else sprint_dir_gap--;
+                        _dir_ok = (sprint_dir_gap > 0);
+                        if (_dir_ok) _move_dir = sprint_commit_dir;
+                    } else if (_dir_held) {
+                        sprint_dir_gap = 0;
+                    }
+                    var _leave_ground = (!grounded || jumped_this_frame);
+                    var _tap_stop = (!sprint_hold_latched && !_dir_ok);
+                    var _hold_stop = (sprint_hold_latched && !_dir_ok && sprint_dir_gap <= 0);
+                    var _z_released = (!key_sprint && sprint_hold_latched);
+                    if (attacking || _leave_ground || _z_released || _tap_stop || _hold_stop) {
+                        if (_leave_ground && key_sprint && sprint_hold_latched) {
+                            sprint_resume_hold = true;
+                        }
+                        if (grounded && !_leave_ground && (_tap_stop || _hold_stop || _z_released)) {
+                            sprint_reel_pending = true;
+                            sprint_resume_hold = false;
+                            if (inputDir != 0) {
+                                sprint_reel_dir_wait = max(sprint_reel_dir_wait, SPRINT_REEL_DIR_WAIT_FRAMES);
+                            } else {
+                                sprint_reel_dir_wait = 0;
+                            }
+                        }
+                        sprint_committed = false;
+                        sprint_burst_tick = 0;
+                        var _keep_hold = (_leave_ground && key_sprint && sprint_hold_latched);
+                        var _hold_paused = (_hold_stop && key_sprint);
+                        if (!_keep_hold && !_hold_paused) {
+                            sprint_hold_latched = false;
+                            sprint_commit_dir = 0;
+                            sprint_dir_gap = 0;
+                            if (!_leave_ground) sprint_resume_hold = false;
+                        } else if (_hold_paused) {
+                            sprint_commit_dir = 0;
+                            sprint_dir_gap = 0;
+                            sprint_resume_hold = false;
+                        }
+                    } else {
+                        sprint_burst_tick++;
+                        if (sprint_burst_tick > 1 && key_sprint) sprint_hold_latched = true;
+                        var _in_burst = (sprint_burst_tick <= _burst_frames);
+                        var _burst_done = (sprint_burst_tick > _burst_frames);
+                        if (_burst_done && !sprint_hold_latched) {
+                            sprint_committed = false;
+                            sprint_hold_latched = false;
+                            sprint_burst_tick = 0;
+                            sprint_commit_dir = 0;
+                            sprint_resume_hold = false;
+                            sprint_dir_gap = 0;
+                        } else if (!_land_crouch_prev) {
+                            is_sprinting = true;
+                            sprint_jump_carry = false;
+                            sprint_air_trail = false;
+                            var _sprint_sp = _in_burst ? _burst_speed : runsp;
+                            hsp = _sprint_sp * _move_dir;
+                            runMomentum = hsp;
+                        }
                     }
                 }
             }
@@ -715,13 +750,16 @@ function scr_player_movement() {
                 if (_sj_dir != 0 && (_pre_sprinting || _pre_sprint_committed)) {
                     sprint_committed = false;
                     sprint_burst_tick = 0;
-                    if (!(key_sprint && _pre_sprint_hold_latched)) {
+                    if (!(_pre_sprint_hold_latched && key_sprint)) {
                         sprint_commit_dir = 0;
                         sprint_hold_latched = false;
                     }
+                    sprint_dash_standstill = false;
                     sprint_jump_carry = true;
                     sprint_air_trail = true;
-                    var _carry_sp_j = runsp * (variable_instance_exists(id, "SPRINT_JUMP_CARRY_MULT") ? SPRINT_JUMP_CARRY_MULT : 1);
+                    var _carry_sp_j = _pre_sprint_dash_standstill
+                        ? (variable_instance_exists(id, "DASH_SPEED") ? DASH_SPEED : 8.5)
+                        : runsp * (variable_instance_exists(id, "SPRINT_JUMP_CARRY_MULT") ? SPRINT_JUMP_CARRY_MULT : 1);
                     runMomentum = _carry_sp_j * _sj_dir;
                     hsp = runMomentum;
                 }
@@ -732,6 +770,7 @@ function scr_player_movement() {
                 }
                 sprint_committed = false;
                 sprint_burst_tick = 0;
+                sprint_dash_standstill = false;
                 if (!(key_sprint && sprint_resume_hold)) {
                     sprint_commit_dir = 0;
                     sprint_hold_latched = false;
@@ -749,7 +788,8 @@ function scr_player_movement() {
             if (is_sprinting || sprint_committed) {
                 sprint_reel_pending = false;
                 sprint_reel_dir_wait = 0;
-            } else if ((_pre_sprinting || _pre_sprint_committed) && grounded && !jumped_this_frame && vsp >= 0) {
+            } else if ((_pre_sprinting || _pre_sprint_committed) && !_pre_sprint_dash_standstill
+                && grounded && !jumped_this_frame && vsp >= 0) {
                 sprint_reel_pending = true;
                 if ((key_left || key_right) && !key_sprint) {
                     sprint_reel_dir_wait = max(sprint_reel_dir_wait, SPRINT_REEL_DIR_WAIT_FRAMES);
@@ -1029,6 +1069,7 @@ function scr_player_movement() {
             sprint_burst_tick = 0;
             sprint_commit_dir = 0;
             sprint_hold_latched = false;
+            sprint_dash_standstill = false;
         }
     }
 
@@ -1677,28 +1718,22 @@ function scr_player_movement() {
     if (grounded && vsp > 0.001 && stunTimer <= 0) vsp = 0;
 
     // §4 runs before 6c sets grounded — resume hold sprint same frame we land (Z still held, no re-press)
-    var _land_crouch_resume_block = force_landing_crouch || (sprite_index == spr_mc_walljump && vsp > 0)
-        || (sprite_index == spr_mc_jump && image_index >= ANIM_LAND_CROUCH_START && image_index < ANIM_LAND_CROUCH_END);
-    if (!attacking && stunTimer <= 0 && grounded && vsp >= 0 && !jumped_this_frame && !_land_crouch_resume_block
-        && attack_recovery_lock <= 0
+    if (!attacking && stunTimer <= 0 && grounded && vsp >= 0 && !jumped_this_frame
         && key_sprint && sprint_hold_latched && sprint_resume_hold && !sprint_committed) {
         var _inputDir_land = (key_right - key_left);
         if (_inputDir_land != 0) {
             var _burst_frames_land = (variable_instance_exists(id, "SPRINT_BURST_FRAMES") ? SPRINT_BURST_FRAMES : 10);
             sprint_committed = true;
-            sprint_hold_latched = true;
+            sprint_dash_standstill = false;
             sprint_burst_tick = _burst_frames_land + 1;
             sprint_commit_dir = _inputDir_land;
+            last_direction = _inputDir_land;
             sprint_reel_pending = false;
             is_sprinting = true;
             sprint_jump_carry = false;
             sprint_air_trail = false;
-            var _walk_scale_land = 1;
-            if (post_attack_accel_timer > 0) {
-                _walk_scale_land = 1 - post_attack_accel_timer / POST_ATTACK_ACCEL_FRAMES;
-                if (_walk_scale_land < 0.35) _walk_scale_land = 0.35;
-            }
-            hsp = runsp * _inputDir_land * _walk_scale_land;
+            sprint_resume_hold = false;
+            hsp = runsp * _inputDir_land;
             runMomentum = hsp;
         }
     }
@@ -1845,15 +1880,7 @@ function scr_player_movement() {
                     image_index = 0;
                 }
                 image_speed = 1;
-                if (key_sprint_press && _input_dir != 0 && attack_recovery_lock <= 0) {
-                    sprint_reel_active = false;
-                    sprint_committed = true;
-                    sprint_hold_latched = key_sprint;
-                    sprint_burst_tick = 0;
-                    sprint_commit_dir = _input_dir;
-                    sprite_index = spr_mc_sprint;
-                    image_index = 0;
-                } else if (_input_dir != 0) {
+                if (_input_dir != 0) {
                     sprint_reel_active = false;
                     sprite_index = spr_mc_jog;
                     image_index = 0;
@@ -2118,4 +2145,107 @@ function scr_player_movement() {
     }
 
     shelf_bb_bottom_prev = bbox_bottom;
+}
+
+/// @function scr_player_sprint_try_begin
+/// @description Commit dash/sprint on the input frame — sets hsp + i-frames immediately.
+/// @param {Bool} _early True from Begin Step (before movement / other instances' Step).
+/// @returns {Bool} True if a new dash or sprint session started.
+function scr_player_sprint_try_begin(_early) {
+    if (is_dying || stunTimer > 0 || sprint_committed) return false;
+
+    var _dash_wants = (key_sprint_press || dash_input_buffer > 0);
+    if (!_dash_wants) return false;
+
+    var _recovery_locked = scr_player_attack_is_recovery_locked();
+    var inputDir = (key_right - key_left);
+    var _ground_ok = _early ? grounded : (grounded && !jumped_this_frame);
+    if (!_ground_ok || vsp < 0) return false;
+
+    var _reel_blocked = sprint_reel_active || sprint_reel_pending || (sprite_index == spr_mc_reelback);
+    var _sprint_sprite_ok = (sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
+        && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && !sprint_reel_active);
+    var _dash_lock = (variable_instance_exists(id, "dash_lock_timer") ? dash_lock_timer : 0);
+    var _dash_sprite_ok = _sprint_sprite_ok && !_reel_blocked && _dash_lock <= 0;
+    var _sprint_start_ok = _sprint_sprite_ok || (sprint_resume_hold && key_sprint);
+    var _dash_speed = (variable_instance_exists(id, "DASH_SPEED") ? DASH_SPEED : 8.5);
+    var _burst_speed = (variable_instance_exists(id, "SPRINT_BURST_SPEED") ? SPRINT_BURST_SPEED : runsp);
+
+    // Atk1 poke-and-run — buffered Z works too
+    if (attacking && !_recovery_locked) {
+        var _dc_dir = inputDir;
+        if (_dc_dir == 0) _dc_dir = last_direction;
+        if (_dc_dir == 0) _dc_dir = sign(image_xscale);
+        if (_dc_dir != 0 && scr_player_attack_can_dodge_cancel()) {
+            dash_input_buffer = 0;
+            scr_player_attack_dodge_cancel(_dc_dir);
+            return true;
+        }
+        return false;
+    }
+
+    if (attacking || _recovery_locked) return false;
+
+    post_attack_accel_timer = 0;
+
+    // Standstill tap-Z: fixed burst in facing direction — never extends to run
+    if (inputDir == 0 && _dash_sprite_ok) {
+        var _sd = last_direction;
+        if (_sd == 0) _sd = sign(image_xscale);
+        if (_sd == 0) _sd = 1;
+        sprint_committed = true;
+        sprint_hold_latched = false;
+        sprint_dash_standstill = true;
+        sprint_burst_tick = 0;
+        sprint_commit_dir = _sd;
+        last_direction = _sd;
+        sprint_reel_pending = false;
+        sprint_reel_active = false;
+        sprint_z_idle_charged = false;
+        dash_input_buffer = 0;
+        is_sprinting = true;
+        sprint_jump_carry = false;
+        sprint_air_trail = false;
+        if (sprite_index != spr_mc_sprint) {
+            sprite_index = spr_mc_sprint;
+            image_index = 0;
+        }
+        image_speed = 1;
+        sprint_squash_coil_frames = 1;
+        hsp = _dash_speed * _sd;
+        runMomentum = hsp;
+        scr_player_dash_iframes_begin();
+        return true;
+    }
+
+    // Directional sprint: tap = burst only, hold Z = burst + runsp sustain
+    var _sprint_from_idle_charge = (key_sprint && sprint_z_idle_charged && inputDir != 0);
+    if (inputDir != 0 && (_dash_wants || _sprint_from_idle_charge) && _sprint_start_ok && _dash_lock <= 0) {
+        sprint_committed = true;
+        sprint_hold_latched = _sprint_from_idle_charge;
+        sprint_dash_standstill = false;
+        sprint_burst_tick = 0;
+        sprint_commit_dir = inputDir;
+        last_direction = inputDir;
+        sprint_reel_pending = false;
+        sprint_reel_active = false;
+        sprint_dir_gap = 0;
+        sprint_z_idle_charged = false;
+        dash_input_buffer = 0;
+        is_sprinting = true;
+        sprint_jump_carry = false;
+        sprint_air_trail = false;
+        if (sprite_index != spr_mc_sprint) {
+            sprite_index = spr_mc_sprint;
+            image_index = 0;
+        }
+        image_speed = 1;
+        sprint_squash_coil_frames = 1;
+        hsp = _burst_speed * inputDir;
+        runMomentum = hsp;
+        scr_player_dash_iframes_begin();
+        return true;
+    }
+
+    return false;
 }

@@ -222,64 +222,125 @@ function scr_enemy_begin_attack_dash() {
     scr_enemy_set_facing(_dir);
 }
 
-/// @function scr_enemy_attack_hitbox_active
-/// @description Waist-height sweep line — ATTACK dash frames only (never CHASE / TELEGRAPH).
-function scr_enemy_attack_hitbox_active() {
-    return (state == ENEMY_STATE.ATTACK && attack_frame > 0);
+/// @function scr_enemy_attack_draw_origin
+/// @description World origin for attack sprite (feet + telegraph shake + hover).
+function scr_enemy_attack_draw_origin() {
+    var _shake_x = (variable_instance_exists(id, "telegraph_shake_x") ? telegraph_shake_x : 0);
+    var _shake_y = (variable_instance_exists(id, "telegraph_shake_y") ? telegraph_shake_y : 0);
+    var _hover_y = scr_enemy_floating_hover_draw_offset_y();
+    return {
+        x: floor(x + _shake_x),
+        y: floor(y + _shake_y) + _hover_y
+    };
 }
 
-/// @function scr_enemy_resolve_attack_player_contact
-/// @description ATTACK-only sweep; body contact ends dash (no pass-through). No player attack i-frames.
-/// @returns {Bool} True if player body was struck this step.
-function scr_enemy_resolve_attack_player_contact() {
-    if (!scr_enemy_attack_hitbox_active() || attack_hit_dealt || !instance_exists(obj_player)) return false;
+/// @function scr_enemy_attack_compute_hitbox
+/// @description Pink streak slash AABB for the current attack subimage (world space).
+/// @returns {Struct} { active, x1, y1, x2, y2 }
+function scr_enemy_attack_compute_hitbox() {
+    var _hb = { active: false, x1: 0, y1: 0, x2: 0, y2: 0 };
 
-    var _yc = (bbox_top + bbox_bottom) * 0.5;
-    var _contact = place_meeting(x, y, obj_player)
-        || (collision_line(dash_sweep_prev_x, _yc, x, _yc, obj_player, true, true) != noone);
-    if (!_contact) return false;
+    if (state != ENEMY_STATE.ATTACK || attack_frame <= 0) return _hb;
+    if (sprite_index != spr_enemy_attack) return _hb;
+
+    var _table = (variable_instance_exists(id, "ENEMY_ATTACK_SLASH_HITBOX")
+        ? ENEMY_ATTACK_SLASH_HITBOX : undefined);
+    if (_table == undefined) return _hb;
+
+    var _idx = clamp(floor(image_index), 0, array_length(_table) - 1);
+    var _box = _table[_idx];
+    if (!_box.active) return _hb;
+
+    var _face = scr_enemy_facing_sign();
+    if (_face == 0) _face = 1;
+
+    var _origin = scr_enemy_attack_draw_origin();
+    var _x1;
+    var _x2;
+    if (_face > 0) {
+        _x1 = _origin.x + _box.x1;
+        _x2 = _origin.x + _box.x2;
+    } else {
+        _x1 = _origin.x - _box.x2;
+        _x2 = _origin.x - _box.x1;
+    }
+
+    _hb.active = true;
+    _hb.x1 = _x1;
+    _hb.y1 = _origin.y + _box.y1;
+    _hb.x2 = _x2;
+    _hb.y2 = _origin.y + _box.y2;
+    return _hb;
+}
+
+/// @function scr_enemy_apply_attack_hit
+/// @description Damage + knockback when the slash connects (single hit per swing).
+/// @returns {Bool} True if player was struck.
+function scr_enemy_apply_attack_hit() {
+    if (attack_hit_dealt || !instance_exists(obj_player)) return false;
+
+    var _hb = scr_enemy_attack_compute_hitbox();
+    if (!_hb.active) return false;
+    if (collision_rectangle(_hb.x1, _hb.y1, _hb.x2, _hb.y2, obj_player, false, true) == noone) return false;
+
+    var _dodged = false;
+    with (obj_player) {
+        _dodged = scr_player_has_damage_iframes();
+    }
+    if (_dodged) return false;
 
     with (obj_player) {
-        if (!invincible) {
-            obj_player_health -= other.enemy_attack_damage;
-            var _push_dir = sign(x - other.x);
-            if (_push_dir == 0) _push_dir = -last_direction;
-            knockBackX = _push_dir * other.enemy_attack_hsp_push;
-            knockBackY = ENEMY_KNOCKBACK_Y;
-            stunTimer = ENEMY_STUN_FRAMES;
-            attacking = false;
-            attack_lockout = 0;
-            attack_commit_lock = 0;
-            attack_recovery_lock = 0;
-            attackCooldownTimer = 0;
-            attack_buffer_timer = 0;
-            attack_chain_buffer_timer = 0;
-            attack_chain_latched = false;
-            attack_shift_remaining = 0;
-            combo_buffer = false;
-            comboTimer = 0;
-            comboCount = 0;
-            debug_hitbox_active = false;
-            is_sprinting = false;
-            sprint_afterimage_tick = 0;
-            sprint_jump_carry = false;
-            sprint_air_trail = false;
-            invincible = true;
-            invincibleTimer = INVINCIBILITY_FRAMES;
-            attack_priority_timer = 0;
-        }
+        obj_player_health -= other.enemy_attack_damage;
+        var _push_dir = sign(x - other.x);
+        if (_push_dir == 0) _push_dir = -last_direction;
+        knockBackX = _push_dir * other.enemy_attack_hsp_push;
+        knockBackY = ENEMY_KNOCKBACK_Y;
+        stunTimer = ENEMY_STUN_FRAMES;
+        attacking = false;
+        attack_lockout = 0;
+        attack_commit_lock = 0;
+        attack_recovery_lock = 0;
+        attackCooldownTimer = 0;
+        attack_buffer_timer = 0;
+        attack_chain_buffer_timer = 0;
+        attack_chain_latched = false;
+        attack_shift_remaining = 0;
+        combo_buffer = false;
+        comboTimer = 0;
+        comboCount = 0;
+        debug_hitbox_active = false;
+        is_sprinting = false;
+        sprint_afterimage_tick = 0;
+        sprint_jump_carry = false;
+        sprint_air_trail = false;
+        invincible = true;
+        invincibleTimer = INVINCIBILITY_FRAMES;
+        attack_priority_timer = 0;
     }
 
     scr_camera_trigger_shake(6, 12);
     scr_hitstop_trigger(3);
 
-    // Stop on body contact — never ghost through the player.
     hsp = 0;
     state = ENEMY_STATE.RECOIL;
     state_timer = enemy_recover_frames;
     image_blend = c_white;
     attack_hit_dealt = true;
     return true;
+}
+
+/// @function scr_enemy_attack_hitbox_active
+/// @description Active only while the pink slash streak is visible on the attack sheet.
+function scr_enemy_attack_hitbox_active() {
+    return scr_enemy_attack_compute_hitbox().active;
+}
+
+/// @function scr_enemy_resolve_attack_player_contact
+/// @description Slash-only damage — body overlap alone does not hit.
+/// @returns {Bool} True if player body was struck this step.
+function scr_enemy_resolve_attack_player_contact() {
+    if (state != ENEMY_STATE.ATTACK || attack_frame <= 0 || attack_hit_dealt) return false;
+    return scr_enemy_apply_attack_hit();
 }
 
 /// @function scr_enemy_post_stun_recovery
@@ -401,9 +462,61 @@ function scr_enemy_on_player_hit(_combo_count) {
     return { landed: true, intercepted: false, armored_chip: false, super_armor: false };
 }
 
+/// @function scr_enemy_get_glow_sprite
+/// @description Emissive overlay matched to the active body sheet (not FSM — avoids idle glow on attack).
+function scr_enemy_get_glow_sprite() {
+    if (variable_instance_exists(id, "sprite_index")) {
+        if (sprite_index == spr_enemy_windup) return BULB_ENEMY_GLOW_SPRITE_WINDUP;
+        if (sprite_index == spr_enemy_attack) return BULB_ENEMY_GLOW_SPRITE_ATTACK;
+    }
+    return BULB_ENEMY_GLOW_SPRITE;
+}
+
+/// @function scr_enemy_update_combat_sprite
+/// @description Swap body sprite + scrub frame for telegraph windup and attack dash.
+function scr_enemy_update_combat_sprite() {
+    var _idle = (variable_instance_exists(id, "ENEMY_SPRITE_IDLE") ? ENEMY_SPRITE_IDLE : spr_enemy);
+    var _windup = (variable_instance_exists(id, "ENEMY_SPRITE_WINDUP") ? ENEMY_SPRITE_WINDUP : spr_enemy_windup);
+    var _attack = (variable_instance_exists(id, "ENEMY_SPRITE_ATTACK") ? ENEMY_SPRITE_ATTACK : spr_enemy_attack);
+
+    switch (state) {
+        case ENEMY_STATE.TELEGRAPH:
+            if (sprite_index != _windup) {
+                sprite_index = _windup;
+                image_index = 0;
+            }
+            image_speed = 0;
+            var _w_frames = sprite_get_number(_windup);
+            var _w_dur = max(1, (variable_instance_exists(id, "enemy_telegraph_frames") ? enemy_telegraph_frames : 32));
+            var _w_t = 1 - (state_timer / _w_dur);
+            image_index = clamp(floor(_w_t * _w_frames), 0, _w_frames - 1);
+            break;
+
+        case ENEMY_STATE.ATTACK:
+            if (sprite_index != _attack) {
+                sprite_index = _attack;
+                image_index = 0;
+            }
+            image_speed = 0;
+            var _a_frames = sprite_get_number(_attack);
+            var _a_dur = max(1, (variable_instance_exists(id, "enemy_attack_dash_frames") ? enemy_attack_dash_frames : 14));
+            var _a_t = clamp((variable_instance_exists(id, "attack_frame") ? attack_frame : 0) / _a_dur, 0, 0.999);
+            image_index = clamp(floor(_a_t * _a_frames), 0, _a_frames - 1);
+            break;
+
+        default:
+            if (sprite_index != _idle) {
+                sprite_index = _idle;
+                image_index = 0;
+            }
+            if (image_speed == 0) image_speed = 1;
+            break;
+    }
+}
+
 /// @function scr_enemy_attack_windup_visuals
 function scr_enemy_attack_windup_visuals() {
-    image_blend = make_color_rgb(255, 72, 88);
+    image_blend = c_white;
     telegraph_shake_x = random_range(-2.5, 2.5);
     telegraph_shake_y = random_range(-1.5, 1.5);
 }

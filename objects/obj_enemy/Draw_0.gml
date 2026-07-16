@@ -4,6 +4,12 @@ scr_enemy_raycast_debug_draw();
 
 // Debug Draw Collision Points
 if (global.show_debug) {
+    var _slash = scr_enemy_attack_compute_hitbox();
+    if (_slash.active) {
+        draw_set_color(c_fuchsia);
+        draw_rectangle(_slash.x1, _slash.y1, _slash.x2, _slash.y2, false);
+    }
+
     draw_set_color(c_red);
     var _side_dist = floor((bbox_right - bbox_left) * 0.5) - 1;
     var _waist_y = floor((bbox_top + bbox_bottom) * 0.5);

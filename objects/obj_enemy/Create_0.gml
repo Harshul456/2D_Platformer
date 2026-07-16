@@ -57,6 +57,18 @@ enemy_approach_slow_factor = 0.5;
 enemy_attack_damage = 12;
 enemy_attack_hsp_push = 4.8;
 
+// Downward slash hitboxes — local space from feet origin (+X = facing right), per spr_enemy_attack frame.
+// Derived from pink streak pixels; frames 0–2 = windup (no damage), 3–5 = active slash.
+ENEMY_ATTACK_SLASH_HITBOX = array_create(7);
+ENEMY_ATTACK_SLASH_HITBOX[0] = { active: false, x1: 0, y1: 0, x2: 0, y2: 0 };
+ENEMY_ATTACK_SLASH_HITBOX[1] = { active: false, x1: 0, y1: 0, x2: 0, y2: 0 };
+ENEMY_ATTACK_SLASH_HITBOX[2] = { active: false, x1: 0, y1: 0, x2: 0, y2: 0 };
+ENEMY_ATTACK_SLASH_HITBOX[3] = { active: false, x1: 0, y1: 0, x2: 0, y2: 0 };
+ENEMY_ATTACK_SLASH_HITBOX[4] = { active: true,  x1:  0, y1: -55, x2: 31, y2:  -7 };
+ENEMY_ATTACK_SLASH_HITBOX[5] = { active: true,  x1:  0, y1: -55, x2: 23, y2:  -6 };
+ENEMY_ATTACK_SLASH_HITBOX[6] = { active: false, x1: 0, y1: 0, x2: 0, y2: 0 };
+enemy_attack_hitbox_debug = false;
+
 home_x = x;
 spawn_x = home_x;
 patrol_range_px = 180;
@@ -102,3 +114,9 @@ target_angle = 0;
 lean_max_patrol = 3;
 lean_max_chase = 12;
 lean_lerp_speed = 0.15;
+
+// Combat pose sprites — idle uses spr_enemy; telegraph/attack swap body + glow art.
+ENEMY_SPRITE_IDLE = spr_enemy;
+ENEMY_SPRITE_WINDUP = spr_enemy_windup;
+ENEMY_SPRITE_ATTACK = spr_enemy_attack;
+mask_index = ENEMY_SPRITE_IDLE;

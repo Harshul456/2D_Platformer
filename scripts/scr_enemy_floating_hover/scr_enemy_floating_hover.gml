@@ -67,7 +67,22 @@ function scr_enemy_floating_hover_step() {
     image_speed = 0;
     hover_time += _speed;
     hover_y_offset = (sin(hover_time) - 1) * _amp;
-    image_index = scr_enemy_floating_hover_frame_from_time(hover_time, hover_y_offset, _amp);
+
+    // Combat poses own image_index — only apply idle breath frames on patrol/chase/stun.
+    var _hover_anim = true;
+    if (variable_instance_exists(id, "state")) {
+        switch (state) {
+            case ENEMY_STATE.NOTICE:
+            case ENEMY_STATE.TELEGRAPH:
+            case ENEMY_STATE.ATTACK:
+            case ENEMY_STATE.RECOIL:
+                _hover_anim = false;
+                break;
+        }
+    }
+    if (_hover_anim) {
+        image_index = scr_enemy_floating_hover_frame_from_time(hover_time, hover_y_offset, _amp);
+    }
 
     if (variable_instance_exists(id, "enemy_is_floating") && enemy_is_floating) {
         y = ystart;

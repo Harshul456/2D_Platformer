@@ -21,7 +21,7 @@ hsp             = 0;            // velocity
 vsp             = 0;            // Vertical velocity
 grv             = 0.5;          // Gravity strength
 walksp          = 3.5;          // Standard walk speed
-runsp           = 5.0;          // Sprint speed (hold Z; slightly above walksp)
+runsp           = 5.0;          // Sprint sustain speed (hold Z + direction)
 jumpsp          = 9.0;          // Jump power
 jump_count      = 0;            // 0 = fresh from ground; 1 = one air jump left; 2 = no jumps until land (incl. after wall jump / walk-off).
 jumped_this_frame = false;      // Set true in scr_player_movement when a jump fires (footsteps land check reads this).
@@ -207,16 +207,23 @@ sprint_reel_active = false;     // spr_mc_reelback playing
 sprint_reel_pending = false;    // Armed after sprint ends — reel when direction released
 sprint_reel_dir_wait = 0;       // Frames to wait for direction to release after Z up before assuming walk intent
 SPRINT_REEL_DIR_WAIT_FRAMES = 14; // ~230ms @60fps — forgiving staggered key release when stopping from sprint
-sprint_committed = false;       // Active sprint session (tap = burst only; hold Z = burst + sustain)
-sprint_hold_latched = false;    // True once Z stays held after first burst frame → sustained runsp
-sprint_z_idle_charged = false;  // Z held while standing — next direction press starts sprint
+sprint_committed = false;       // Active sprint / dash session
+sprint_hold_latched = false;    // Hold Z after burst → sustained runsp (directional sprint only)
+sprint_dash_standstill = false; // Standstill tap-Z — fixed burst, never extends to run
+sprint_z_idle_charged = false;  // Z held while idle — next direction press starts sprint
 sprint_resume_hold = false;     // Z held through hold-sprint jump — resume sustain on landing
-sprint_dir_gap = 0;             // Frames left to keep sprint during direction-key switch gap
-SPRINT_DIR_SWITCH_GAP = 6;      // Grace frames when swapping L/R while holding Z
-sprint_burst_tick = 0;          // Frames elapsed this commit (1..SPRINT_BURST_FRAMES = burst speed)
-sprint_commit_dir = 0;          // Direction locked in when sprint started (−1 / +1)
-SPRINT_BURST_FRAMES = 15;       // Tap-Z dash length; hold-Z also uses this before runsp sustain
-SPRINT_BURST_SPEED = 8.5;       // Speed during burst phase (hold-Z sustain uses runsp)
+sprint_dir_gap = 0;             // Grace frames when swapping L/R during hold sprint
+SPRINT_DIR_SWITCH_GAP = 6;
+sprint_burst_tick = 0;          // Frames elapsed this commit
+sprint_commit_dir = 0;          // Direction locked when sprint/dash started (−1 / +1)
+SPRINT_BURST_FRAMES = 10;       // Directional burst before runsp sustain
+SPRINT_BURST_SPEED = 8.5;       // Speed during directional burst
+DASH_FRAMES = 8;                // Standstill tap-Z dash length (no direction at press)
+DASH_SPEED = 8.5;               // Standstill tap-Z dash speed
+DASH_INPUT_BUFFER_FRAMES = 4;   // Retry window when Z is pressed slightly early
+DASH_LOCK_FRAMES = 14;          // Blocks re-trigger through reel after standstill dash
+dash_input_buffer = 0;
+dash_lock_timer = 0;
 SPRINT_JUMP_CARRY_MULT = 1.12;  // Jump/leaving ground while sprinting: runsp × this (initial air hsp)
 SPRINT_AIR_DECAY = 0.003;       // Air lerp toward 0 while sprint_jump_carry (lower = longer glide)
 SPRINT_AIR_DECAY_TURN = 0.10;   // Extra decay when reversing direction in air during carry
@@ -262,6 +269,7 @@ ENEMY_KNOCKBACK_X       = 4;    // Horizontal knockback
 ENEMY_KNOCKBACK_Y       = -3;   // Vertical knockback (up)
 ENEMY_STUN_FRAMES       = 15;   // Frames player is stunned
 INVINCIBILITY_FRAMES    = 90;   // Frames of invincibility after hit
+DASH_IFRAME_FRAMES      = 10;   // Silent i-frames at dash start (covers dash + margin)
 COLLISION_SEPARATION_PUSH = 1.5; // Push player out of enemy when overlapping
 
 // Damage/knockback when player hits enemy (Step_0 attack block)
@@ -374,11 +382,12 @@ ATTACK2_HIT_POST_ACCEL_FRAMES = 12;
 ATTACK2_COMMIT_LOCK_FRAMES = 28;      // Locked in place during finisher swing
 ATTACK2_RECOVERY_LOCK_FRAMES = 18;    // No sprint/dash after finisher ends
 ATTACK2_COMBO_LUNGE_HSP = 5.5;
-DODGE_CANCEL_MIN_INDEX = 1;           // Earliest atk1 subimage that can cancel into dash
+DODGE_CANCEL_MIN_INDEX = 0;           // Earliest atk1 subimage that can cancel into dash
 
 // --- INVINCIBILITY & FEEDBACK ---
 invincible      = false;
 invincibleTimer = 0;
+dash_iframe_timer = 0;
 blinkDelay      = 5;
 blinkCounter    = 0;
 knockBackX      = 0;

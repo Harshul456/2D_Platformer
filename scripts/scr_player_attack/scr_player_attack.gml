@@ -173,23 +173,23 @@ function scr_player_attack_dodge_cancel(_dir) {
     image_xscale = _dir * image_base_scale;
 
     sprint_committed = true;
-    sprint_hold_latched = true;
+    sprint_hold_latched = false;
+    sprint_dash_standstill = false;
     sprint_burst_tick = 0;
     sprint_commit_dir = _dir;
     sprint_reel_pending = false;
     sprint_reel_dir_wait = 0;
-    sprint_dir_gap = 0;
-    sprint_z_idle_charged = false;
-    sprint_resume_hold = false;
     sprint_squash_coil_frames = 1;
     is_sprinting = true;
     sprint_jump_carry = false;
     sprint_air_trail = false;
     sprint_reel_active = false;
 
-    var _burst_sp = (variable_instance_exists(id, "SPRINT_BURST_SPEED") ? SPRINT_BURST_SPEED : runsp);
-    hsp = _burst_sp * _dir;
+    var _dash_sp = (variable_instance_exists(id, "DASH_SPEED") ? DASH_SPEED : 8.5);
+    hsp = _dash_sp * _dir;
     runMomentum = hsp;
+
+    scr_player_dash_iframes_begin();
 
     sprite_index = spr_mc_sprint;
     image_index = 0;

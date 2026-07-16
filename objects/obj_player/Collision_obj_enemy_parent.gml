@@ -18,7 +18,7 @@ if (place_meeting(x, y, other)) {
     if (_in_tile || _in_hazard) x = _old_x;
 }
 
-if (!invincible && !_protected) {
+if (!scr_player_has_damage_iframes() && !_protected) {
     var _dmg = ENEMY_COLLISION_DAMAGE;
     if (variable_instance_exists(other, "gnd_touch_damage")) _dmg = other.gnd_touch_damage;
     if (_st == GND_STATE_CHASE && variable_instance_exists(other, "gnd_touch_damage_chase")) {
