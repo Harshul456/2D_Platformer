@@ -7,8 +7,31 @@ function scr_player_apply_attack_facing() {
     }
 }
 
+/// @function scr_player_try_attack_start
+/// @description Start a buffered ground swing if allowed. Call before sprint/reel so dash/run cancel wins.
+/// @returns {Bool} True if a new swing began.
+function scr_player_try_attack_start() {
+    if (attacking || stunTimer > 0) return false;
+    if (attack_lockout > 0 || attack_recovery_grace > 0 || attack_recovery_lock > 0) return false;
+    if (attack_buffer_timer <= 0 || attackCooldownTimer > 0) return false;
+    // Coyote: dash/run floor probes can flicker one frame at speed.
+    if (!grounded && coyote_time_timer <= 0) return false;
+
+    scr_player_attack();
+    if (!attacking) return false;
+
+    attack_buffer_timer = 0;
+    attackCooldownTimer = attackCooldown;
+    attack_has_hit = false;
+    if (!attack_no_lunge) {
+        attack_shift_remaining = (comboCount == 1) ? ATTACK_SHIFT_PX_1 : ATTACK_SHIFT_PX_2;
+    }
+    return true;
+}
+
 function scr_player_attack() {
-    if (!grounded) return;
+    // Lenient ground during dash/run — floor probes can flicker one frame at speed.
+    if (!grounded && coyote_time_timer <= 0) return;
 
     if (attacking) {
         if (image_index > image_number * 0.4) combo_buffer = true;
@@ -26,17 +49,18 @@ function scr_player_attack() {
     attack_chain_latched = false;
     attack_has_hit = false;
     attack_recovery_cut = false;
-    image_index = 0;
+    attack_timer = 0;
     comboTimer = comboCooldown;
     attack_priority_timer = 14; // Startup priority — does not beat enemy telegraph armor or super-armor dash
     scr_player_saber_trail_clear();
 
+    // Sprite first, THEN reset index — never inherit sprint/reel image_index into end-swing checks.
     switch (comboCount) {
         case 1:
-            hsp = last_direction * 3;
             sprite_index = spr_asta_attack1;
             image_blend = c_white;
             attack_commit_lock = 0;
+            hsp = last_direction * 3;
             break;
         case 2:
             scr_player_apply_attack_facing();
@@ -54,6 +78,28 @@ function scr_player_attack() {
             attack_commit_lock = 0;
             break;
     }
+    image_index = 0;
+    image_speed = 1;
+
+    // Hard cancel sprint/dash/reel — must not be gated on image_index (float / remap races).
+    is_sprinting = false;
+    sprint_afterimage_tick = 0;
+    sprint_jump_carry = false;
+    sprint_air_trail = false;
+    sprint_reel_active = false;
+    sprint_reel_pending = false;
+    sprint_reel_dir_wait = 0;
+    sprint_committed = false;
+    sprint_burst_tick = 0;
+    sprint_commit_dir = 0;
+    sprint_hold_latched = false;
+    sprint_dash_standstill = false;
+    sprint_z_idle_charged = false;
+    sprint_resume_hold = false;
+    sprint_dir_gap = 0;
+    runMomentum = 0;
+    // Leftover Z buffer must not instantly dodge-cancel this swing (MIN_INDEX can be 0).
+    dash_input_buffer = 0;
 }
 
 /// @function scr_player_attack1_prepare_retreat
@@ -95,6 +141,7 @@ function scr_player_attack_end_swing(_post_accel_frames) {
     var _was_atk2 = (comboCount >= 2);
 
     attacking = false;
+    attack_timer = 0;
     attack_lockout = 0;
     attack_commit_lock = 0;
     image_blend = c_white;
@@ -140,6 +187,9 @@ function scr_player_attack_can_dodge_cancel() {
     if (!attacking || !grounded || stunTimer > 0) return false;
     if (comboCount >= 2) return false;
     if (variable_instance_exists(id, "attack_commit_lock") && attack_commit_lock > 0) return false;
+    // Startup lockout: dash/run → attack must not be stolen by buffered Z / dodge-cancel on frame 0.
+    var _min_frames = (variable_instance_exists(id, "DODGE_CANCEL_MIN_ATTACK_FRAMES") ? DODGE_CANCEL_MIN_ATTACK_FRAMES : 6);
+    if (attack_timer < _min_frames) return false;
     var _min_idx = (variable_instance_exists(id, "DODGE_CANCEL_MIN_INDEX") ? DODGE_CANCEL_MIN_INDEX : 1);
     return (image_index >= _min_idx) || attack_recovery_cut;
 }
@@ -151,6 +201,7 @@ function scr_player_attack_dodge_cancel(_dir) {
     if (_dir == 0) return;
 
     attacking = false;
+    attack_timer = 0;
     attack_lockout = 0;
     attack_buffer_timer = 0;
     attack_chain_buffer_timer = 0;
@@ -172,18 +223,23 @@ function scr_player_attack_dodge_cancel(_dir) {
     last_direction = _dir;
     image_xscale = _dir * image_base_scale;
 
+    // Direction held + Z → directional burst (can sustain). No direction → standstill dash
+    // (fixed DASH_FRAMES). Using directional with hold_latched=false and no dir was
+    // instantly _tap_stop'd → hsp wiped + reel (felt like "dash stays in place").
+    var _dir_held = key_left || key_right;
     sprint_committed = true;
-    sprint_hold_latched = false;
-    sprint_dash_standstill = false;
+    sprint_dash_standstill = !_dir_held;
+    sprint_hold_latched = _dir_held && key_sprint;
     sprint_burst_tick = 0;
     sprint_commit_dir = _dir;
     sprint_reel_pending = false;
     sprint_reel_dir_wait = 0;
+    sprint_reel_active = false;
     sprint_squash_coil_frames = 1;
     is_sprinting = true;
     sprint_jump_carry = false;
     sprint_air_trail = false;
-    sprint_reel_active = false;
+    dash_input_buffer = 0;
 
     var _dash_sp = (variable_instance_exists(id, "DASH_SPEED") ? DASH_SPEED : 8.5);
     hsp = _dash_sp * _dir;

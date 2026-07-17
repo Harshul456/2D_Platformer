@@ -241,7 +241,7 @@ sprint_squash_coil_frames = 0; // Set to 1 on Z press — exactly one Step of co
 // --- COMBAT & DAMAGE ---
 obj_player_health = 100;
 stomp_force     = 20;           // Downward force for air-stomp
-attack_timer    = 0;            // Active frames of attack
+attack_timer    = 0;            // Active frames of current swing (Step increments; end-swing gated on this)
 attackCooldown  = 20;           // Wait time between attacks
 attackCooldownTimer = 0;
 
@@ -382,7 +382,8 @@ ATTACK2_HIT_POST_ACCEL_FRAMES = 12;
 ATTACK2_COMMIT_LOCK_FRAMES = 28;      // Locked in place during finisher swing
 ATTACK2_RECOVERY_LOCK_FRAMES = 18;    // No sprint/dash after finisher ends
 ATTACK2_COMBO_LUNGE_HSP = 5.5;
-DODGE_CANCEL_MIN_INDEX = 0;           // Earliest atk1 subimage that can cancel into dash
+DODGE_CANCEL_MIN_INDEX = 1;           // Earliest atk1 subimage that can cancel into dash
+DODGE_CANCEL_MIN_ATTACK_FRAMES = 6;   // Startup frames where dash/run → attack cannot be stolen by dodge-cancel
 
 // --- INVINCIBILITY & FEEDBACK ---
 invincible      = false;

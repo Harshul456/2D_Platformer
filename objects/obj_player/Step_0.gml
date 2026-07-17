@@ -76,50 +76,25 @@ if (stunTimer > 0 && attacking) {
 // otherwise section 2 never allows a new attack.
 if (attack_lockout > 0) attack_lockout--;
 
-function _attack_step_shift() {
-    // Queue a small slide instead of instant teleport.
-    if (attack_no_lunge) return;
-    attack_shift_remaining = (comboCount == 1) ? ATTACK_SHIFT_PX_1 : ATTACK_SHIFT_PX_2;
-}
-
-// 2. PROCESS ATTACK INPUT (with buffer)
-// Skip if attacking — let combo transition handle chaining.
-// Skip if attack_lockout > 0: prevents starting before current attack finishes.
-// Skip if attack_recovery_grace > 0: prevents restarting attack 1 immediately after it ends (see ATTACK_RECOVERY_GRACE)
-// Skip if attack_recovery_lock > 0: atk2 finisher recovery — no new attack until lock expires
-if (!attacking && stunTimer <= 0 && attack_lockout <= 0 && attack_recovery_grace <= 0
-    && attack_recovery_lock <= 0 && attack_buffer_timer > 0 && attackCooldownTimer <= 0 && grounded) {
-    scr_player_attack(); 
-    
-    // Start the forward slide on attack 1.
-    _attack_step_shift();
-
-    attack_buffer_timer = 0; // Consume the buffer — one press = one attack
-    
-    // Only reset these if the script actually started a NEW swing
-    if (image_index == 0) {
-        attackCooldownTimer = attackCooldown;
-        attack_has_hit = false; 
-        is_sprinting = false;
-        sprint_afterimage_tick = 0;
-        sprint_jump_carry = false;
-        sprint_air_trail = false;
-        sprint_reel_active = false;
-        sprint_reel_pending = false;
-        sprint_reel_dir_wait = 0;
-        sprint_committed = false;
-        sprint_burst_tick = 0;
-        sprint_commit_dir = 0;
-        sprint_hold_latched = false;
-        sprint_dash_standstill = false;
-        sprint_z_idle_charged = false;
-        sprint_resume_hold = false;
-        sprint_dir_gap = 0;
-    }
+// 2. PROCESS ATTACK INPUT (fallback — primary start is melee preempt inside movement §4 before sprint/reel)
+if (!attacking) {
+    scr_player_try_attack_start();
 }
 
 // 3. PROCESS THE ATTACK STATE & PHYSICS (stunned = knockback only; no lunge / combo in air)
-if (attacking && stunTimer <= 0 && !sprint_committed) {
+// NOTE: do NOT require !sprint_committed — dash/run cancel clears sprint inside scr_player_attack,
+// and gating here previously skipped the whole swing (one-frame flash + keep running).
+if (attacking && stunTimer <= 0) {
+    attack_timer++;
+
+    // Pin swing art so reel/sprint pose cannot stick after cancel.
+    var _swing_sprite = (comboCount >= 2) ? spr_mc_attack2 : spr_asta_attack1;
+    if (sprite_index != _swing_sprite) {
+        sprite_index = _swing_sprite;
+        image_index = 0;
+        image_speed = 1;
+    }
+
     // --- STRONGER LUNGE FRICTION ---
     hsp = lerp(hsp, 0, ATTACK_LUNGE_FRICTION);
     if (abs(hsp) < ATTACK_LUNGE_CUTOFF) hsp = 0;
@@ -248,7 +223,9 @@ if (attacking && stunTimer <= 0 && !sprint_committed) {
     }
 
     // Atk1 early endlag — poke-and-run after solo hit.
-    if (attack_recovery_cut && comboCount == 1) {
+    // attack_timer guard: dash/run cancel must not end on the startup frame from a stale image_index.
+    var _can_end = (attack_timer >= 3) && (sprite_index == _swing_sprite);
+    if (_can_end && attack_recovery_cut && comboCount == 1) {
         var _cancel_after = (variable_instance_exists(id, "ATTACK1_HIT_CANCEL_AFTER_INDEX")
             ? ATTACK1_HIT_CANCEL_AFTER_INDEX : 2);
         if (image_index > _cancel_after) {
@@ -256,7 +233,7 @@ if (attacking && stunTimer <= 0 && !sprint_committed) {
                 ? ATTACK1_HIT_POST_ACCEL_FRAMES : 4);
             scr_player_attack_end_swing(_post_accel);
         }
-    } else if (image_index >= image_number - 1) {
+    } else if (_can_end && image_index >= image_number - 1) {
         var _post_accel = POST_ATTACK_ACCEL_FRAMES;
         if (attack_has_hit && comboCount == 1) {
             _post_accel = (variable_instance_exists(id, "ATTACK1_HIT_POST_ACCEL_FRAMES")

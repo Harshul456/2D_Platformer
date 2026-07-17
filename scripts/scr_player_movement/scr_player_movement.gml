@@ -501,6 +501,9 @@ function scr_player_movement() {
     var _vsp_wall_jump_fall_ref = vsp;
 
     // --- 4. GRAVITY & SPRINT LOGIC ---
+    // Melee preempt (after grounded/coyote): start swing BEFORE sprint/reel so dash/run → attack wins this frame.
+    scr_player_try_attack_start();
+
     vsp += grv;
     // Short-hop: release jump early caps rise speed (jump_cut_multiplier)
     if (vsp < 0 && !key_jump_held) vsp = max(vsp, jumpsp * (-jump_cut_multiplier));
@@ -532,9 +535,26 @@ function scr_player_movement() {
         var _recovery_locked = scr_player_attack_is_recovery_locked();
         var _dash_buffer_max = (variable_instance_exists(id, "DASH_INPUT_BUFFER_FRAMES") ? DASH_INPUT_BUFFER_FRAMES : 0);
         if (dash_lock_timer > 0) dash_lock_timer--;
+        // Buffer Z even during atk1 so poke→dash can be queued; attack start clears buffer,
+        // and DODGE_CANCEL_MIN_ATTACK_FRAMES blocks instant steal of dash→attack cancels.
         if (key_sprint_press) {
             dash_input_buffer = _dash_buffer_max;
         }
+        // While swinging: kill reel/stale sprint. (If Begin Step already dodge-canceled,
+        // attacking is false here so this block is skipped and the new dash is kept.)
+        if (attacking) {
+            sprint_reel_active = false;
+            sprint_reel_pending = false;
+            sprint_reel_dir_wait = 0;
+            sprint_committed = false;
+            sprint_hold_latched = false;
+            sprint_dash_standstill = false;
+            sprint_burst_tick = 0;
+            sprint_commit_dir = 0;
+            is_sprinting = false;
+        }
+        // Always decay dash buffer — while sprint_committed it used to stick and steal the next attack into dodge-cancel.
+        if (dash_input_buffer > 0) dash_input_buffer--;
         if (!sprint_committed) {
             scr_player_sprint_try_begin(false);
         }
@@ -585,8 +605,6 @@ function scr_player_movement() {
                 runMomentum = hsp;
                 is_sprinting = true;
             }
-            if (dash_input_buffer > 0 && !sprint_committed) dash_input_buffer--;
-
             if (sprint_committed) {
                 if (sprint_dash_standstill) {
                     var _stand_done = (attacking || !grounded || jumped_this_frame || sprint_burst_tick >= _dash_frames);
@@ -2000,8 +2018,13 @@ function scr_player_movement() {
             }
         }
     } else {
-        // Keep attack swing animation at designed speed
-        image_speed = 1; 
+        // Keep attack swing animation at designed speed; never let reel/sprint art win mid-slash.
+        image_speed = 1;
+        var _want_atk = (comboCount >= 2) ? spr_mc_attack2 : spr_asta_attack1;
+        if (sprite_index != _want_atk) {
+            sprite_index = _want_atk;
+            image_index = 0;
+        }
     }
 
     // --- 7b. LANDING CROUCH MOVEMENT LOCK (animation runs after §5 hsp — zero slide during crouch) ---
