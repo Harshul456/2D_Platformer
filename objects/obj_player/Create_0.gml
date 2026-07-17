@@ -36,6 +36,14 @@ JUMP_RISE_THRESHOLD = -1;       // vsp threshold for rising animation
 JUMP_PEAK_MIN = -1;             // vsp range for peak animation start
 JUMP_PEAK_MAX = 1;              // vsp range for peak animation end
 MOVEMENT_THRESHOLD = 0.5;       // hsp threshold to trigger run animation
+// Walk anim buffer — move/face instantly; hold idle through micro-taps (Hollow Knight-style)
+walk_init_timer = 0;            // Consecutive frames holding the same move direction
+walk_init_dir = 0;              // Direction currently being counted (−1 / 0 / +1)
+walk_anim_threshold = 6;        // ~100ms @60fps before idle → jog
+walk_anim_confirm = 0;          // Extra frames at threshold before first jog frame shows
+WALK_ANIM_CONFIRM_FRAMES = 1;   // Tiny confirm — blocks 1-frame threshold brushes
+walk_buffer_threshold = 6;      // Legacy alias for walk_anim_threshold
+WALK_INIT_HSP_EPSILON = 0.1;
 
 // Cave footsteps (snd_cave_footstep1–3) — animation contact frames on spr_mc_jog / spr_mc_sprint.
 FOOTSTEP_CAVE_ENABLED = true;

@@ -92,8 +92,8 @@ if (attacking && stunTimer <= 0) {
     if (sprite_index != _swing_sprite) {
         sprite_index = _swing_sprite;
         image_index = 0;
-        image_speed = 1;
     }
+    image_speed = 1;
 
     // --- STRONGER LUNGE FRICTION ---
     hsp = lerp(hsp, 0, ATTACK_LUNGE_FRICTION);
