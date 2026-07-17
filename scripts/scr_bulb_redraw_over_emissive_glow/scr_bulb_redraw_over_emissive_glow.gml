@@ -109,6 +109,8 @@ function scr_bulb_redraw_over_emissive_glow(_lit_surface = -1) {
         } else {
             scr_player_draw_main_sprite();
         }
+        // Saber trail stays with the player redraw; hit slash FX draw in Post-Draw (Draw_77).
+        scr_player_saber_trail_draw();
     }
 
     with (obj_enemy_parent) {

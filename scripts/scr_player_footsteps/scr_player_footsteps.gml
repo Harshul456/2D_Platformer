@@ -130,6 +130,12 @@ function scr_player_footsteps_land_check() {
             var _land_cd = (variable_instance_exists(id, "FOOTSTEP_LAND_STEP_COOLDOWN") ? FOOTSTEP_LAND_STEP_COOLDOWN : 8);
             footstep_cooldown = max((variable_instance_exists(id, "footstep_cooldown") ? footstep_cooldown : 0), _land_cd);
         }
+
+        // Landing squash even on lighter drops (uses its own min vsp / air frames).
+        var _sq_air = (variable_instance_exists(id, "LAND_SQUASH_MIN_AIR_FRAMES") ? LAND_SQUASH_MIN_AIR_FRAMES : 3);
+        if (_air_frames >= _sq_air) {
+            scr_player_land_squash_trigger(_fall_vsp);
+        }
     }
 
     if (grounded) {

@@ -20,6 +20,12 @@ scr_bulb_redraw_over_emissive_glow(_lit_scene);
 scr_bulb_draw_enemy_emissive_glow_all();
 scr_crystal_spark_draw_all();
 
+// Hit slash FX — after glow so neon cores stay razor-visible (room Draw gets buried).
+var _cam_imp = view_camera[0];
+if (instance_exists(obj_camera_controller)) _cam_imp = obj_camera_controller.cam;
+camera_apply(_cam_imp);
+scr_player_impact_lines_draw();
+
 scr_cave_vignette_draw();
 
 if (normal_map_hud_timer > 0) {

@@ -52,6 +52,8 @@
   "resources":[
     {"id":{"name":"obj_afterimage","path":"objects/obj_afterimage/obj_afterimage.yy",},},
     {"id":{"name":"obj_bulb_controller","path":"objects/obj_bulb_controller/obj_bulb_controller.yy",},},
+    {"id":{"name":"obj_hit_particle","path":"objects/obj_hit_particle/obj_hit_particle.yy",},},
+    {"id":{"name":"obj_hit_slash","path":"objects/obj_hit_slash/obj_hit_slash.yy",},},
     {"id":{"name":"obj_bulb_crystal_light","path":"objects/obj_bulb_crystal_light/obj_bulb_crystal_light.yy",},},
     {"id":{"name":"obj_camera_controller","path":"objects/obj_camera_controller/obj_camera_controller.yy",},},
     {"id":{"name":"obj_camera_zone","path":"objects/obj_camera_zone/obj_camera_zone.yy",},},
@@ -132,6 +134,7 @@
     {"id":{"name":"scr_player_draw_main_sprite","path":"scripts/scr_player_draw_main_sprite/scr_player_draw_main_sprite.yy",},},
     {"id":{"name":"scr_player_footsteps","path":"scripts/scr_player_footsteps/scr_player_footsteps.yy",},},
     {"id":{"name":"scr_player_ground_debris","path":"scripts/scr_player_ground_debris/scr_player_ground_debris.yy",},},
+    {"id":{"name":"scr_player_impact_lines","path":"scripts/scr_player_impact_lines/scr_player_impact_lines.yy",},},
     {"id":{"name":"scr_player_input","path":"scripts/scr_player_input/scr_player_input.yy",},},
     {"id":{"name":"scr_player_invincibility","path":"scripts/scr_player_invincibility/scr_player_invincibility.yy",},},
     {"id":{"name":"scr_player_movement","path":"scripts/scr_player_movement/scr_player_movement.yy",},},

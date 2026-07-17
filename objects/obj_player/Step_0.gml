@@ -13,10 +13,17 @@ function _player_sprint_deform() {
         sprint_squash_x = lerp(sprint_squash_x, 1, SPRINT_SQUASH_LERP);
         sprint_squash_y = lerp(sprint_squash_y, 1, SPRINT_SQUASH_LERP);
     }
+
+    scr_player_land_squash_step();
+    scr_player_jump_stretch_step();
+
     var _face = sign(image_xscale);
     if (_face == 0) _face = last_direction != 0 ? last_direction : 1;
-    image_xscale = _face * image_base_scale * sprint_squash_x;
-    image_yscale = image_base_scale * sprint_squash_y;
+    var _sx = image_base_scale * sprint_squash_x * land_squash_x * jump_stretch_x;
+    var _sy = image_base_scale * sprint_squash_y * land_squash_y * jump_stretch_y;
+    // Snap so width/height land on whole pixels — no smeared texel stretch.
+    image_xscale = scr_player_texel_perfect_scale(_face * _sx, sprite_get_width(sprite_index));
+    image_yscale = scr_player_texel_perfect_scale(_sy, sprite_get_height(sprite_index));
 }
 
 // --- HITSTOP CHECK (at the very start of Step Event) ---
@@ -163,6 +170,7 @@ if (attacking && stunTimer <= 0) {
                 scr_enemy_grounded_apply_damage(other.ATTACK_DAMAGE_PER_HIT, other.x);
                 hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
             }
+            scr_player_impact_lines_on_hit(x1, y1, x2, y2, _hit_parent);
             var _hitstop_frames = (comboCount >= 2) ? ATTACK_FINISHER_HITSTOP : ATTACK_LIGHT_HITSTOP;
             scr_hitstop_trigger(_hitstop_frames);
             hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
@@ -178,6 +186,8 @@ if (attacking && stunTimer <= 0) {
             }
 
             attack_has_hit = true;
+            // Always spark on contact — landed / chip / intercept all get juice.
+            scr_player_impact_lines_on_hit(x1, y1, x2, y2, _hit_enemy);
 
             if (_hit_result.intercepted) {
                 if (_hit_result.super_armor) {

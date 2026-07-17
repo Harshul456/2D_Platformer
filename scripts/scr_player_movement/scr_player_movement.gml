@@ -44,29 +44,10 @@ function scr_player_movement() {
         }
         if (!attacking && attack_buffer_timer > 0) attack_buffer_timer--;
         if (attack_chain_buffer_timer > 0) attack_chain_buffer_timer--;
-
-        // Same-dir hold timer — only gates jog sprite (movement stays instant).
-        var _walk_idir = key_right - key_left;
-        if (_walk_idir != 0) {
-            if (_walk_idir == walk_init_dir) {
-                walk_init_timer++;
-            } else {
-                walk_init_dir = _walk_idir;
-                walk_init_timer = 1;
-                walk_anim_confirm = 0;
-            }
-        } else {
-            walk_init_dir = 0;
-            walk_init_timer = 0;
-            walk_anim_confirm = 0;
-        }
     } else {
         key_wall_cling = false;
         key_sprint = false;
         key_sprint_press = false;
-        walk_init_dir = 0;
-        walk_init_timer = 0;
-        walk_anim_confirm = 0;
     }
 
     // --- 2. GROUNDED & COYOTE LOGIC ---
@@ -423,6 +404,7 @@ function scr_player_movement() {
             wall_jump_kick_hold_timer = WALL_JUMP_KICK_HOLD_FRAMES;
             double_jump_anim_active = true;
             double_jump_anim_tick = 0;
+            scr_player_jump_stretch_trigger();
             is_sprinting = false;
             sprint_jump_carry = false;
             sprint_air_trail = false;
@@ -454,6 +436,7 @@ function scr_player_movement() {
                 air_chain_jump_used = true;
                 double_jump_anim_active = true;
                 double_jump_anim_tick = 0;
+                scr_player_jump_stretch_trigger();
             }
             
             if (_grounded_jump) {
@@ -1098,6 +1081,7 @@ function scr_player_movement() {
             wall_jump_kick_hold_timer = WALL_JUMP_KICK_HOLD_FRAMES;
             double_jump_anim_active = true;
             double_jump_anim_tick = 0;
+            scr_player_jump_stretch_trigger();
             is_sprinting = false;
             sprint_jump_carry = false;
             sprint_air_trail = false;
@@ -1845,14 +1829,6 @@ function scr_player_movement() {
         && wall_side == 0 && abs(vsp) <= 2 && !_torso_overlap_pose && !_feet_embed_pose;
     var _anim_grounded = grounded || _teeter_anim;
 
-    // Jog only after a real hold — micro-taps slide on idle with no jog flash.
-    if (walk_init_timer >= walk_anim_threshold) {
-        walk_anim_confirm++;
-    } else {
-        walk_anim_confirm = 0;
-    }
-    var _walk_buffered = (walk_anim_confirm >= WALK_ANIM_CONFIRM_FRAMES);
-
     if (!attacking) {
         if (_anim_grounded) {
             var _hold_full_lip_pose = FULL_BLOCK_EDGE_GROUND_FORGIVE && !_shelf_any_near_feet_pose && (full_lip_anim_sticky > 0 || _teeter_anim)
@@ -1862,11 +1838,17 @@ function scr_player_movement() {
                 && sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump; // allow landing crouch on full-block lip edges
             if (_hold_full_lip_pose) {
                 // No dedicated teeter art yet — keep stable *ground* visuals on full-block lip (after jump land anim finishes).
-                // Buffered walk so lip edges don't idle/jog flicker on micro-slides.
-                var _ground_sprite_lip = _walk_buffered ? spr_mc_jog : spr_mc_idle;
-                if (sprite_index != _ground_sprite_lip) {
-                    sprite_index = _ground_sprite_lip;
-                    image_index = 0;
+                var _lip_move = (_input_dir != 0) || (abs(hsp) > MOVEMENT_THRESHOLD);
+                if (_lip_move) {
+                    if (sprite_index != spr_mc_jog) {
+                        sprite_index = spr_mc_jog;
+                        image_index = 0;
+                    }
+                } else {
+                    if (sprite_index != spr_mc_idle) {
+                        sprite_index = spr_mc_idle;
+                        image_index = 0;
+                    }
                 }
                 image_speed = 1;
             } else if (sprite_index == spr_mc_jump || sprite_index == spr_mc_doublejump) {
@@ -1881,18 +1863,14 @@ function scr_player_movement() {
                     force_landing_crouch = false;
                 } else if (_input_dir != 0 && !force_landing_crouch) {
                     // Skip crouch if moving (unless forced landing crouch is still playing)
-                    if (is_sprinting || sprint_committed) {
-                        sprite_index = spr_mc_sprint;
-                    } else {
-                        sprite_index = _walk_buffered ? spr_mc_jog : spr_mc_idle;
-                    }
+                    sprite_index = (is_sprinting || sprint_committed) ? spr_mc_sprint : spr_mc_jog;
                     image_index = 0;
                 } else if (image_index >= ANIM_LAND_CROUCH_END) {
                     force_landing_crouch = false;
                     if ((key_sprint_press || (key_sprint && sprint_resume_hold)) && _input_dir != 0) {
                         sprite_index = spr_mc_sprint;
                         image_index = 0;
-                    } else if (_walk_buffered) {
+                    } else if (_input_dir != 0) {
                         sprite_index = spr_mc_jog;
                         image_index = 0;
                     } else {
@@ -1906,8 +1884,8 @@ function scr_player_movement() {
                 image_index = ANIM_LAND_CROUCH_START;
                 force_landing_crouch = true;
             } else if (sprite_index == spr_mc_attack2 || sprite_index == spr_asta_attack1) {
-                // Attack just ended — buffered walk so spam-strafe doesn't flicker jog
-                sprite_index = _walk_buffered ? spr_mc_jog : spr_mc_idle;
+                // Attack just ended — transition to jog/idle
+                sprite_index = (abs(hsp) > MOVEMENT_THRESHOLD) ? spr_mc_jog : spr_mc_idle;
                 image_index = 0;
             } else if (is_sprinting || sprint_committed) {
                 sprint_reel_active = false;
@@ -1916,7 +1894,6 @@ function scr_player_movement() {
             } else if (sprint_reel_active || sprite_index == spr_mc_reelback
                 || (sprint_reel_pending && !(key_left || key_right))) {
                 // Play reel as soon as direction is released — do NOT wait for Z up.
-                // Waiting on !key_sprint caused: run → idle (Z still held) → reel on Z release.
                 sprint_reel_active = true;
                 sprint_reel_pending = false;
                 sprint_reel_dir_wait = 0;
@@ -1927,7 +1904,7 @@ function scr_player_movement() {
                 image_speed = 1;
                 if (_input_dir != 0) {
                     sprint_reel_active = false;
-                    sprite_index = _walk_buffered ? spr_mc_jog : spr_mc_idle;
+                    sprite_index = spr_mc_jog;
                     image_index = 0;
                 } else if (image_index >= sprite_get_number(spr_mc_reelback) - 0.1) {
                     sprint_reel_active = false;
@@ -1944,9 +1921,9 @@ function scr_player_movement() {
                 image_speed = 1;
             } else {
                 if (!sprint_reel_pending) sprint_reel_active = false;
-                // Normal ground movement — buffered idle/jog (anti spam L/R jitter)
+                // Normal ground movement (walk / idle)
                 image_speed = 1;
-                var _ground_sprite = _walk_buffered ? spr_mc_jog : spr_mc_idle;
+                var _ground_sprite = (abs(hsp) > MOVEMENT_THRESHOLD) ? spr_mc_jog : spr_mc_idle;
                 if (sprite_index != _ground_sprite) {
                     sprite_index = _ground_sprite;
                     image_index = 0;

@@ -36,14 +36,6 @@ JUMP_RISE_THRESHOLD = -1;       // vsp threshold for rising animation
 JUMP_PEAK_MIN = -1;             // vsp range for peak animation start
 JUMP_PEAK_MAX = 1;              // vsp range for peak animation end
 MOVEMENT_THRESHOLD = 0.5;       // hsp threshold to trigger run animation
-// Walk anim buffer — move/face instantly; hold idle through micro-taps (Hollow Knight-style)
-walk_init_timer = 0;            // Consecutive frames holding the same move direction
-walk_init_dir = 0;              // Direction currently being counted (−1 / 0 / +1)
-walk_anim_threshold = 6;        // ~100ms @60fps before idle → jog
-walk_anim_confirm = 0;          // Extra frames at threshold before first jog frame shows
-WALK_ANIM_CONFIRM_FRAMES = 1;   // Tiny confirm — blocks 1-frame threshold brushes
-walk_buffer_threshold = 6;      // Legacy alias for walk_anim_threshold
-WALK_INIT_HSP_EPSILON = 0.1;
 
 // Cave footsteps (snd_cave_footstep1–3) — animation contact frames on spr_mc_jog / spr_mc_sprint.
 FOOTSTEP_CAVE_ENABLED = true;
@@ -246,6 +238,29 @@ sprint_squash_x = 1;
 sprint_squash_y = 1;
 sprint_squash_coil_frames = 0; // Set to 1 on Z press — exactly one Step of coil before normal scale
 
+// Landing squash — wide/short on impact; scales snap to whole pixels (texel-perfect)
+LAND_SQUASH_FRAMES = 6;         // Hold peak squash this many steps
+LAND_SQUASH_RECOVER = 0.28;     // Lerp back to 1 after hold
+LAND_SQUASH_X_MIN = 1.06;       // Light land horizontal stretch
+LAND_SQUASH_X_MAX = 1.22;       // Hard land horizontal stretch
+LAND_SQUASH_Y_MIN = 0.78;       // Hard land vertical squash
+LAND_SQUASH_Y_MAX = 0.94;       // Light land vertical squash
+LAND_SQUASH_VSP_REF = 8;        // Fall speed that reaches max squash
+LAND_SQUASH_MIN_VSP = 1.5;      // Ignore tiny grounding blips
+LAND_SQUASH_MIN_AIR_FRAMES = 3;
+land_squash_x = 1;
+land_squash_y = 1;
+land_squash_timer = 0;
+
+// Wall-jump / double-jump kick stretch — tall/thin; texel-snapped like landing squash
+JUMP_STRETCH_FRAMES = 5;        // Hold peak stretch into double-jump kick anim
+JUMP_STRETCH_RECOVER = 0.22;
+JUMP_STRETCH_X = 0.88;          // Slight horizontal tuck
+JUMP_STRETCH_Y = 1.14;          // Vertical stretch on kick-off
+jump_stretch_x = 1;
+jump_stretch_y = 1;
+jump_stretch_timer = 0;
+
 // --- COMBAT & DAMAGE ---
 obj_player_health = 100;
 stomp_force     = 20;           // Downward force for air-stomp
@@ -356,6 +371,8 @@ saber_trail_arc_combo = 0;
 saber_trail_has_prev_tip = false;
 saber_trail_prev_tip_x = 0;
 saber_trail_prev_tip_y = 0;
+
+// Hit slash FX — obj_hit_slash + obj_hit_particle (spawned from scr_player_impact_lines_on_hit)
 
 ENEMY_HIT_PRESSURE_WINDOW_FRAMES = 45;
 HIT_PRESSURE_KB_PER_STACK = 0.08;
