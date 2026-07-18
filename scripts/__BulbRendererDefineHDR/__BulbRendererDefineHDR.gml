@@ -5,7 +5,7 @@ function __BulbRendererDefineHDR()
     static _system = __BulbSystem();
     
     hdr         = false;
-    hdrTonemap  = BULB_TONEMAP_HBD;
+    hdrTonemap  = BULB_TONEMAP_ACES; // Filmic contrast that keeps blacks (Heji/HBD lifted them → milky wash)
     
     hdrBloomIntensity    = 0;
     hdrBloomIterations   = 3;

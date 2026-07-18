@@ -30,13 +30,15 @@
 #macro BULB_NORMAL_MAPS_ENABLED       true
 #macro BULB_NORMAL_MAP_TOGGLE_KEY     vk_f8
 
-// HDR bloom — off by default; press F9 in-game to toggle on.
-#macro BULB_HDR_BLOOM_DEFAULT_ON        false
-#macro BULB_HDR_BLOOM_INTENSITY         0.04
-#macro BULB_HDR_BLOOM_ITERATIONS        2
-#macro BULB_HDR_BLOOM_THRESHOLD_MIN     0.72
-#macro BULB_HDR_BLOOM_THRESHOLD_MAX     0.94
-#macro BULB_HDR_EXPOSURE                1.16
+// HDR bloom — on by default; press F9 in-game to toggle it off.
+// Tuned so bloom only glows genuine highlights (light cores / crystals) instead of
+// washing the whole scene: neutral exposure + high threshold + visible intensity.
+#macro BULB_HDR_BLOOM_DEFAULT_ON        true
+#macro BULB_HDR_BLOOM_INTENSITY         0.28   // Glow strength on the highlights that pass threshold
+#macro BULB_HDR_BLOOM_ITERATIONS        3      // Wider, softer falloff
+#macro BULB_HDR_BLOOM_THRESHOLD_MIN     1.02   // Only bright crystal/light cores bloom (higher = less scene lift)
+#macro BULB_HDR_BLOOM_THRESHOLD_MAX     1.40   // Full bloom above this
+#macro BULB_HDR_EXPOSURE                0.94   // Slightly under 1 to keep the dark, moody cave (was 1.16)
 #macro BULB_HDR_BLOOM_TOGGLE_KEY        vk_f9
 
 // Cave ambient — dark mood, but high enough to read platforms between lights.
