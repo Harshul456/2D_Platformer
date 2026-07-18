@@ -79,9 +79,31 @@
 #macro BULB_ENEMY_GLOW_SPRITE                  spr_enemy_glow  // Idle / patrol / chase
 #macro BULB_ENEMY_GLOW_SPRITE_WINDUP           spr_enemy_windup_glow
 #macro BULB_ENEMY_GLOW_SPRITE_ATTACK           spr_enemy_attack_glow
-#macro BULB_ENEMY_GLOW_ALPHA                   1.0    // Scales pulse alpha (tile glow uses art color + pulse only)
+#macro BULB_ENEMY_GLOW_ALPHA                   1.0    // Scales flare alpha (tile glow uses art color + pulse only)
 #macro BULB_ENEMY_LIGHT_SCALE                  0.88   // Bulb circle vs tile crystal lights
 #macro BULB_ENEMY_LIGHT_Y_OFFSET               -14    // Light anchor above feet (sprite center mass)
+
+// Enemy hit reaction — emissive flare + expanding light ripple (glow driven by hits, not breathe).
+#macro BULB_ENEMY_GLOW_BASE                    0.5    // Resting emissive glow when not hit (decoupled from breathe)
+#macro BULB_ENEMY_HIT_GLOW_BOOST               0.22   // Subtle brightening on hit (kept low — ripple carries the reaction)
+#macro BULB_ENEMY_HIT_GLOW_DECAY               0.055  // Per-frame flare falloff
+// Water-drop ripple — the enemy light radius undulates in a damped wave when hit.
+// Disabled: the pulsing light edge read as a visible circle; the distortion shockwave carries the ripple now.
+#macro BULB_ENEMY_HIT_RIPPLE_ENABLED           false
+#macro BULB_ENEMY_HIT_RIPPLE_LIFE              40     // Frames the ripple lasts before settling
+#macro BULB_ENEMY_HIT_RIPPLE_WAVES             4.0    // Expand/contract oscillations (more = wobblier water)
+#macro BULB_ENEMY_HIT_RIPPLE_AMPLITUDE         0.42   // Peak radius swing (fraction of base scale)
+#macro BULB_ENEMY_HIT_RIPPLE_DAMP              0.10   // Exponential decay per frame (higher = settles faster)
+#macro BULB_ENEMY_HIT_RIPPLE_INTENSITY_MOD     0.12   // How much brightness follows the ripple (low = no flash)
+
+// Screen-space distortion shockwave — the scene refracts/warps outward on hit (no colored ring).
+#macro HIT_DISTORT_ENABLED                     true
+#macro HIT_DISTORT_MAX                         8      // Max simultaneous ripples the shader handles
+#macro HIT_DISTORT_LIFE                        42     // Frames a ripple expands before it dies (higher = slower)
+#macro HIT_DISTORT_R0                          0.02   // Start radius (fraction of view width)
+#macro HIT_DISTORT_RMAX                        0.42   // End radius (fraction of view width), scaled by strength
+#macro HIT_DISTORT_WIDTH                       0.075  // Band half-width of the warp (wider = softer, less line-like)
+#macro HIT_DISTORT_STRENGTH                    0.014  // Peak UV displacement (fraction of view) — the warp amount
 
 #macro BULB_CRYSTAL_SPARK_MAX                8
 #macro BULB_CRYSTAL_SPARK_RATE_MIN           0.03

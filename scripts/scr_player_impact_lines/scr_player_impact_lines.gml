@@ -81,6 +81,43 @@ function scr_player_impact_lines_draw() {
     }
 }
 
+/// @function scr_player_attack_impact_sfx
+/// @description Random clank with pitch variation, played through the cave reverb bus.
+function scr_player_attack_impact_sfx(_finisher = false) {
+    var _clanks = [snd_clank_1, snd_clank_2, snd_clank_3];
+
+    // Avoid repeating the same clip back-to-back
+    var _pick = irandom(array_length(_clanks) - 1);
+    if (variable_instance_exists(id, "attack_clank_last")
+        && _pick == attack_clank_last && random(1) < 0.7) {
+        _pick = (_pick + 1 + irandom(1)) mod array_length(_clanks);
+    }
+    attack_clank_last = _pick;
+
+    var _pitch_lo = (variable_instance_exists(id, "ATTACK_IMPACT_PITCH_MIN") ? ATTACK_IMPACT_PITCH_MIN : 0.86);
+    var _pitch_hi = (variable_instance_exists(id, "ATTACK_IMPACT_PITCH_MAX") ? ATTACK_IMPACT_PITCH_MAX : 1.12);
+    var _gain     = (variable_instance_exists(id, "ATTACK_IMPACT_GAIN") ? ATTACK_IMPACT_GAIN : 0.9);
+
+    var _pitch = random_range(_pitch_lo, _pitch_hi);
+    if (_finisher) {
+        _pitch *= 0.85; // Beefier, lower clank on finishers
+        _gain  *= 1.15;
+    }
+
+    var _prio = 12;
+    if (variable_global_exists("sfx_combat_emitter")) {
+        // audio_play_sound_on(emitter, sound, loop, priority, gain, offset, pitch)
+        return audio_play_sound_on(global.sfx_combat_emitter, _clanks[_pick], false, _prio, _gain, 0, _pitch);
+    }
+
+    var _snd_id = audio_play_sound(_clanks[_pick], _prio, false);
+    if (_snd_id != -1) {
+        audio_sound_pitch(_snd_id, _pitch);
+        audio_sound_gain(_snd_id, _gain, 0);
+    }
+    return _snd_id;
+}
+
 /// @function scr_player_impact_lines_on_hit
 /// @description Spawn directional slash FX aligned to the attack angle.
 function scr_player_impact_lines_on_hit(_x1, _y1, _x2, _y2, _enemy = noone) {
@@ -92,6 +129,10 @@ function scr_player_impact_lines_on_hit(_x1, _y1, _x2, _y2, _enemy = noone) {
     }
 
     var _finisher = (comboCount >= 2);
+
+    // Cave-reverb clank with randomized pitch (once per landed hit)
+    scr_player_attack_impact_sfx(_finisher);
+
     var _angle;
 
     // Align to attack vector — downward air strike vs facing slash

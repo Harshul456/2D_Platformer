@@ -25,6 +25,7 @@ var _cam_imp = view_camera[0];
 if (instance_exists(obj_camera_controller)) _cam_imp = obj_camera_controller.cam;
 camera_apply(_cam_imp);
 scr_player_impact_lines_draw();
+scr_enemy_shards_draw();
 
 scr_cave_vignette_draw();
 

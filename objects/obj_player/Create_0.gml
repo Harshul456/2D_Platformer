@@ -374,6 +374,12 @@ saber_trail_prev_tip_y = 0;
 
 // Hit slash FX — obj_hit_slash + obj_hit_particle (spawned from scr_player_impact_lines_on_hit)
 
+// Attack impact SFX — random clank + pitch variation through the cave reverb bus
+ATTACK_IMPACT_PITCH_MIN = 0.86;
+ATTACK_IMPACT_PITCH_MAX = 1.12;
+ATTACK_IMPACT_GAIN      = 0.9;
+attack_clank_last       = -1;   // Last clank clip index (avoids back-to-back repeats)
+
 ENEMY_HIT_PRESSURE_WINDOW_FRAMES = 45;
 HIT_PRESSURE_KB_PER_STACK = 0.08;
 HIT_PRESSURE_KB_MULT_CAP = 1.5;

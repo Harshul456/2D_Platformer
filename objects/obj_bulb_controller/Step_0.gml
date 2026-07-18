@@ -18,3 +18,4 @@ if (bloom_hud_timer > 0) bloom_hud_timer--;
 scr_cave_dust_step(id);
 scr_ceiling_drip_step(id);
 scr_cave_fog_step(id);
+scr_hit_distort_step();

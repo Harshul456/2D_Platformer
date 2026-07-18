@@ -7,8 +7,17 @@ enum ENEMY_STATE {
     TELEGRAPH,
     ATTACK,
     RECOIL,
-    STUNNED
+    STUNNED,
+    DEATH
 }
+
+// Explosive crystal death — freeze/flash, then shatter into physics shards.
+#macro ENEMY_DEATH_HITSTOP        8    // Freeze frames on the killing blow
+#macro ENEMY_DEATH_FLASH_FRAMES   8    // Frozen white-flash duration before shatter
+#macro ENEMY_DEATH_SHAKE_MAG      5    // Camera rumble magnitude
+#macro ENEMY_DEATH_SHAKE_DUR      12   // Camera rumble frames
+#macro ENEMY_DEATH_SHARD_MIN      14   // Min crystal shards on shatter
+#macro ENEMY_DEATH_SHARD_MAX      20   // Max crystal shards on shatter
 
 /// @function scr_enemy_facing_sign
 /// @returns {Real} Logical facing (-1 left, 1 right).
@@ -400,6 +409,13 @@ function scr_enemy_on_player_hit(_combo_count) {
 
     hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
     obj_enemy_health -= other.ATTACK_DAMAGE_PER_HIT * _policy.damage_mult;
+    scr_enemy_hit_react_trigger(_combo_count >= 2 ? 1.4 : 1);
+
+    // Lethal blow — hand off to the explosive shatter sequence.
+    if (obj_enemy_health <= 0 && state != ENEMY_STATE.DEATH) {
+        scr_enemy_begin_death();
+        return { landed: true, intercepted: false, armored_chip: false, super_armor: false };
+    }
 
     // Regular armor — telegraph chips but cannot be interrupted or shoved.
     if (!_policy.take_stun && !_policy.take_knockback) {
@@ -460,6 +476,64 @@ function scr_enemy_on_player_hit(_combo_count) {
     }
 
     return { landed: true, intercepted: false, armored_chip: false, super_armor: false };
+}
+
+/// @function scr_enemy_begin_death
+/// @description Enter the death state: freeze, flash white, punch hitstop + screenshake.
+function scr_enemy_begin_death() {
+    state = ENEMY_STATE.DEATH;
+    enemy_ai_enabled = false;
+    hsp = 0;
+    vsp = 0;
+    knockbackX = 0;
+    death_flash_timer = ENEMY_DEATH_FLASH_FRAMES;
+
+    scr_hitstop_trigger(ENEMY_DEATH_HITSTOP);
+    scr_camera_trigger_shake(ENEMY_DEATH_SHAKE_MAG, ENEMY_DEATH_SHAKE_DUR);
+}
+
+/// @function scr_enemy_death_step
+/// @description Hold frozen + white for a few frames, then shatter and vanish.
+function scr_enemy_death_step() {
+    hsp = 0;
+    vsp = 0;
+    if (!variable_instance_exists(id, "death_flash_timer")) death_flash_timer = 0;
+
+    death_flash_timer--;
+    if (death_flash_timer <= 0) {
+        scr_enemy_death_shatter();
+        instance_destroy();
+    }
+}
+
+/// @function scr_enemy_death_shatter
+/// @description Burst geometric crystal shards from the enemy core (colors from its light).
+function scr_enemy_death_shatter() {
+    var _mid_x = (bbox_left + bbox_right) * 0.5;
+    var _mid_y = (bbox_top + bbox_bottom) * 0.5;
+    var _layer = layer_exists("Particles") ? "Particles" : "Instances";
+
+    // Shatter SFX through the cave-reverb combat bus, with a touch of pitch variety.
+    var _pitch = random_range(0.9, 1.08);
+    if (variable_global_exists("sfx_combat_emitter")) {
+        audio_play_sound_on(global.sfx_combat_emitter, snd_shatter_death, false, 14, 1, 0, _pitch);
+    } else {
+        var _snd = audio_play_sound(snd_shatter_death, 14, false);
+        if (_snd != -1) audio_sound_pitch(_snd, _pitch);
+    }
+
+    var _crystal = (variable_instance_exists(id, "bulb_light") && bulb_light != undefined)
+        ? bulb_light.blend : make_colour_rgb(220, 115, 170);
+    var _palette = [
+        c_white,
+        _crystal,
+        merge_colour(_crystal, c_white, 0.5)
+    ];
+
+    repeat (irandom_range(ENEMY_DEATH_SHARD_MIN, ENEMY_DEATH_SHARD_MAX)) {
+        var _sh = instance_create_layer(_mid_x, _mid_y, _layer, obj_enemy_shard);
+        _sh.shard_color = _palette[irandom(array_length(_palette) - 1)];
+    }
 }
 
 /// @function scr_enemy_get_glow_sprite

@@ -1,6 +1,12 @@
 // --- obj_enemy STEP — Hollow Knight crystal FSM (scr_enemy_ai + tile movement) ---
 // Parent Step runs scr_enemy_grounded_step; this object overrides with HK behaviour.
 
+// Explosive death takes over completely — freeze/flash then shatter (ticks through hitstop).
+if (state == ENEMY_STATE.DEATH) {
+    scr_enemy_death_step();
+    exit;
+}
+
 var _hitstop_frozen = (global.hitstop > 0);
 var _step_prev_x = x;
 

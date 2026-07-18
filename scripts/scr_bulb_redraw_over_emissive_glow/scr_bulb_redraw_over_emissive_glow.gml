@@ -167,6 +167,15 @@ function scr_bulb_draw_lit_scene(_renderer) {
     var _w = _pos[2] - _x;
     var _h = _pos[3] - _y;
 
+    // Cache the (undistorted) lit scene first so the player/enemy redraw stays crisp.
+    var _cache = scr_bulb_ensure_lit_scene_cache(obj_bulb_controller, _lit);
+
+    // Blit the lit scene, warping it through active distortion shockwaves.
+    var _cam = view_camera[0];
+    if (instance_exists(obj_camera_controller)) _cam = obj_camera_controller.cam;
+    var _distort = scr_hit_distort_shader_begin(_cam);
     draw_surface_stretched(_lit, _x, _y, _w, _h);
-    return scr_bulb_ensure_lit_scene_cache(obj_bulb_controller, _lit);
+    if (_distort) shader_reset();
+
+    return _cache;
 }

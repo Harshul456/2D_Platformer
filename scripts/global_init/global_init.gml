@@ -60,3 +60,22 @@ global.display_windowed_x = -1;
 global.display_windowed_y = -1;
 window_set_fullscreen(false);
 
+// --- Combat impact SFX — dedicated reverb bus so clank hits read cave-like ---
+// Created once (global_init re-runs per room); routed through an emitter with no
+// distance falloff so hits stay centered/audible regardless of world position.
+if (!variable_global_exists("sfx_combat_emitter")) {
+    global.sfx_combat_emitter = audio_emitter_create();
+    audio_emitter_falloff(global.sfx_combat_emitter, 100, 1000000, 0);
+
+    global.sfx_combat_bus = audio_bus_create();
+    audio_emitter_bus(global.sfx_combat_emitter, global.sfx_combat_bus);
+
+    var _reverb = audio_effect_create(AudioEffectType.Reverb1);
+    _reverb.size = 0.72;   // Large cavern space
+    _reverb.damp = 0.45;   // Soften the high-frequency tail (wet stone)
+    _reverb.mix  = 0.32;   // Mostly dry clank with an audible cave tail
+    global.sfx_combat_bus.effects[0] = _reverb;
+
+    global.sfx_combat_reverb = _reverb; // Handle kept for runtime tuning
+}
+
