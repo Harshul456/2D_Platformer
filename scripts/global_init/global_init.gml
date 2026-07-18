@@ -71,11 +71,30 @@ if (!variable_global_exists("sfx_combat_emitter")) {
     audio_emitter_bus(global.sfx_combat_emitter, global.sfx_combat_bus);
 
     var _reverb = audio_effect_create(AudioEffectType.Reverb1);
-    _reverb.size = 0.72;   // Large cavern space
+    _reverb.size = 0.82;   // Large cavern space
     _reverb.damp = 0.45;   // Soften the high-frequency tail (wet stone)
-    _reverb.mix  = 0.32;   // Mostly dry clank with an audible cave tail
+    _reverb.mix  = 0.40;   // Clank stays punchy but with a fuller cave tail
     global.sfx_combat_bus.effects[0] = _reverb;
 
     global.sfx_combat_reverb = _reverb; // Handle kept for runtime tuning
+}
+
+// --- Cave ambience SFX — shared reverb bus for dry diegetic sounds (footsteps, landings, etc.) ---
+// The drip clips have reverb baked in; these SFX are dry samples, so route them through a wetter
+// cavern reverb so everything shares the same echoey space. Music/UI stay on the dry master bus.
+if (!variable_global_exists("sfx_cave_emitter")) {
+    global.sfx_cave_emitter = audio_emitter_create();
+    audio_emitter_falloff(global.sfx_cave_emitter, 100, 1000000, 0);
+
+    global.sfx_cave_bus = audio_bus_create();
+    audio_emitter_bus(global.sfx_cave_emitter, global.sfx_cave_bus);
+
+    var _cave_reverb = audio_effect_create(AudioEffectType.Reverb1);
+    _cave_reverb.size = 0.85;   // Big, open cavern
+    _cave_reverb.damp = 0.40;   // Wet-stone high-frequency damping
+    _cave_reverb.mix  = 0.42;   // Noticeably echoey tail (wetter than combat hits)
+    global.sfx_cave_bus.effects[0] = _cave_reverb;
+
+    global.sfx_cave_reverb = _cave_reverb; // Handle kept for runtime tuning
 }
 

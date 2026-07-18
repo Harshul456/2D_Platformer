@@ -71,10 +71,15 @@ function scr_player_footstep_play_cave(_speed_norm) {
     var _gain = lerp(_vol_lo, _vol_hi, _speed_norm) * _vol_cave * random_range(0.9, 1.0);
 
     var _bus = (variable_instance_exists(id, "FOOTSTEP_AUDIO_PRIORITY") ? FOOTSTEP_AUDIO_PRIORITY : 8);
-    var _snd_id = audio_play_sound(_sounds[_pick], _bus, false);
-    if (_snd_id != -1) {
-        audio_sound_pitch(_snd_id, _pitch);
-        audio_sound_gain(_snd_id, _gain, 0);
+    // Route through the shared cave reverb bus so steps echo like the rest of the cavern.
+    if (variable_global_exists("sfx_cave_emitter")) {
+        audio_play_sound_on(global.sfx_cave_emitter, _sounds[_pick], false, _bus, _gain, 0, _pitch);
+    } else {
+        var _snd_id = audio_play_sound(_sounds[_pick], _bus, false);
+        if (_snd_id != -1) {
+            audio_sound_pitch(_snd_id, _pitch);
+            audio_sound_gain(_snd_id, _gain, 0);
+        }
     }
 }
 
@@ -98,10 +103,15 @@ function scr_player_footstep_play_land(_impact_vsp) {
     var _gain = lerp(_vol_lo, _vol_hi, _impact_norm) * _vol_cave * random_range(0.9, 1.0);
 
     var _bus = (variable_instance_exists(id, "FOOTSTEP_AUDIO_PRIORITY") ? FOOTSTEP_AUDIO_PRIORITY : 8);
-    var _snd_id = audio_play_sound(_snd, _bus, false);
-    if (_snd_id != -1) {
-        audio_sound_pitch(_snd_id, _pitch);
-        audio_sound_gain(_snd_id, _gain, 0);
+    // Route through the shared cave reverb bus so the landing thud echoes.
+    if (variable_global_exists("sfx_cave_emitter")) {
+        audio_play_sound_on(global.sfx_cave_emitter, _snd, false, _bus, _gain, 0, _pitch);
+    } else {
+        var _snd_id = audio_play_sound(_snd, _bus, false);
+        if (_snd_id != -1) {
+            audio_sound_pitch(_snd_id, _pitch);
+            audio_sound_gain(_snd_id, _gain, 0);
+        }
     }
 }
 
