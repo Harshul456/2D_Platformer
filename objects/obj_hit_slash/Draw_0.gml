@@ -10,7 +10,6 @@ if (!fx_built) {
         star_ang[_i] = _bias + random_range(-42, 42);
         star_len[_i] = slash_length * random_range(0.24, 0.55);
     }
-    ring_r = slash_length * 0.60;
 }
 
 var _life_u = clamp(life_timer / max(1, life_max), 0, 1); // 1 -> 0 over life
@@ -21,17 +20,6 @@ var _cy = floor(y);
 var _old_blend = gpu_get_blendmode();
 var _old_alpha = draw_get_alpha();
 gpu_set_blendmode(bm_add);
-
-// --- 1. Shockwave ring (expands fast, thins, fades) ---
-var _rr = lerp(2, ring_r, 1 - power(_life_u, 1.7));
-var _ring_a = _life_u * 0.75;
-if (_ring_a > 0.02 && _rr >= 2) {
-    draw_set_alpha(_ring_a);
-    draw_set_color(color_outer);
-    draw_circle(_cx, _cy, floor(_rr), true);
-    if (life_timer >= life_max - 3) draw_circle(_cx, _cy, floor(_rr) - 1, true);
-    draw_set_alpha(1);
-}
 
 // --- 2. Center flash (bright core, biggest on opening frames) ---
 var _flash = slash_length * 0.30 * _life_u;
