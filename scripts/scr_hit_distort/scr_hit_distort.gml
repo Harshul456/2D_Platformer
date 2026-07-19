@@ -19,15 +19,44 @@ function scr_hit_distort_add(_x, _y, _strength = 1) {
 
     // Cap concurrent ripples; drop the oldest so the shader array never overflows.
     if (array_length(global.hit_distort) >= HIT_DISTORT_MAX) {
+        scr_hit_distort_free_light(global.hit_distort[0]);
         array_delete(global.hit_distort, 0, 1);
     }
 
-    array_push(global.hit_distort, {
+    var _ripple = {
         x: _x,
         y: _y,
         age: 0,
-        strength: _strength
-    });
+        strength: _strength,
+        light: undefined
+    };
+
+    // Companion Bulb light — a bright core that expands with the shockwave so the surrounding cave
+    // lights up (normal-mapped) as the ring spreads. Purely additive lighting; no shadow casting.
+    if (HIT_LIGHT_ENABLED && variable_global_exists("bulb_renderer") && global.bulb_renderer != undefined) {
+        var _l = new BulbLight(global.bulb_renderer, sLight128, 0, _x, _y);
+        _l.blend        = HIT_LIGHT_COLOR;
+        _l.intensity    = HIT_LIGHT_INTENSITY * _strength;
+        _l.xscale       = HIT_LIGHT_SCALE_START;
+        _l.yscale       = HIT_LIGHT_SCALE_START;
+        _l.penumbraSize = 0;
+        _l.castShadows  = false;
+        _l.normalMap    = true;
+        _l.normalMapZ   = BULB_CRYSTAL_NORMAL_MAP_Z;
+        _ripple.light   = _l;
+    }
+
+    array_push(global.hit_distort, _ripple);
+}
+
+/// @function scr_hit_distort_free_light
+/// @description Destroy a ripple's companion Bulb light if it has one (renderer prunes dead refs).
+/// @param {Struct} _r Ripple struct
+function scr_hit_distort_free_light(_r) {
+    if (is_struct(_r) && variable_struct_exists(_r, "light") && _r.light != undefined) {
+        _r.light.Destroy();
+        _r.light = undefined;
+    }
 }
 
 /// @function scr_hit_distort_step
@@ -38,7 +67,19 @@ function scr_hit_distort_step() {
     for (var _i = array_length(global.hit_distort) - 1; _i >= 0; _i--) {
         var _r = global.hit_distort[_i];
         _r.age += 1;
+
+        // Drive the companion light: expand (same ease-out as the warp) + flash-then-fade brightness.
+        if (variable_struct_exists(_r, "light") && _r.light != undefined) {
+            var _t = clamp(_r.age / HIT_DISTORT_LIFE, 0, 1);
+            var _ease = 1 - power(1 - _t, 2);
+            var _sc = lerp(HIT_LIGHT_SCALE_START, HIT_LIGHT_SCALE_END * (0.8 + 0.4 * _r.strength), _ease);
+            _r.light.xscale    = _sc;
+            _r.light.yscale    = _sc;
+            _r.light.intensity = HIT_LIGHT_INTENSITY * _r.strength * power(1 - _t, HIT_LIGHT_FADE_POWER);
+        }
+
         if (_r.age >= HIT_DISTORT_LIFE) {
+            scr_hit_distort_free_light(_r);
             array_delete(global.hit_distort, _i, 1);
         }
     }

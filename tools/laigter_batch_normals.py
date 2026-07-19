@@ -37,6 +37,8 @@ DEFAULT_SPRITES = [
     "spr_mc_doublejump",
     "spr_mc_reelback",
     "spr_mc_attack2",
+    "spr_mc_hurt",
+    "spr_mc_hurt_air",
     "spr_enemy",
     "spr_enemy_windup",
     "spr_enemy_attack",

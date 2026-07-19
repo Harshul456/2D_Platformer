@@ -58,8 +58,13 @@ function scr_bulb_draw_player_lit_sprite(_lit_surface, _cam) {
         _wall_draw_nudge = wall_side * WALL_CLING_DRAW_NUDGE_PX;
     }
 
+    // Restore at FULL alpha, not image_alpha: the invincibility blink is already baked into the lit
+    // snapshot (the player is drawn to the app surface at image_alpha before the snapshot + before the
+    // pink emissive glow). Re-applying image_alpha here would make the restore only partially cover the
+    // glow on blink frames, so the additive pink bleeds through the player (pink legs). Full coverage
+    // stops the bleed while the snapshot still carries the blink's translucency against the scene.
     scr_bulb_draw_lit_sprite_ext(_lit_surface, _cam, _draw_x + _wall_draw_nudge, _draw_y,
-        sprite_index, image_index, image_xscale, image_yscale, 0, image_alpha);
+        sprite_index, image_index, image_xscale, image_yscale, 0, 1);
 }
 
 /// @description Restore the already-lit obj_enemy sprite over emissive overlays.

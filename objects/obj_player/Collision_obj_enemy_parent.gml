@@ -51,7 +51,13 @@ if (!scr_player_has_damage_iframes() && !_protected) {
     knockBackY = ENEMY_KNOCKBACK_Y;
     if (variable_instance_exists(other, "gnd_touch_knock_x")) knockBackX = _push_dir * other.gnd_touch_knock_x;
     if (variable_instance_exists(other, "gnd_touch_knock_y")) knockBackY = other.gnd_touch_knock_y;
+    // Keep footing on a ground hit — only pop vertically when the hit lands mid-air.
+    if (grounded) knockBackY = 0;
     stunTimer = ENEMY_STUN_FRAMES;
+    // Air hits use the air-hurt animation (airborne frames now, landing frames on touchdown).
+    hurt_is_air = !grounded;
+    hurt_air_landed = false;
+    hurt_anim_tick = 0;
     if (variable_instance_exists(other, "gnd_touch_stun_frames") && other.gnd_touch_stun_frames > 0) {
         stunTimer = other.gnd_touch_stun_frames;
     }

@@ -304,7 +304,13 @@ function scr_enemy_apply_attack_hit() {
         if (_push_dir == 0) _push_dir = -last_direction;
         knockBackX = _push_dir * other.enemy_attack_hsp_push;
         knockBackY = ENEMY_KNOCKBACK_Y;
+        // Keep footing on a ground hit — only pop vertically when the hit lands mid-air.
+        if (grounded) knockBackY = 0;
         stunTimer = ENEMY_STUN_FRAMES;
+        // Air hits use the air-hurt animation (airborne frames now, landing frames on touchdown).
+        hurt_is_air = !grounded;
+        hurt_air_landed = false;
+        hurt_anim_tick = 0;
         attacking = false;
         attack_lockout = 0;
         attack_commit_lock = 0;

@@ -63,20 +63,47 @@ if (!_hitstop_frozen) {
     if (enemy_ai_enabled && state == ENEMY_STATE.ATTACK) {
         dash_sweep_prev_x = _step_prev_x;
         attack_frame++;
-        if (scr_enemy_attack_wall_probe()) {
-            hsp = 0;
-            state = ENEMY_STATE.RECOIL;
-            state_timer = (attack_hit_dealt ? enemy_recover_frames : enemy_recover_frames_whiff);
-            image_blend = c_white;
-            scr_enemy_wall_impact_feedback();
-            if (scr_enemy_player_above_unreachable()) {
-                attack_cooldown = attack_cooldown_max_frames;
+        // Resolve the slash BEFORE the forward wall probe. When the player is pinned against a wall the
+        // probe trips on that same wall (just behind the player) on the exact frame the hitbox goes
+        // active, recoiling the enemy so the hit never registered — the screen still shook from the
+        // wall bonk, but the player took no damage and never flinched. Landing the hit first fixes that;
+        // a successful hit already zeroes hsp + switches to RECOIL, so the probe below won't re-fire.
+        scr_enemy_resolve_attack_player_contact();
+        if (state == ENEMY_STATE.ATTACK) {
+            // Is the player pinned in the dash path (between us and the wall)? A wall bonk should only
+            // happen on a genuine whiff — if the player is cornered against the wall we must keep
+            // dashing so the attack reaches its active hitbox frames and actually connects. Otherwise
+            // the forward probe trips on the wall behind the player during attack startup (before any
+            // hitbox is active) and recoils us instantly: screen shakes, but the player is never hit
+            // and the attack animation barely plays.
+            var _pin_dir = sign(hsp);
+            if (_pin_dir == 0) _pin_dir = scr_enemy_facing_sign();
+            if (_pin_dir == 0) _pin_dir = 1;
+            // Cover the WHOLE enemy body plus a forward reach — not just a strip ahead of the leading
+            // edge — so a player who is overlapping the enemy (both jammed into the same corner) counts
+            // as "in the path" too. A thin front-only strip misses an overlapping player and the wall
+            // bonk fires anyway.
+            var _pin_reach = 22;
+            var _pin_x1 = (_pin_dir > 0) ? bbox_left : bbox_left - _pin_reach;
+            var _pin_x2 = (_pin_dir > 0) ? bbox_right + _pin_reach : bbox_right;
+            var _player_in_path = (instance_exists(obj_player)
+                && collision_rectangle(_pin_x1, bbox_top - 4, _pin_x2, bbox_bottom, obj_player, false, true) != noone);
+
+            if (scr_enemy_attack_wall_probe() && !_player_in_path) {
+                hsp = 0;
+                state = ENEMY_STATE.RECOIL;
+                state_timer = (attack_hit_dealt ? enemy_recover_frames : enemy_recover_frames_whiff);
+                image_blend = c_white;
+                scr_enemy_wall_impact_feedback();
+                if (scr_enemy_player_above_unreachable()) {
+                    attack_cooldown = attack_cooldown_max_frames;
+                }
+            } else if (attack_frame >= enemy_attack_dash_frames) {
+                hsp = 0;
+                state = ENEMY_STATE.RECOIL;
+                state_timer = (attack_hit_dealt ? enemy_recover_frames : enemy_recover_frames_whiff);
+                image_blend = c_white;
             }
-        } else if (attack_frame >= enemy_attack_dash_frames) {
-            hsp = 0;
-            state = ENEMY_STATE.RECOIL;
-            state_timer = (attack_hit_dealt ? enemy_recover_frames : enemy_recover_frames_whiff);
-            image_blend = c_white;
         }
     }
 

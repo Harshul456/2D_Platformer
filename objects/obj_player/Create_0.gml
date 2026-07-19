@@ -290,7 +290,7 @@ ATTACK_ON_HIT_PUSHBACK = 2.5;   // Player pushback on hit (prevent overlap)
 ENEMY_COLLISION_DAMAGE  = 10;   // Health lost per touch
 ENEMY_KNOCKBACK_X       = 4;    // Horizontal knockback
 ENEMY_KNOCKBACK_Y       = -3;   // Vertical knockback (up)
-ENEMY_STUN_FRAMES       = 15;   // Frames player is stunned
+ENEMY_STUN_FRAMES       = 30;   // Frames player is stunned/locked out (matches hurt-pose animation length)
 INVINCIBILITY_FRAMES    = 90;   // Frames of invincibility after hit
 DASH_IFRAME_FRAMES      = 10;   // Silent i-frames at dash start (covers dash + margin)
 COLLISION_SEPARATION_PUSH = 1.5; // Push player out of enemy when overlapping
@@ -425,7 +425,12 @@ blinkCounter    = 0;
 knockBackX      = 0;
 knockBackY      = 0;
 knockback_friction = 0.9;       // Per-frame decay of knockback (multiply)
-stunTimer       = 0;
+stunTimer       = 0;            // Also locks input/movement — kept in sync with the hurt-pose length below
+hurt_anim_tick  = 0;            // Steps elapsed since current hurt frame block started (drives held frame timing)
+HURT_ANIM_HOLD_FRAMES = 10;     // Steps each hurt-sprite frame holds (3 frames × 10 = ENEMY_STUN_FRAMES)
+hurt_is_air     = false;        // True when the active hurt was taken airborne (uses spr_mc_hurt_air)
+hurt_air_landed = false;        // True once an air-hurt player touches the ground (plays the landing frames)
+HURT_AIR_LAND_START = 2;        // spr_mc_hurt_air: frames 0..1 are airborne, frames 2..end are the ground impact
 jump_cut_multiplier = 0.333;    // Release jump early: cap rise speed to jumpsp * this (short hop)
 
 // --- VISUALS ---

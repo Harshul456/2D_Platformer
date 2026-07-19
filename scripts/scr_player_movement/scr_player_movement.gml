@@ -515,7 +515,11 @@ function scr_player_movement() {
     }
     
     if (stunTimer > 0) {
-        stunTimer--;
+        // Air-hurt: hold the stun lock while the player is still falling (airborne flinch frames).
+        // The countdown only resumes once landed, so the landing frames get their full window and
+        // control never returns mid-air. hurt_air_landed is latched in the animation section below.
+        var _air_hurt_hold = (hurt_is_air && !hurt_air_landed && !grounded);
+        if (!_air_hurt_hold) stunTimer--;
         is_sprinting = false;
         sprint_afterimage_tick = 0;
         sprint_jump_carry = false;
@@ -1830,7 +1834,50 @@ function scr_player_movement() {
     var _anim_grounded = grounded || _teeter_anim;
 
     if (!attacking) {
-        if (_anim_grounded) {
+        if (stunTimer > 0) {
+            // Hurt flinch takes priority over locomotion/jump pose for the whole stun/knockback
+            // lock — movement stays frozen (see stunned-physics block above) until this clears,
+            // so the pose can never outlast (or be outlasted by) player control. Per-frame pacing
+            // is tuned via HURT_ANIM_HOLD_FRAMES; overall length via ENEMY_STUN_FRAMES.
+            sprint_reel_active = false;
+            sprint_reel_pending = false;
+            sprint_reel_dir_wait = 0;
+            image_speed = 0;
+            var _hurt_hold = (variable_instance_exists(id, "HURT_ANIM_HOLD_FRAMES") ? HURT_ANIM_HOLD_FRAMES : 8);
+
+            if (hurt_is_air) {
+                // Air-hurt: frames 0..1 are the airborne knockback, frames 2..end are the ground impact.
+                if (sprite_index != spr_mc_hurt_air) {
+                    sprite_index = spr_mc_hurt_air;
+                    hurt_anim_tick = 0;
+                }
+                if (!hurt_air_landed && _anim_grounded) {
+                    // Touchdown: switch to the landing block and restart its frame timing.
+                    hurt_air_landed = true;
+                    hurt_anim_tick = 0;
+                    knockBackX = 0; // plant on landing so the ground-impact frames don't slide
+                    hsp = 0;
+                }
+                if (!hurt_air_landed) {
+                    // Still falling: advance through the two airborne frames, then hold the last one.
+                    hurt_anim_tick++;
+                    image_index = min(floor(hurt_anim_tick / max(1, _hurt_hold)), HURT_AIR_LAND_START - 1);
+                } else {
+                    // Landed: play the remaining ground-impact frames.
+                    image_index = min(HURT_AIR_LAND_START + floor(hurt_anim_tick / max(1, _hurt_hold)),
+                        sprite_get_number(spr_mc_hurt_air) - 1);
+                    hurt_anim_tick++;
+                }
+            } else {
+                if (sprite_index != spr_mc_hurt) {
+                    sprite_index = spr_mc_hurt;
+                    hurt_anim_tick = 0;
+                } else {
+                    hurt_anim_tick++;
+                }
+                image_index = min(floor(hurt_anim_tick / max(1, _hurt_hold)), sprite_get_number(spr_mc_hurt) - 1);
+            }
+        } else if (_anim_grounded) {
             var _hold_full_lip_pose = FULL_BLOCK_EDGE_GROUND_FORGIVE && !_shelf_any_near_feet_pose && (full_lip_anim_sticky > 0 || _teeter_anim)
                 && !_feet_embed_pose
                 && !is_sprinting && sprite_index != spr_mc_sprint && sprite_index != spr_mc_reelback

@@ -107,6 +107,15 @@
 #macro HIT_DISTORT_WIDTH                       0.075  // Band half-width of the warp (wider = softer, less line-like)
 #macro HIT_DISTORT_STRENGTH                    0.014  // Peak UV displacement (fraction of view) — the warp amount
 
+// Expanding light burst riding the shockwave — a real Bulb light so the cave rock actually lights up
+// (normal-mapped) as the ring spreads, then fades. Shares the distortion ripple's life/center.
+#macro HIT_LIGHT_ENABLED                       true
+#macro HIT_LIGHT_COLOR                         make_colour_rgb(255, 206, 232)  // warm pink-white energy flash
+#macro HIT_LIGHT_INTENSITY                     2.4    // Peak brightness at impact (decays as the ring expands)
+#macro HIT_LIGHT_SCALE_START                   0.35   // sLight128 scale at spawn — tight bright core on the hit
+#macro HIT_LIGHT_SCALE_END                     2.6    // sLight128 scale at end — how far the glow spreads outward
+#macro HIT_LIGHT_FADE_POWER                    1.6    // Intensity falloff curve (higher = snappier flash, longer tail)
+
 #macro BULB_CRYSTAL_SPARK_MAX                8
 #macro BULB_CRYSTAL_SPARK_RATE_MIN           0.03
 #macro BULB_CRYSTAL_SPARK_RATE_MAX           0.14
