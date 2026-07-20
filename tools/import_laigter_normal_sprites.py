@@ -26,6 +26,7 @@ DEFAULT_SPRITES = [
     "spr_mc_walljump",
     "spr_mc_doublejump",
     "spr_mc_reelback",
+    "spr_asta_attack1",
     "spr_mc_attack2",
     "spr_mc_hurt",
     "spr_mc_hurt_air",

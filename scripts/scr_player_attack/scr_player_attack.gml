@@ -13,7 +13,10 @@ function scr_player_apply_attack_facing() {
 function scr_player_try_attack_start() {
     if (attacking || stunTimer > 0) return false;
     if (attack_lockout > 0 || attack_recovery_grace > 0 || attack_recovery_lock > 0) return false;
-    if (attack_buffer_timer <= 0 || attackCooldownTimer > 0) return false;
+    if (attack_buffer_timer <= 0) return false;
+    // Combo 1→2 must not wait on attackCooldown (that caused atk1→idle→atk2 when mashing).
+    var _combo_followup = (comboTimer > 0 && comboCount == 1);
+    if (attackCooldownTimer > 0 && !_combo_followup) return false;
     // Coyote: dash/run floor probes can flicker one frame at speed.
     if (!grounded && coyote_time_timer <= 0) return false;
 
@@ -21,6 +24,7 @@ function scr_player_try_attack_start() {
     if (!attacking) return false;
 
     attack_buffer_timer = 0;
+    // Cooldown gates the next string after this swing (1→2 skips the wait above).
     attackCooldownTimer = attackCooldown;
     attack_has_hit = false;
     if (!attack_no_lunge) {
@@ -69,7 +73,7 @@ function scr_player_attack() {
             sprite_index = spr_mc_attack2;
             image_blend = c_lime;
             attack_commit_lock = (variable_instance_exists(id, "ATTACK2_COMMIT_LOCK_FRAMES")
-                ? ATTACK2_COMMIT_LOCK_FRAMES : 28);
+                ? ATTACK2_COMMIT_LOCK_FRAMES : 0);
             break;
         case 3:
             hsp = last_direction * 5;
@@ -103,13 +107,14 @@ function scr_player_attack() {
 }
 
 /// @function scr_player_attack1_prepare_retreat
-/// @description Solo atk1 hit — early endlag + retreat; chain intent keeps forward lean.
+/// @description Hit endlag setup — atk1 can chain-forward or retreat; atk2 always early-cuts like solo atk1.
 function scr_player_attack1_prepare_retreat() {
-    if (comboCount != 1) return;
+    if (comboCount < 1) return;
 
     attack_shift_remaining = 0;
 
-    if (attack_chain_latched) {
+    // Chaining 1→2: keep forward lean, no early cut.
+    if (comboCount == 1 && attack_chain_latched) {
         var _spd = (variable_instance_exists(id, "ATTACK_COMBO_CONTINUE_HSP") ? ATTACK_COMBO_CONTINUE_HSP : 3.5);
         if (last_direction != 0) {
             hsp = last_direction * _spd;
@@ -120,13 +125,16 @@ function scr_player_attack1_prepare_retreat() {
 
     attack_recovery_cut = true;
 
-    var _dir = key_right - key_left;
-    if (_dir == 0) _dir = -last_direction;
-    if (_dir == 0) _dir = -sign(image_xscale);
-    if (_dir != 0) {
-        var _spd = (variable_instance_exists(id, "ATTACK1_HIT_RETREAT_HSP") ? ATTACK1_HIT_RETREAT_HSP : 4);
-        hsp = _dir * _spd;
-        runMomentum = 0;
+    // Solo atk1 poke: step back. Atk2 keeps existing hit pushback/recoil.
+    if (comboCount == 1) {
+        var _dir = key_right - key_left;
+        if (_dir == 0) _dir = -last_direction;
+        if (_dir == 0) _dir = -sign(image_xscale);
+        if (_dir != 0) {
+            var _spd_r = (variable_instance_exists(id, "ATTACK1_HIT_RETREAT_HSP") ? ATTACK1_HIT_RETREAT_HSP : 4);
+            hsp = _dir * _spd_r;
+            runMomentum = 0;
+        }
     }
 }
 
@@ -148,7 +156,7 @@ function scr_player_attack_end_swing(_post_accel_frames) {
     attack_recovery_cut = false;
     debug_hitbox_active = false;
 
-    // Atk1 poke: almost zero recovery grace. Atk2: recovery_lock handles commitment.
+    // Atk1 poke: almost zero recovery grace. Atk2 uses the same (no recovery_lock).
     attack_recovery_grace = 0;
 
     if (!_keep_combo_window) {
@@ -162,16 +170,22 @@ function scr_player_attack_end_swing(_post_accel_frames) {
     post_attack_accel_timer = _post_accel_frames;
 
     if (_was_atk2) {
-        attack_recovery_lock = (variable_instance_exists(id, "ATTACK2_RECOVERY_LOCK_FRAMES")
-            ? ATTACK2_RECOVERY_LOCK_FRAMES : 18);
+        // Same as atk1: only apply if ATTACK2_RECOVERY_LOCK_FRAMES > 0 (default 0 = dash free).
+        var _rec2 = (variable_instance_exists(id, "ATTACK2_RECOVERY_LOCK_FRAMES")
+            ? ATTACK2_RECOVERY_LOCK_FRAMES : 0);
+        if (_rec2 > 0) attack_recovery_lock = _rec2;
     }
 
-    if (_keep_combo_window && attack_chain_latched) {
+    if (_keep_combo_window && (attack_chain_latched || attack_buffer_timer > 0)) {
         attack_chain_latched = false;
+        attack_buffer_timer = 0;
+        attackCooldownTimer = 0; // don't delay the finisher
         scr_player_attack();
         if (!attack_no_lunge) {
             attack_shift_remaining = (variable_instance_exists(id, "ATTACK_SHIFT_PX_2") ? ATTACK_SHIFT_PX_2 : 5);
         }
+        // Start the post-string cooldown once atk2 begins.
+        attackCooldownTimer = attackCooldown;
     }
 }
 
@@ -182,10 +196,9 @@ function scr_player_attack_is_recovery_locked() {
 }
 
 /// @function scr_player_attack_can_dodge_cancel
-/// @description Atk1 poke only — dash away mid-swing; atk2 finisher is committed.
+/// @description Dash cancel mid-swing (atk1 and atk2 share the same window).
 function scr_player_attack_can_dodge_cancel() {
     if (!attacking || !grounded || stunTimer > 0) return false;
-    if (comboCount >= 2) return false;
     if (variable_instance_exists(id, "attack_commit_lock") && attack_commit_lock > 0) return false;
     // Startup lockout: dash/run → attack must not be stolen by buffered Z / dodge-cancel on frame 0.
     var _min_frames = (variable_instance_exists(id, "DODGE_CANCEL_MIN_ATTACK_FRAMES") ? DODGE_CANCEL_MIN_ATTACK_FRAMES : 6);
@@ -195,7 +208,7 @@ function scr_player_attack_can_dodge_cancel() {
 }
 
 /// @function scr_player_attack_dodge_cancel
-/// @description Cancel atk1 into sprint burst — poke-and-run.
+/// @description Cancel swing into sprint burst (atk1 or atk2).
 /// @param {Real} _dir Horizontal dash direction (−1 / +1).
 function scr_player_attack_dodge_cancel(_dir) {
     if (_dir == 0) return;

@@ -176,9 +176,8 @@ if (attacking && stunTimer <= 0) {
             hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
             if (comboCount >= 2) {
                 hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
-            } else if (comboCount == 1) {
-                scr_player_attack1_prepare_retreat();
             }
+            scr_player_attack1_prepare_retreat();
         } else if (_hit_enemy != noone) {
             var _hit_result = { landed: false, intercepted: false, armored_chip: false, super_armor: false };
             with (_hit_enemy) {
@@ -216,31 +215,32 @@ if (attacking && stunTimer <= 0) {
                     hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
                     if (comboCount >= 2) {
                         hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
-                    } else if (comboCount == 1) {
-                        scr_player_attack1_prepare_retreat();
                     }
+                    scr_player_attack1_prepare_retreat();
                 }
             }
         }
     }
     if (!_hb.active) debug_hitbox_active = false;
 
-    // Atk2 commit lock — heavy finisher holds player in the swing (no dash cancel).
+    // Optional commit lock (ATTACK2_COMMIT_LOCK_FRAMES > 0) — brakes hsp while locked.
     if (attack_commit_lock > 0) {
         attack_commit_lock--;
         hsp = lerp(hsp, 0, 0.45);
         if (abs(hsp) < 0.4) hsp = 0;
     }
 
-    // Atk1 early endlag — poke-and-run after solo hit.
+    // Early endlag after hit — same cancel window for atk1 and atk2.
     // attack_timer guard: dash/run cancel must not end on the startup frame from a stale image_index.
     var _can_end = (attack_timer >= 3) && (sprite_index == _swing_sprite);
-    if (_can_end && attack_recovery_cut && comboCount == 1) {
-        var _cancel_after = (variable_instance_exists(id, "ATTACK1_HIT_CANCEL_AFTER_INDEX")
-            ? ATTACK1_HIT_CANCEL_AFTER_INDEX : 2);
+    if (_can_end && attack_recovery_cut && comboCount >= 1) {
+        var _cancel_after = (comboCount >= 2)
+            ? (variable_instance_exists(id, "ATTACK2_HIT_CANCEL_AFTER_INDEX") ? ATTACK2_HIT_CANCEL_AFTER_INDEX : 2)
+            : (variable_instance_exists(id, "ATTACK1_HIT_CANCEL_AFTER_INDEX") ? ATTACK1_HIT_CANCEL_AFTER_INDEX : 2);
         if (image_index > _cancel_after) {
-            var _post_accel = (variable_instance_exists(id, "ATTACK1_HIT_POST_ACCEL_FRAMES")
-                ? ATTACK1_HIT_POST_ACCEL_FRAMES : 4);
+            var _post_accel = (comboCount >= 2)
+                ? (variable_instance_exists(id, "ATTACK2_HIT_POST_ACCEL_FRAMES") ? ATTACK2_HIT_POST_ACCEL_FRAMES : 4)
+                : (variable_instance_exists(id, "ATTACK1_HIT_POST_ACCEL_FRAMES") ? ATTACK1_HIT_POST_ACCEL_FRAMES : 4);
             scr_player_attack_end_swing(_post_accel);
         }
     } else if (_can_end && image_index >= image_number - 1) {
@@ -250,7 +250,7 @@ if (attacking && stunTimer <= 0) {
                 ? ATTACK1_HIT_POST_ACCEL_FRAMES : 4);
         } else if (attack_has_hit && comboCount >= 2) {
             _post_accel = (variable_instance_exists(id, "ATTACK2_HIT_POST_ACCEL_FRAMES")
-                ? ATTACK2_HIT_POST_ACCEL_FRAMES : 12);
+                ? ATTACK2_HIT_POST_ACCEL_FRAMES : 4);
         }
         scr_player_attack_end_swing(_post_accel);
     }

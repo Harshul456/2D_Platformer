@@ -33,13 +33,14 @@ function scr_player_movement() {
         // Jump buffer (decay after §2c — can pause while sliding into wall with a live jump buffer, or hugging wall with air jump banked)
         if (key_jump) jump_buffer_timer = jump_buffer_max;
         
-        // Attack buffer: idle only (not during atk2 recovery — avoids mashing through finisher lock).
+        // Attack buffer: idle refill; during atk1 also latch 1→2 + keep a buffer so end_swing can chain same frame.
         if (key_attack) {
             var _recovery_locked = scr_player_attack_is_recovery_locked();
             if (!_recovery_locked && !attacking && attack_recovery_grace <= 0) attack_buffer_timer = attack_buffer_max;
             else if (attacking && comboCount == 1) {
                 attack_chain_latched = true;
                 attack_chain_buffer_timer = attack_chain_buffer_max;
+                attack_buffer_timer = attack_buffer_max;
             }
         }
         if (!attacking && attack_buffer_timer > 0) attack_buffer_timer--;

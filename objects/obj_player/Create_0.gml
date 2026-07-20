@@ -317,12 +317,12 @@ ATTACK_COMBO_LUNGE_PER_FRAME = 0;      // 0 = off (only scr_player_attack initia
 ATTACK_COMBO_LUNGE_MAX_HSP = 5.5;
 ATTACK_COMBO_LUNGE_MAX_HSP_2 = 7;
 ATTACK_COMBO2_PLAYER_RECOIL = 1.5;
-ATTACK_HITBOX_REACH_1 = 28;
-ATTACK_HITBOX_REACH_2 = 38;
+ATTACK_HITBOX_REACH_1 = 25;
+ATTACK_HITBOX_REACH_2 = 53;
 ATTACK_HITBOX_TOP_PAD_1 = 10;
-ATTACK_HITBOX_TOP_PAD_2 = 10;
+ATTACK_HITBOX_TOP_PAD_2 = 0;
 ATTACK_HITBOX_BOT_PAD_1 = 14;
-ATTACK_HITBOX_BOT_PAD_2 = 14;
+ATTACK_HITBOX_BOT_PAD_2 = 0;
 ATTACK_HITBOX_X_INSET = 4;
 
 // Blue saber trail — grip/tip keyframes follow full swing (waist↔head↔feet).
@@ -397,9 +397,9 @@ hitstop_timer   = 0;            // For that "weighty" feel
 ATTACK_RECOVERY_GRACE = 8;      // Frames of protection after attack ends (covers 3rd attack windup)
 attack_recovery_grace = 0;      // Countdown; set when attack ends without combo
 attack_lockout = 0;             // Blocks new attack from section 2 until current attack finishes
-attack_commit_lock = 0;         // Atk2 swing lock — no dash cancel mid-finisher
-attack_recovery_lock = 0;       // Post-atk2 lock — blocks sprint/dash after finisher
-attack_recovery_cut = false;    // Atk1 early endlag after solo hit (poke-and-run)
+attack_commit_lock = 0;         // Optional mid-swing lock (0 = dash cancel allowed like atk1)
+attack_recovery_lock = 0;       // Optional post-swing lock (0 = dash/sprint free after end)
+attack_recovery_cut = false;    // Early endlag after hit (poke-and-run / dash cancel)
 
 // Atk1 poke — low commitment (Hollow Knight / MMX-style probe)
 ATTACK1_HIT_CANCEL_AFTER_INDEX = 2;   // End swing early after this subimage on solo hit
@@ -407,13 +407,13 @@ ATTACK1_HIT_POST_ACCEL_FRAMES = 4;    // Minimal recovery after atk1 poke
 ATTACK1_HIT_RETREAT_HSP = 4;          // Step back on solo atk1 hit
 ATTACK_COMBO_CONTINUE_HSP = 3.5;      // Lean forward when chaining into atk2
 
-// Atk2 finisher — heavy commitment (punishes blind combo into telegraphs)
-ATTACK2_HIT_CANCEL_AFTER_INDEX = 99;  // Never cut atk2 short — full swing + recovery
-ATTACK2_HIT_POST_ACCEL_FRAMES = 12;
-ATTACK2_COMMIT_LOCK_FRAMES = 28;      // Locked in place during finisher swing
-ATTACK2_RECOVERY_LOCK_FRAMES = 18;    // No sprint/dash after finisher ends
+// Atk2 — same endlag / dash-cancel rules as atk1 (no extra commit or recovery lock)
+ATTACK2_HIT_CANCEL_AFTER_INDEX = 2;   // Match atk1 early end after this subimage on hit
+ATTACK2_HIT_POST_ACCEL_FRAMES = 4;    // Match atk1 post-hit walk ramp
+ATTACK2_COMMIT_LOCK_FRAMES = 0;       // 0 = dash-cancel mid-swing like atk1
+ATTACK2_RECOVERY_LOCK_FRAMES = 0;     // 0 = dash/sprint free after swing ends (like atk1)
 ATTACK2_COMBO_LUNGE_HSP = 5.5;
-DODGE_CANCEL_MIN_INDEX = 1;           // Earliest atk1 subimage that can cancel into dash
+DODGE_CANCEL_MIN_INDEX = 1;           // Earliest subimage that can cancel into dash
 DODGE_CANCEL_MIN_ATTACK_FRAMES = 6;   // Startup frames where dash/run → attack cannot be stolen by dodge-cancel
 
 // --- INVINCIBILITY & FEEDBACK ---
