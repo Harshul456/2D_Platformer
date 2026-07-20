@@ -566,8 +566,12 @@ function scr_player_movement() {
         }
         if (!attacking) {
             var inputDir = (key_right - key_left);
-            var _land_crouch_prev = force_landing_crouch
-                || (sprite_index == spr_mc_jump && image_index >= ANIM_LAND_CROUCH_START && image_index < ANIM_LAND_CROUCH_END)
+            // Only while jump crouch frames are actually playing — bare force_landing_crouch after
+            // idle transition used to zero hsp forever (stuck on shelf/wall corner).
+            var _land_crouch_prev = (
+                    (sprite_index == spr_mc_jump || sprite_index == spr_mc_doublejump)
+                    && image_index >= ANIM_LAND_CROUCH_START && image_index < ANIM_LAND_CROUCH_END
+                )
                 || (sprite_index == spr_mc_walljump && vsp > 0 && wall_jump_kick_hold_timer <= 0 && wall_jump_extend_timer <= 0);
             var _reel_blocked = sprint_reel_active || sprint_reel_pending || (sprite_index == spr_mc_reelback);
             var _burst_frames = (variable_instance_exists(id, "SPRINT_BURST_FRAMES") ? SPRINT_BURST_FRAMES : 10);
@@ -585,6 +589,26 @@ function scr_player_movement() {
                 sprint_z_idle_charged = false;
             }
 
+            // Grounded + holding into a wall: never start/keep a sprint. Easy fix for corner
+            // dash/fall jitter — there's nowhere to run, so don't play the dash.
+            var _sprint_wall_blocked = false;
+            if (grounded && inputDir != 0 && global.tilemap_collision_id != noone) {
+                var _wx_sb = (inputDir > 0) ? (floor(bbox_right) + 1) : (floor(bbox_left) - 1);
+                var _ym_sb = floor((bbox_top + bbox_bottom) * 0.5);
+                var _yf_sb = floor(bbox_bottom) - 1;
+                _sprint_wall_blocked = check_tile_collision(_wx_sb, _ym_sb) || check_tile_collision(_wx_sb, _yf_sb);
+            }
+            if (_sprint_wall_blocked && (is_sprinting || sprint_committed)) {
+                is_sprinting = false;
+                sprint_committed = false;
+                sprint_burst_tick = 0;
+                sprint_dash_standstill = false;
+                sprint_air_trail = false;
+                sprint_jump_carry = false;
+                hsp = 0;
+                runMomentum = 0;
+            }
+
             // Hold Z while idle — direction later starts sprint (not standstill dash)
             if (!_recovery_locked && key_sprint && inputDir == 0 && grounded && !jumped_this_frame && vsp >= 0
                 && (sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
@@ -594,7 +618,7 @@ function scr_player_movement() {
             }
 
             // Re-enter sustain: landed from hold-sprint jump, or turned around while Z still held
-            if (!_recovery_locked && key_sprint && sprint_hold_latched && grounded && !jumped_this_frame && vsp >= 0
+            if (!_recovery_locked && !_sprint_wall_blocked && key_sprint && sprint_hold_latched && grounded && !jumped_this_frame && vsp >= 0
                 && inputDir != 0 && !sprint_committed
                 && ((sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
                     && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && !sprint_reel_active)
@@ -851,6 +875,43 @@ function scr_player_movement() {
     global.player_move_vsp = vsp;
     tilecol_sync_actor_context(vsp, shelf_bb_bottom_prev);
 
+    // Landing onto shelf 1/5/34/36: detect window so wall shove / magnet / ledge-mount stay off.
+    // Do NOT kill air hsp or force crouch here — that made shelf landings feel laggy.
+    var _shelf_landing_window = false;
+    if (!grounded && vsp >= 0 && global.tilemap_collision_id != noone) {
+        var _tm_sw = global.tilemap_collision_id;
+        var _fy_sw = floor(bbox_bottom);
+        var _pl_sw = floor(bbox_left) + 1;
+        var _pr_sw = floor(bbox_right) - 1;
+        var _pc_sw = floor((bbox_left + bbox_right) * 0.5);
+        if (tilemap_shelf_cap_near_feet(_tm_sw, _pl_sw, _pc_sw, _pr_sw, _fy_sw)) {
+            _shelf_landing_window = true;
+        } else {
+            for (var _dy_sw = 1; _dy_sw <= 14; _dy_sw++) {
+                if (tilemap_shelf_cap_near_feet(_tm_sw, _pl_sw, _pc_sw, _pr_sw, _fy_sw + _dy_sw)) {
+                    _shelf_landing_window = true;
+                    break;
+                }
+            }
+        }
+        // Only kill leftover air hsp when holding into a wall or into the shelf→void gap.
+        if (_shelf_landing_window && hsp != 0) {
+            var _idir_sw = clamp(key_right - key_left, -1, 1);
+            if (_idir_sw == 0) _idir_sw = sign(hsp);
+            var _into_bad = false;
+            if (_idir_sw != 0) {
+                var _wx_sw = (_idir_sw > 0) ? (floor(bbox_right) + 1) : (floor(bbox_left) - 1);
+                var _ym_sw = floor((bbox_top + bbox_bottom) * 0.5);
+                _into_bad = check_tile_collision(_wx_sw, _ym_sw)
+                    || tilemap_shelf_step_into_void(_tm_sw, _pl_sw, _pc_sw, _pr_sw, _fy_sw, _idir_sw);
+            }
+            if (_into_bad) {
+                hsp = 0;
+                runMomentum = 0;
+            }
+        }
+    }
+
     // --- 5. COLLISIONS (Horizontal) ---
     if (hsp != 0) {
         var _h_step = sign(hsp);
@@ -876,6 +937,8 @@ function scr_player_movement() {
             var _y_h = head_y + WALL_CHECK_OFFSET;
             var _y_t = feet_y - LEDGE_TOE_INSET;
             var _ledge_mount = tilemap_horizontal_ledge_mount_priority(_tm_h, _wx, _bb_bot_h, min(_y_h, center_y, _y_t), max(_y_h, center_y, _y_t), HORIZONTAL_LEDGE_WINDOW_PX);
+            // Landing onto a shelf next to a wall: ledge-mount must not step into the wall column.
+            if (_shelf_landing_window) _ledge_mount = false;
             var _w_led = HORIZONTAL_LEDGE_WINDOW_PX;
             var _air_fb_face = (!grounded) && (
                 tilemap_horizontal_full_block_side_face_at(_tm_h, _wx, _y_h, _bb_bot_h, _w_led) ||
@@ -921,6 +984,24 @@ function scr_player_movement() {
                     if (!_stepped) {
                         hsp = 0;
                         runMomentum = 0;
+                        // Can't sprint into a wall — kill dash/sprint the moment horizontal motion is
+                        // blocked. Stops the run/dash pose from fighting fall when you're jammed into
+                        // a corner and holding Z + into-wall (animation jitter).
+                        if (is_sprinting || sprint_committed || sprint_air_trail || sprint_jump_carry) {
+                            is_sprinting = false;
+                            sprint_committed = false;
+                            sprint_burst_tick = 0;
+                            sprint_dash_standstill = false;
+                            sprint_air_trail = false;
+                            sprint_jump_carry = false;
+                            sprint_afterimage_tick = 0;
+                            // Keep Z latched so releasing off the wall can re-commit sprint immediately.
+                            if (!key_sprint) {
+                                sprint_hold_latched = false;
+                                sprint_commit_dir = 0;
+                                sprint_resume_hold = false;
+                            }
+                        }
                         break;
                     }
                 }
@@ -1100,7 +1181,14 @@ function scr_player_movement() {
     }
 
     // --- 5c. DE-PENETRATE (torso or feet inside full block — recover bad clips; run grounded or not) ---
+    // Skip on shelf 1/5/34/36 (landing window or already planted): wall-side toe at shelf height reads as
+    // "feet embedded" in the adjacent full wall and shoves you into the gap → lose ground → land anim twice.
+    var _shelf_feet_dp = false;
     if (global.tilemap_collision_id != noone) {
+        _shelf_feet_dp = tilemap_shelf_cap_near_feet(global.tilemap_collision_id,
+            floor(bbox_left) + 1, floor((bbox_left + bbox_right) * 0.5), floor(bbox_right) - 1, floor(bbox_bottom));
+    }
+    if (!_shelf_landing_window && !_shelf_feet_dp && global.tilemap_collision_id != noone) {
         var _tm_dp = global.tilemap_collision_id;
         var _ly_e = FULL_BLOCK_FEET_INTERIOR_LY_MIN;
         repeat (16) {
@@ -1127,6 +1215,41 @@ function scr_player_movement() {
         }
     }
 
+    // --- 5d. AIRBORNE SIDE-EMBED RECOVERY (edge-clip into a wall face) ---
+    // The airborne ledge-mount priority (§5) can step the body into a full-block wall column when the
+    // feet momentarily align with an internal tile boundary (feet near a wall tile's top edge, head/
+    // center still above the cap). The result is a shallow SIDE clip: only the leading bbox edge is
+    // inside the wall, so §5c (which tests torso-center + feet) never fires and the player hangs inside
+    // the wall face in the fall pose. This net checks the raw left/right edge columns across the body
+    // and pushes out of any full block until the edge is clear. It cannot affect a normal flush wall
+    // rest (that leaves the edge pixel in air) or one-way platforms (full-block only). Airborne only.
+    // SKIP when landing onto shelf 1/5/34/36 — that shove is the visible "jitter away from the wall"
+    // on jump→tap-toward-wall→land (still !grounded here; §6 lands after).
+    if (!grounded && !_shelf_landing_window && global.tilemap_collision_id != noone) {
+        var _tm_se = global.tilemap_collision_id;
+        repeat (16) {
+            var _hi_se  = floor(bbox_top) + WALL_CHECK_OFFSET;
+            var _mid_se = floor((bbox_top + bbox_bottom) * 0.5);
+            var _lo_se  = floor(bbox_bottom) - 1;
+            var _bl_se  = floor(bbox_left);
+            var _br_se  = floor(bbox_right);
+            var _embed_l = tilemap_point_full_block_solid(_tm_se, _bl_se, _hi_se)
+                || tilemap_point_full_block_solid(_tm_se, _bl_se, _mid_se)
+                || tilemap_point_full_block_solid(_tm_se, _bl_se, _lo_se);
+            var _embed_r = tilemap_point_full_block_solid(_tm_se, _br_se, _hi_se)
+                || tilemap_point_full_block_solid(_tm_se, _br_se, _mid_se)
+                || tilemap_point_full_block_solid(_tm_se, _br_se, _lo_se);
+            if (!_embed_l && !_embed_r) break;
+            var _push_se = 0;
+            if (_embed_r && !_embed_l) _push_se = -1;      // right edge in wall -> shove left
+            else if (_embed_l && !_embed_r) _push_se = 1;  // left edge in wall  -> shove right
+            else break;                                     // both sides solid (pinched) — leave to §6
+            x += _push_se;
+            hsp = 0;
+            runMomentum = 0;
+        }
+    }
+
     // --- 6. COLLISIONS (Vertical) ---
     var _y_pre_vertical = y;
     feet_y    = floor(bbox_bottom);
@@ -1137,8 +1260,10 @@ function scr_player_movement() {
     p_center  = floor((bbox_left + bbox_right) * 0.5);
 
     // One-way ledges: threshold when falling (vsp>0); side-entry = _is_tapping (immediate) OR passive vsp+air gates.
+    // No horizontal magnet while landing into a shelf/wall corner — magnet probes into the wall column and
+    // plants a half-supported pose that the next frame "corrects" (double land crouch).
     var _tm_s6 = global.tilemap_collision_id;
-    var _mag_thr = (stunTimer <= 0) ? clamp(key_right - key_left, -1, 1) : 0;
+    var _mag_thr = (stunTimer <= 0 && !_shelf_landing_window) ? clamp(key_right - key_left, -1, 1) : 0;
     var _shelf_snap_dy = noone;
     if (_tm_s6 != noone && vsp > 0) {
         _shelf_snap_dy = tilemap_shelf_threshold_land_dy(_tm_s6, p_left, p_center, p_right, bbox_bottom, shelf_bb_bottom_prev, vsp, _mag_thr);
@@ -1422,6 +1547,8 @@ function scr_player_movement() {
     }
 
     // --- 6b. FEET POP (full block: rest on top surface, not inside body — fixes corner sink + landing pose jitter) ---
+    // Skip on shelf caps: wall-column toes at shelf height are "embedded" in the wall body; popping y-- lifts
+    // off the platform and triggers a second land (crouch restarts).
     if (global.tilemap_collision_id != noone) {
         var _tm_pop = global.tilemap_collision_id;
         var _ly_pop = FULL_BLOCK_FEET_INTERIOR_LY_MIN;
@@ -1431,7 +1558,8 @@ function scr_player_movement() {
         var _pc_pop = floor((bbox_left + bbox_right) * 0.5);
         var _bl_pop = floor(bbox_left);
         var _br_pop = floor(bbox_right);
-        if (tilemap_any_feet_row_full_block_embedded(_tm_pop, _pl_pop, _pc_pop, _pr_pop, _bl_pop, _br_pop, feet_y, _ly_pop)) {
+        var _shelf_feet_pop = tilemap_shelf_cap_near_feet(_tm_pop, _pl_pop, _pc_pop, _pr_pop, feet_y);
+        if (!_shelf_feet_pop && tilemap_any_feet_row_full_block_embedded(_tm_pop, _pl_pop, _pc_pop, _pr_pop, _bl_pop, _br_pop, feet_y, _ly_pop)) {
             full_lip_anim_sticky = 0;
             repeat (12) {
                 y -= 1;
@@ -1743,6 +1871,39 @@ function scr_player_movement() {
     }
     if (grounded && vsp > 0.001 && stunTimer <= 0) vsp = 0;
 
+    // Land frame on shelf: only plant/cancel sprint when holding into wall or shelf→void (keep walk snappy otherwise).
+    if (grounded && !_s2_grounded_in && !jumped_this_frame && stunTimer <= 0
+        && global.tilemap_collision_id != noone) {
+        var _fy_lb = floor(bbox_bottom);
+        var _pl_lb = floor(bbox_left) + 1;
+        var _pr_lb = floor(bbox_right) - 1;
+        var _pc_lb = floor((bbox_left + bbox_right) * 0.5);
+        var _tm_lb = global.tilemap_collision_id;
+        if (tilemap_shelf_cap_near_feet(_tm_lb, _pl_lb, _pc_lb, _pr_lb, _fy_lb)) {
+            var _idir_lb = clamp(key_right - key_left, -1, 1);
+            var _into_bad_lb = false;
+            if (_idir_lb != 0) {
+                var _wx_lb = (_idir_lb > 0) ? (floor(bbox_right) + 1) : (floor(bbox_left) - 1);
+                var _ym_lb = floor((bbox_top + bbox_bottom) * 0.5);
+                _into_bad_lb = check_tile_collision(_wx_lb, _ym_lb)
+                    || tilemap_shelf_step_into_void(_tm_lb, _pl_lb, _pc_lb, _pr_lb, _fy_lb, _idir_lb);
+            }
+            if (_into_bad_lb) {
+                hsp = 0;
+                runMomentum = 0;
+                is_sprinting = false;
+                sprint_committed = false;
+                sprint_burst_tick = 0;
+                sprint_dash_standstill = false;
+                sprint_resume_hold = false;
+            } else if ((key_right - key_left) != 0) {
+                // Same-frame walk after land — §4 ran while still airborne.
+                hsp = walksp * clamp(key_right - key_left, -1, 1);
+                runMomentum = 0;
+            }
+        }
+    }
+
     // §4 runs before 6c sets grounded — resume hold sprint same frame we land (Z still held, no re-press)
     if (!attacking && stunTimer <= 0 && grounded && vsp >= 0 && !jumped_this_frame
         && key_sprint && sprint_hold_latched && sprint_resume_hold && !sprint_committed) {
@@ -1831,7 +1992,11 @@ function scr_player_movement() {
     var _teeter_toe_floor = (_raw_l_teet || _raw_r_teet) && (!_raw_c_teet || full_lip_anim_sticky > 0);
     var _teeter_anim = FULL_BLOCK_EDGE_GROUND_FORGIVE && !_shelf_any_near_feet_pose && _teeter_toe_floor && _span_teet <= CAP_GROUND_CELL_SPAN_MAX
         && wall_side == 0 && abs(vsp) <= 2 && !_torso_overlap_pose && !_feet_embed_pose;
-    var _anim_grounded = grounded || _teeter_anim;
+    // Keep crouch art through a 1-frame ground flicker only while still on jump land frames.
+    var _land_crouch_anim_hold = force_landing_crouch
+        && (sprite_index == spr_mc_jump || sprite_index == spr_mc_doublejump)
+        && image_index >= ANIM_LAND_CROUCH_START && image_index <= ANIM_LAND_CROUCH_END;
+    var _anim_grounded = grounded || _teeter_anim || _land_crouch_anim_hold;
 
     if (!attacking) {
         if (stunTimer > 0) {
@@ -1904,20 +2069,34 @@ function scr_player_movement() {
                 if (image_index < ANIM_LAND_CROUCH_START) image_index = ANIM_LAND_CROUCH_START;
                 image_speed = 1; // Fall anim uses image_speed = 0; restore so crouch can play
                 
-                if ((key_sprint_press || (key_sprint && sprint_resume_hold)) && _input_dir != 0 && !force_landing_crouch) {
+                // Holding a direction skips crouch → jog/sprint — but only if that direction is open.
+                // Into a wall (or shelf→void) is not movement: play the land crouch like a plant.
+                var _land_move = (_input_dir != 0);
+                if (_land_move && global.tilemap_collision_id != noone) {
+                    var _wx_lm = (_input_dir > 0) ? (floor(bbox_right) + 1) : (floor(bbox_left) - 1);
+                    var _ym_lm = floor((bbox_top + bbox_bottom) * 0.5);
+                    var _yf_lm = floor(bbox_bottom) - 1;
+                    if (check_tile_collision(_wx_lm, _ym_lm) || check_tile_collision(_wx_lm, _yf_lm)) {
+                        _land_move = false;
+                    } else if (_shelf_any_near_feet_pose
+                        && tilemap_shelf_step_into_void(global.tilemap_collision_id, _pl_pose, _pc_pose, _pr_pose, _fy_pose, _input_dir)) {
+                        _land_move = false;
+                    }
+                }
+                if ((key_sprint_press || (key_sprint && sprint_resume_hold)) && _land_move && !force_landing_crouch) {
                     sprite_index = spr_mc_sprint;
                     image_index = 0;
                     force_landing_crouch = false;
-                } else if (_input_dir != 0 && !force_landing_crouch) {
-                    // Skip crouch if moving (unless forced landing crouch is still playing)
+                } else if (_land_move && !force_landing_crouch) {
+                    // Skip crouch if moving into open space (unless forced landing crouch is still playing)
                     sprite_index = (is_sprinting || sprint_committed) ? spr_mc_sprint : spr_mc_jog;
                     image_index = 0;
                 } else if (image_index >= ANIM_LAND_CROUCH_END) {
                     force_landing_crouch = false;
-                    if ((key_sprint_press || (key_sprint && sprint_resume_hold)) && _input_dir != 0) {
+                    if ((key_sprint_press || (key_sprint && sprint_resume_hold)) && _land_move) {
                         sprite_index = spr_mc_sprint;
                         image_index = 0;
-                    } else if (_input_dir != 0) {
+                    } else if (_land_move) {
                         sprite_index = spr_mc_jog;
                         image_index = 0;
                     } else {
@@ -1968,6 +2147,8 @@ function scr_player_movement() {
                 image_speed = 1;
             } else {
                 if (!sprint_reel_pending) sprint_reel_active = false;
+                // Left jump crouch without clearing the latch (e.g. shelf land → idle) — release control.
+                force_landing_crouch = false;
                 // Normal ground movement (walk / idle)
                 image_speed = 1;
                 var _ground_sprite = (abs(hsp) > MOVEMENT_THRESHOLD) ? spr_mc_jog : spr_mc_idle;
@@ -2056,8 +2237,9 @@ function scr_player_movement() {
                     var _is_near_ground = (vsp > 0) && _below_anim && _near_anim;
                     
                     if (_is_near_ground) {
+                        // Only enter crouch — do NOT pin to START every frame (that restarts the land anim).
                         image_speed = 1;
-                        image_index = ANIM_LAND_CROUCH_START; // Landing imminent: show crouch early
+                        if (image_index < ANIM_LAND_CROUCH_START) image_index = ANIM_LAND_CROUCH_START;
                     } else {
                         image_speed = 0;
                         hair_flicker_counter++;
@@ -2080,12 +2262,17 @@ function scr_player_movement() {
 
     // --- 7b. LANDING CROUCH MOVEMENT LOCK (animation runs after §5 hsp — zero slide during crouch) ---
     if (!attacking && stunTimer <= 0) {
-        var _land_crouch_now = force_landing_crouch
-            || (grounded && (sprite_index == spr_mc_jump || sprite_index == spr_mc_doublejump)
-                && image_index >= ANIM_LAND_CROUCH_START && image_index < ANIM_LAND_CROUCH_END);
+        var _land_crouch_now = grounded
+            && (sprite_index == spr_mc_jump || sprite_index == spr_mc_doublejump)
+            && image_index >= ANIM_LAND_CROUCH_START && image_index < ANIM_LAND_CROUCH_END;
         if (_land_crouch_now) {
             hsp = 0;
             runMomentum = 0;
+        } else if (force_landing_crouch
+            && sprite_index != spr_mc_jump
+            && sprite_index != spr_mc_doublejump
+            && sprite_index != spr_mc_walljump) {
+            force_landing_crouch = false;
         }
     }
 
@@ -2236,6 +2423,17 @@ function scr_player_sprint_try_begin(_early) {
     var inputDir = (key_right - key_left);
     var _ground_ok = _early ? grounded : (grounded && !jumped_this_frame);
     if (!_ground_ok || vsp < 0) return false;
+
+    // Don't start a dash/sprint straight into a wall (same rule as sustain cancel above).
+    var _begin_dir = inputDir;
+    if (_begin_dir == 0) _begin_dir = last_direction;
+    if (_begin_dir == 0) _begin_dir = sign(image_xscale);
+    if (_begin_dir != 0 && global.tilemap_collision_id != noone) {
+        var _wx_b = (_begin_dir > 0) ? (floor(bbox_right) + 1) : (floor(bbox_left) - 1);
+        var _ym_b = floor((bbox_top + bbox_bottom) * 0.5);
+        var _yf_b = floor(bbox_bottom) - 1;
+        if (check_tile_collision(_wx_b, _ym_b) || check_tile_collision(_wx_b, _yf_b)) return false;
+    }
 
     var _reel_blocked = sprint_reel_active || sprint_reel_pending || (sprite_index == spr_mc_reelback);
     var _sprint_sprite_ok = (sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump

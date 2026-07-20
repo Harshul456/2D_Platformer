@@ -54,6 +54,7 @@ function tilemap_point_on_shelf_walkable_cap(_tm, _px, _py) {
     if (td == 0) return false;
     var idx = tile_get_index(td);
     if (!tilecol_one_way_shelf_tile_index(idx)) return false;
+    if (tilemap_cell_above_is_solid(_tm, _px, _py)) return false; // buried cap = wall, not a walkable top
     var tw = tilemap_get_tile_width(_tm);
     var th = tilemap_get_tile_height(_tm);
     var tcx = tilemap_get_cell_x_at_pixel(_tm, _px, _py);
@@ -117,19 +118,78 @@ function tilecol_one_way_shelf_tile_index(_idx) {
     return (_idx == 1 || _idx == 5 || _idx == 34 || _idx == 35 || _idx == 36);
 }
 
+/// True if the cell directly ABOVE (_px,_py)'s cell contains any collision tile.
+/// A genuine walkable platform top always has open air above it, so a shelf/cap tile WITH a tile above
+/// it isn't a platform — it's buried in a wall mass.
+function tilemap_cell_above_is_solid(_tm, _px, _py) {
+    if (_tm == noone || _tm == -1) return false;
+    var th = tilemap_get_tile_height(_tm);
+    var tcy = tilemap_get_cell_y_at_pixel(_tm, _px, _py);
+    if (tcy <= 0) return false;
+    var cell_top = tilemap_get_y(_tm) + tcy * th;
+    return tilemap_get_at_pixel(_tm, _px, cell_top - 1) != 0;
+}
+
+/// Option A — "buried cap": a one-way shelf/cap tile that has a tile directly above it. Treated as a
+/// FULL solid block everywhere (blocks from all sides, full-cell solidity, excluded from platform/cap
+/// ground logic) so walls built from cap art behave like solid walls instead of climbable corners.
+function tilemap_shelf_tile_is_buried(_tm, _px, _py) {
+    if (_tm == noone || _tm == -1) return false;
+    var td = tilemap_get_at_pixel(_tm, _px, _py);
+    if (td == 0) return false;
+    if (!tilecol_one_way_shelf_tile_index(tile_get_index(td))) return false;
+    return tilemap_cell_above_is_solid(_tm, _px, _py);
+}
+
+/// True if a 1px step in `_dir` would leave shelf feet with no floor/shelf support.
+/// Used to kill jump→land momentum into the empty lip of tiles 1/5/34/36 (no position snap).
+function tilemap_shelf_step_into_void(_tm, _pl, _pc, _pr, _feet_y, _dir) {
+    if (_tm == noone || _tm == -1 || _dir == 0) return false;
+    if (!tilemap_shelf_cap_near_feet(_tm, _pl, _pc, _pr, _feet_y)) {
+        // Airborne landing window: shelf just below feet.
+        var _near = false;
+        for (var _dy = 1; _dy <= 14; _dy++) {
+            if (tilemap_shelf_cap_near_feet(_tm, _pl, _pc, _pr, _feet_y + _dy)) {
+                _near = true;
+                _feet_y = _feet_y + _dy;
+                break;
+            }
+        }
+        if (!_near) return false;
+    }
+
+    var _pl2 = _pl + _dir;
+    var _pc2 = _pc + _dir;
+    var _pr2 = _pr + _dir;
+    var _fy1 = _feet_y + 1;
+    var _fy2 = _feet_y + 2;
+    var _supported = tilemap_point_on_shelf_walkable_cap(_tm, _pl2, _fy1)
+        || tilemap_point_on_shelf_walkable_cap(_tm, _pc2, _fy1)
+        || tilemap_point_on_shelf_walkable_cap(_tm, _pr2, _fy1)
+        || tilemap_point_on_shelf_walkable_cap(_tm, _pl2, _fy2)
+        || tilemap_point_on_shelf_walkable_cap(_tm, _pc2, _fy2)
+        || tilemap_point_on_shelf_walkable_cap(_tm, _pr2, _fy2)
+        || tilemap_point_solid(_tm, _pl2, _fy1) || tilemap_point_solid(_tm, _pc2, _fy1) || tilemap_point_solid(_tm, _pr2, _fy1);
+    return !_supported;
+}
+
 /// Walkable solid X in tile-local space (after mirror). Right edge "32" in art notes = exclusive → last lx = tw-1.
 function tilemap_ledge_walkable_x(_idx, _lx, _tw) {
-    var _lo;
-    var _hi;
+    var _r = tilemap_ledge_walkable_range(_idx, _tw);
+    if (_r.lo < 0) return false;
+    return (_lx >= _r.lo && _lx <= _r.hi);
+}
+
+/// @returns {Struct} { lo, hi } local walkable X inclusive, or lo=-1 if not a shelf.
+function tilemap_ledge_walkable_range(_idx, _tw) {
     switch (_idx) {
-        case 1: _lo = 12; _hi = 31; break;  // left ledge: 12..31
-        case 5: _lo = 0; _hi = 20; break;
-        case 34: _lo = 16; _hi = 31; break;
-        case 36: _lo = 0; _hi = 16; break;
-        case 35: _lo = 0; _hi = _tw - 1; break; // middle platform full width
-        default: return false;
+        case 1:  return { lo: 12, hi: 31 };
+        case 5:  return { lo: 0,  hi: 20 };
+        case 34: return { lo: 16, hi: 31 };
+        case 36: return { lo: 0,  hi: 16 };
+        case 35: return { lo: 0,  hi: _tw - 1 };
+        default: return { lo: -1, hi: -1 };
     }
-    return (_lx >= _lo && _lx <= _hi);
 }
 
 function tilecol_one_way_shelf_max_ly(_idx) {
@@ -142,7 +202,9 @@ function tilemap_shelf_index_at_pixel(_tm, _px, _probe_y) {
     var td = tilemap_get_at_pixel(_tm, _px, _probe_y);
     if (td == 0) return -1;
     var ix = tile_get_index(td);
-    return tilecol_one_way_shelf_tile_index(ix) ? ix : -1;
+    if (!tilecol_one_way_shelf_tile_index(ix)) return -1;
+    if (tilemap_cell_above_is_solid(_tm, _px, _probe_y)) return -1; // buried cap = full block, not a shelf
+    return ix;
 }
 
 /// Toe-only shelf cap (indices 1/5/34/36) — ignores center probe so knockback off lip cannot hover.
@@ -320,6 +382,11 @@ function tilemap_point_solid(_tm, _px, _py) {
     if (tile_get_mirror(td)) lx = tw - 1 - lx;
     if (tile_get_flip(td)) ly = th - 1 - ly;
     var idx = tile_get_index(td);
+    // Buried cap = wall mass (tile directly above): full solid block from every direction. Checked
+    // before _ignore_shelf so downward pass-through logic can't tunnel through a cap-built wall.
+    if (tilecol_one_way_shelf_tile_index(idx) && tilemap_cell_above_is_solid(_tm, _px, _py)) {
+        return true;
+    }
     if (_ignore_shelf && tilecol_one_way_shelf_tile_index(idx)) return false;
     if (tilecol_one_way_shelf_tile_index(idx)) {
         if (tilecol_actor_vsp_get() < 0) return false;
@@ -346,6 +413,7 @@ function tilemap_cell_thin_floor_tile(_tm, _px, _py) {
     if (td == 0) return false;
     var idx = tile_get_index(td);
     if (tilecol_one_way_shelf_tile_index(idx)) {
+        if (tilemap_cell_above_is_solid(_tm, _px, _py)) return false; // buried cap = full block, not a thin floor
         var tw = tilemap_get_tile_width(_tm);
         var th = tilemap_get_tile_height(_tm);
         var tcx = tilemap_get_cell_x_at_pixel(_tm, _px, _py);
@@ -406,7 +474,10 @@ function tilemap_horizontal_side_probe_blocks(_tm, _px, _py, _bbox_bottom, _ledg
     if (tile_get_mirror(td)) lx = tw - 1 - lx;
     if (tile_get_flip(td)) ly = th - 1 - ly;
     var idx = tile_get_index(td);
-    if (abs(_bbox_bottom - cell_top) <= _ledge_win && tilemap_corner_catch_top_surface_hit(idx, lx, ly, tw, th, _ledge_win)) return false;
+    // Buried cap = wall: never grant the ledge-window "mountable top" exemption — always block.
+    if (!tilemap_cell_above_is_solid(_tm, _px, _py)
+        && abs(_bbox_bottom - cell_top) <= _ledge_win
+        && tilemap_corner_catch_top_surface_hit(idx, lx, ly, tw, th, _ledge_win)) return false;
     return check_tile_collision(_px, _py);
 }
 
@@ -417,8 +488,11 @@ function tilemap_horizontal_full_block_side_face_at(_tm, _px, _py, _bbox_bottom,
     var td = tilemap_get_at_pixel(_tm, _px, _py);
     if (td == 0) return false;
     var idx = tile_get_index(td);
-    if (tilecol_one_way_shelf_tile_index(idx)) return false;
-    if (tilecol_shape_for_tile_index(idx) != TILECOL_SHAPE_FULL) return false;
+    // A buried cap counts as a full-block face here (so the airborne ledge-mount treats a cap-built
+    // wall as a wall). A non-buried cap/shelf is not a full-block face.
+    var _buried_face = tilecol_one_way_shelf_tile_index(idx) && tilemap_cell_above_is_solid(_tm, _px, _py);
+    if (tilecol_one_way_shelf_tile_index(idx) && !_buried_face) return false;
+    if (!_buried_face && tilecol_shape_for_tile_index(idx) != TILECOL_SHAPE_FULL) return false;
     var th = tilemap_get_tile_height(_tm);
     var tmy = tilemap_get_y(_tm);
     var tcy = tilemap_get_cell_y_at_pixel(_tm, _px, _py);
@@ -448,6 +522,19 @@ function tilemap_point_full_block_feet_embedded(_tm, _px, _py, _ly_embed_min) {
     return ly >= _ly_embed_min;
 }
 
+/// True when a pixel sits inside a solid FULL-block tile (ignores one-way shelves + non-full shapes).
+/// Used for edge-clip recovery — a flush wall rest leaves the edge pixel in air, so this only trips on a real embed.
+function tilemap_point_full_block_solid(_tm, _px, _py) {
+    if (_tm == noone || _tm == -1) return false;
+    var td = tilemap_get_at_pixel(_tm, _px, _py);
+    if (td == 0) return false;
+    var idx = tile_get_index(td);
+    var _buried = tilecol_one_way_shelf_tile_index(idx) && tilemap_cell_above_is_solid(_tm, _px, _py);
+    if (tilecol_one_way_shelf_tile_index(idx) && !_buried) return false;
+    if (!_buried && tilecol_shape_for_tile_index(idx) != TILECOL_SHAPE_FULL) return false;
+    return tilemap_point_solid(_tm, _px, _py);
+}
+
 /// Any of the usual feet probes (or raw bbox L/R) embedded in a full block below the top band.
 function tilemap_any_feet_row_full_block_embedded(_tm, _pl, _pc, _pr, _bbox_left, _bbox_right, _feet_y, _ly_embed_min) {
     return tilemap_point_full_block_feet_embedded(_tm, _pl, _feet_y, _ly_embed_min) ||
@@ -470,6 +557,8 @@ function tilemap_horizontal_ledge_mount_priority(_tm, _wall_x, _bbox_bottom, _y_
         var td = tilemap_get_at_pixel(_tm, _wall_x, _py);
         if (td == 0) continue;
         var idx = tile_get_index(td);
+        // Buried cap = wall mass, not a mountable ledge top — skip it.
+        if (tilecol_one_way_shelf_tile_index(idx) && tilemap_cell_above_is_solid(_tm, _wall_x, _py)) continue;
         var tcx = tilemap_get_cell_x_at_pixel(_tm, _wall_x, _py);
         var tcy = tilemap_get_cell_y_at_pixel(_tm, _wall_x, _py);
         var cell_left = tmx + tcx * tw;
