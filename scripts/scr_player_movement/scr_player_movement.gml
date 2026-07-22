@@ -5,7 +5,19 @@
 function scr_player_movement() {
     
     // --- 0. INITIALIZATION ---
-    if (is_dying) { vsp += grv; y += vsp; return; }
+    // Pit death keeps falling; combat death (hurt + dissolve) freezes in place.
+    if (is_dying) {
+        if (!death_is_dissolve) {
+            vsp += grv;
+            y += vsp;
+        } else {
+            hsp = 0;
+            vsp = 0;
+            knockBackX = 0;
+            knockBackY = 0;
+        }
+        return;
+    }
     shelf_threshold_snap_this_step = false;
     global.player_ledge_bb_prev = shelf_bb_bottom_prev;
     global.player_move_vsp = vsp;

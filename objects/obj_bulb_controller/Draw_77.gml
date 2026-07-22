@@ -26,8 +26,10 @@ if (instance_exists(obj_camera_controller)) _cam_imp = obj_camera_controller.cam
 camera_apply(_cam_imp);
 scr_player_impact_lines_draw();
 scr_enemy_shards_draw();
+scr_player_death_fx_draw();
 
 scr_cave_vignette_draw();
+scr_player_death_fade_draw();
 
 if (normal_map_hud_timer > 0) {
     var _cam = view_camera[0];

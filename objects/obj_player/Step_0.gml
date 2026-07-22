@@ -26,9 +26,23 @@ function _player_sprint_deform() {
     image_yscale = scr_player_texel_perfect_scale(_sy, sprite_get_height(sprite_index));
 }
 
+// --- HP DEATH (before hitstop so dissolve can trigger the freeze) ---
+if (obj_player_health <= 0 && state != PLAYER_STATE.DEATH) {
+    scr_player_begin_death_dissolve();
+}
+
 // --- HITSTOP CHECK (at the very start of Step Event) ---
 if (scr_hitstop_handler()) {
+    if (death_is_dissolve) scr_player_death_sequence_step();
     _player_sprint_deform(); // Coil/normal scale ticks during hitstop freeze
+    exit;
+}
+
+// Dead: pit tumble or void dissolve — no combat / anim updates until respawn finishes.
+if (is_dying || (death_is_dissolve && death_fade_phase != DEATH_SEQ.NONE)) {
+    if (death_is_dissolve) scr_player_death_sequence_step();
+    // Pit fall only — combat death hurt/dissolve is planted inside the death sequence.
+    if (is_dying && !death_is_dissolve) scr_player_movement();
     exit;
 }
 

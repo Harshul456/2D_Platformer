@@ -15,6 +15,16 @@ function scr_camera_control() {
     if (!instance_exists(obj_player)) exit;
 
     var _p = obj_player;
+    // Hold the death view after dissolve starts; allow follow during the hurt wind-up.
+    if (variable_instance_exists(_p, "death_is_dissolve") && _p.death_is_dissolve
+        && variable_instance_exists(_p, "death_fade_phase")
+        && _p.death_fade_phase != DEATH_SEQ.NONE
+        && _p.death_fade_phase != DEATH_SEQ.HURT) {
+        // Keep parallax locked to the (possibly snapped) camera so tiles are ready under the fade.
+        scr_parallax_update();
+        exit;
+    }
+
     var _cam_x = camera_get_view_x(cam);
     var _cam_y = camera_get_view_y(cam);
 

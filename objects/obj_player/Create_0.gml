@@ -1,6 +1,20 @@
 // --- STATUS & STATE ---
-is_dying        = false;        // Trigger for pit death/abyss fall
+state           = PLAYER_STATE.ALIVE; // Combat life (ALIVE / DEATH dissolve)
+is_dying        = false;        // Trigger for pit death/abyss fall / HP dissolve
+death_is_dissolve = false;      // True = void death sequence active (hurt → dissolve → fade)
+death_fade_phase = DEATH_SEQ.NONE;
+death_seq_timer = 0;
+death_fade_alpha = 0;
+DEATH_HITSTOP_FRAMES = 22;      // Heavy freeze on the killing hurt frame
+DEATH_HURT_FRAMES = 28;         // Hurt anim after hitstop before dissolve burst
+DEATH_HOLD_FRAMES = 55;         // Linger on dissolve before fade
+DEATH_FADE_OUT_FRAMES = 32;     // Ease into void black
+DEATH_BLACK_FRAMES = 14;        // Beat under black while camera snaps to spawn
+DEATH_FADE_IN_FRAMES = 40;      // Ease back in at spawn
+DEATH_SPAWN_X = 96;
+DEATH_SPAWN_Y = 960;
 can_move        = true;         // Control toggle for input
+obj_player_health_max = 100;    // Restored on Alarm_0 respawn
 attacking       = false;        // State for combat lockout
 grounded        = false;        // Track floor contact
 is_sprinting    = false;        // Hold Z on ground while moving
@@ -262,7 +276,7 @@ jump_stretch_y = 1;
 jump_stretch_timer = 0;
 
 // --- COMBAT & DAMAGE ---
-obj_player_health = 100;
+obj_player_health = obj_player_health_max;
 stomp_force     = 20;           // Downward force for air-stomp
 attack_timer    = 0;            // Active frames of current swing (Step increments; end-swing gated on this)
 attackCooldown  = 20;           // Wait time between attacks
