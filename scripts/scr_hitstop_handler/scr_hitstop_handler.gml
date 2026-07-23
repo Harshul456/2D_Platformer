@@ -28,7 +28,13 @@ function scr_hitstop_handler() {
         return true;
     }
     with (obj_player) {
-        if (instance_exists(id)) image_speed = 1;
+        if (instance_exists(id)) {
+            if (variable_instance_exists(id, "state") && state == PLAYER_STATE.PERFECT_DODGE_SLOWMO) {
+                image_speed = scr_time_scale_get();
+            } else {
+                image_speed = 1;
+            }
+        }
     }
     // obj_enemy uses code-driven breath frames (scr_enemy_floating_hover), not image_speed
     return false;

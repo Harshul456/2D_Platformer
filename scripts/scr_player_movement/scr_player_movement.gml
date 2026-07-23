@@ -669,22 +669,38 @@ function scr_player_movement() {
                         sprint_burst_tick++;
                         if (!_land_crouch_prev) {
                             is_sprinting = true;
-                            hsp = _dash_speed * sprint_commit_dir;
+                            // Progress 0 on first active frame → ease toward peak, then soft stop.
+                            var _du = (sprint_burst_tick - 0.5) / max(1, _dash_frames);
+                            var _dmult = scr_player_dash_speed_mult(_du);
+                            hsp = _dash_speed * _dmult * sprint_commit_dir;
                             runMomentum = hsp;
                         }
                     }
                 } else {
+                    // Directional sprint: lock facing for the opening burst so opposite input
+                    // cannot flip/cancel the commitment mid-dash.
+                    var _dir_lock_frames = variable_instance_exists(id, "DASH_DIR_LOCK_FRAMES")
+                        ? DASH_DIR_LOCK_FRAMES
+                        : (variable_instance_exists(id, "SPRINT_BURST_FRAMES") ? SPRINT_BURST_FRAMES : 12);
+                    var _dir_locked = (sprint_burst_tick < _dir_lock_frames);
+
                     var _dir_held = (key_left || key_right);
-                    if (inputDir != 0) {
+                    if (!_dir_locked && inputDir != 0) {
                         if (sprint_commit_dir != 0 && inputDir != sprint_commit_dir) {
                             sprint_dir_gap = _switch_gap;
                         }
                         sprint_commit_dir = inputDir;
                         last_direction = inputDir;
                     }
-                    var _move_dir = inputDir != 0 ? inputDir : sprint_commit_dir;
+                    // While locked, always drive the initial commit direction
+                    var _move_dir = _dir_locked
+                        ? sprint_commit_dir
+                        : (inputDir != 0 ? inputDir : sprint_commit_dir);
                     var _dir_ok = _dir_held;
-                    if (!_dir_held && key_sprint && sprint_hold_latched && sprint_commit_dir != 0) {
+                    if (_dir_locked) {
+                        _dir_ok = true;
+                        if (sprint_commit_dir != 0) last_direction = sprint_commit_dir;
+                    } else if (!_dir_held && key_sprint && sprint_hold_latched && sprint_commit_dir != 0) {
                         if (sprint_dir_gap <= 0) sprint_dir_gap = _switch_gap;
                         else sprint_dir_gap--;
                         _dir_ok = (sprint_dir_gap > 0);
@@ -693,9 +709,10 @@ function scr_player_movement() {
                         sprint_dir_gap = 0;
                     }
                     var _leave_ground = (!grounded || jumped_this_frame);
-                    var _tap_stop = (!sprint_hold_latched && !_dir_ok);
-                    var _hold_stop = (sprint_hold_latched && !_dir_ok && sprint_dir_gap <= 0);
-                    var _z_released = (!key_sprint && sprint_hold_latched);
+                    // Release / turnaround cannot abort during the dir-lock window
+                    var _tap_stop = (!_dir_locked && !sprint_hold_latched && !_dir_ok);
+                    var _hold_stop = (!_dir_locked && sprint_hold_latched && !_dir_ok && sprint_dir_gap <= 0);
+                    var _z_released = (!_dir_locked && !key_sprint && sprint_hold_latched);
                     if (attacking || _leave_ground || _z_released || _tap_stop || _hold_stop) {
                         if (_leave_ground && key_sprint && sprint_hold_latched) {
                             sprint_resume_hold = true;
@@ -739,7 +756,11 @@ function scr_player_movement() {
                             is_sprinting = true;
                             sprint_jump_carry = false;
                             sprint_air_trail = false;
-                            var _sprint_sp = _in_burst ? _burst_speed : runsp;
+                            var _sprint_sp = runsp;
+                            if (_in_burst) {
+                                var _bu = (sprint_burst_tick - 0.5) / max(1, _burst_frames);
+                                _sprint_sp = _burst_speed * scr_player_dash_speed_mult(_bu);
+                            }
                             hsp = _sprint_sp * _move_dir;
                             runMomentum = hsp;
                         }
@@ -2290,7 +2311,23 @@ function scr_player_movement() {
     }
 
     // --- 8. DIRECTION FLIPPING (with attack lock; wall jump / wall slide facing) ---
-    if (wall_jump_lock > 0) {
+    // Dash/sprint opening burst: facing stays locked to commit dir (not just hsp).
+    var _dash_face_lock = false;
+    if (sprint_committed && sprint_commit_dir != 0 && stunTimer <= 0 && !attacking) {
+        if (sprint_dash_standstill) {
+            _dash_face_lock = true;
+        } else {
+            var _face_lock_frames = variable_instance_exists(id, "DASH_DIR_LOCK_FRAMES")
+                ? DASH_DIR_LOCK_FRAMES
+                : (variable_instance_exists(id, "SPRINT_BURST_FRAMES") ? SPRINT_BURST_FRAMES : 12);
+            // burst_tick already advanced this frame when moving
+            _dash_face_lock = (sprint_burst_tick <= _face_lock_frames);
+        }
+    }
+    if (_dash_face_lock) {
+        image_xscale = (sprint_commit_dir > 0) ? image_base_scale : -image_base_scale;
+        last_direction = sprint_commit_dir;
+    } else if (wall_jump_lock > 0) {
         var _move_dir = sign(hsp);
         if (_move_dir != 0) {
             image_xscale = (_move_dir > 0) ? image_base_scale : -image_base_scale;
@@ -2422,6 +2459,30 @@ function scr_player_movement() {
     shelf_bb_bottom_prev = bbox_bottom;
 }
 
+/// @function scr_player_dash_speed_mult
+/// @description 0..1 dash progress → speed multiplier (ease-in, hold peak, ease-out).
+function scr_player_dash_speed_mult(_u) {
+    _u = clamp(_u, 0, 1);
+    var _in = variable_instance_exists(id, "DASH_EASE_IN") ? DASH_EASE_IN : 0.30;
+    var _out = variable_instance_exists(id, "DASH_EASE_OUT") ? DASH_EASE_OUT : 0.28;
+    var _start = variable_instance_exists(id, "DASH_START_MULT") ? DASH_START_MULT : 0.38;
+    var _end = variable_instance_exists(id, "DASH_END_MULT") ? DASH_END_MULT : 0.42;
+    _in = clamp(_in, 0.05, 0.45);
+    _out = clamp(_out, 0.05, 0.45);
+
+    if (_u <= _in) {
+        var _t = _u / _in;
+        _t = _t * _t * (3 - 2 * _t); // smoothstep
+        return lerp(_start, 1, _t);
+    }
+    if (_u >= 1 - _out) {
+        var _t2 = (_u - (1 - _out)) / _out;
+        _t2 = _t2 * _t2 * (3 - 2 * _t2);
+        return lerp(1, _end, _t2);
+    }
+    return 1;
+}
+
 /// @function scr_player_sprint_try_begin
 /// @description Commit dash/sprint on the input frame — sets hsp + i-frames immediately.
 /// @param {Bool} _early True from Begin Step (before movement / other instances' Step).
@@ -2498,7 +2559,8 @@ function scr_player_sprint_try_begin(_early) {
         }
         image_speed = 1;
         sprint_squash_coil_frames = 1;
-        hsp = _dash_speed * _sd;
+        // Start at eased entry speed — peak comes mid-dash, not on frame 0.
+        hsp = _dash_speed * scr_player_dash_speed_mult(0) * _sd;
         runMomentum = hsp;
         scr_player_dash_iframes_begin();
         return true;
@@ -2527,7 +2589,7 @@ function scr_player_sprint_try_begin(_early) {
         }
         image_speed = 1;
         sprint_squash_coil_frames = 1;
-        hsp = _burst_speed * inputDir;
+        hsp = _burst_speed * scr_player_dash_speed_mult(0) * inputDir;
         runMomentum = hsp;
         scr_player_dash_iframes_begin();
         return true;

@@ -8,7 +8,13 @@ if (state == ENEMY_STATE.DEATH) {
 }
 
 var _hitstop_frozen = (global.hitstop > 0);
+var _time_frozen = !_hitstop_frozen && !scr_time_scale_should_tick();
 var _step_prev_x = x;
+
+if (_time_frozen) {
+    // Slow-mo: skip AI/physics this frame; anims hold via image_speed elsewhere.
+    exit;
+}
 
 if (!_hitstop_frozen) {
     if (state != ENEMY_STATE.ATTACK && attack_cooldown > 0) attack_cooldown--;

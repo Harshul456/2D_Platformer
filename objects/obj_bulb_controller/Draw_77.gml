@@ -29,6 +29,7 @@ scr_enemy_shards_draw();
 scr_player_death_fx_draw();
 
 scr_cave_vignette_draw();
+scr_player_perfect_dodge_fx_draw();
 scr_player_death_fade_draw();
 
 if (normal_map_hud_timer > 0) {

@@ -2,7 +2,9 @@
 
 enum PLAYER_STATE {
     ALIVE,
-    DEATH
+    DEATH,
+    PERFECT_DODGE_SLOWMO,
+    DODGE_COUNTER
 }
 
 enum DEATH_SEQ {
@@ -115,9 +117,11 @@ function scr_player_respawn(_unlock_move = true) {
     grounded = false;
 
     obj_player_health = obj_player_health_max;
-    invincible = true;
-    invincibleTimer = INVINCIBILITY_FRAMES;
+    // No spawn i-frames — fade sequence blocks damage via death_is_dissolve until control returns.
+    invincible = false;
+    invincibleTimer = 0;
     blinkCounter = 0;
+    if (variable_global_exists("hitstop")) global.hitstop = 0;
 
     visible = true;
     image_alpha = 1;
@@ -274,11 +278,15 @@ function scr_player_death_sequence_step() {
                 death_fade_phase = DEATH_SEQ.NONE;
                 death_is_dissolve = false;
                 can_move = true;
+                invincible = false;
+                invincibleTimer = 0;
+                blinkCounter = 0;
+                image_alpha = 1;
+                if (variable_global_exists("hitstop")) global.hitstop = 0;
                 scr_player_clear_hurt_state();
                 sprite_index = spr_mc_idle;
                 image_index = 0;
                 image_speed = 1;
-                image_alpha = 1;
             }
             break;
         }
@@ -294,6 +302,18 @@ function scr_player_begin_death_dissolve() {
     is_dying = true;
     death_is_dissolve = true;
     can_move = false;
+    scr_time_scale_set(1);
+    if (variable_instance_exists(id, "dodge_counter_strike")) dodge_counter_strike = false;
+    if (variable_instance_exists(id, "dodge_counter_hidden")) dodge_counter_hidden = false;
+    if (variable_instance_exists(id, "perfect_dodge_timer")) perfect_dodge_timer = 0;
+    if (variable_instance_exists(id, "perfect_dodge_light_t")) perfect_dodge_light_t = 0;
+    if (variable_instance_exists(id, "perfect_dodge_focus_light") && perfect_dodge_focus_light != undefined) {
+        perfect_dodge_focus_light.Destroy();
+        perfect_dodge_focus_light = undefined;
+    }
+    if (variable_global_exists("bulb_renderer") && global.bulb_renderer != undefined) {
+        global.bulb_renderer.ambientColor = make_colour_rgb(BULB_AMBIENT_R, BULB_AMBIENT_G, BULB_AMBIENT_B);
+    }
 
     // Plant immediately — no tumble into idle before dissolve.
     hsp = 0;

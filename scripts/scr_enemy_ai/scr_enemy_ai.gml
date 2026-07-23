@@ -263,15 +263,21 @@ function scr_enemy_attack_compute_hitbox() {
     var _face = scr_enemy_facing_sign();
     if (_face == 0) _face = 1;
 
+    // Stretch active slash behind the facing dir so body / through-dashes still overlap.
+    var _rear = variable_instance_exists(id, "ENEMY_ATTACK_HITBOX_REAR_PAD")
+        ? ENEMY_ATTACK_HITBOX_REAR_PAD : 0;
+    var _lx1 = _box.x1 - _rear;
+    var _lx2 = _box.x2;
+
     var _origin = scr_enemy_attack_draw_origin();
     var _x1;
     var _x2;
     if (_face > 0) {
-        _x1 = _origin.x + _box.x1;
-        _x2 = _origin.x + _box.x2;
+        _x1 = _origin.x + _lx1;
+        _x2 = _origin.x + _lx2;
     } else {
-        _x1 = _origin.x - _box.x2;
-        _x2 = _origin.x - _box.x1;
+        _x1 = _origin.x - _lx2;
+        _x2 = _origin.x - _lx1;
     }
 
     _hb.active = true;

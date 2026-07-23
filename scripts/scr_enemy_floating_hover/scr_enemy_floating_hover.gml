@@ -47,6 +47,10 @@ function scr_enemy_floating_hover_init() {
     hover_expand_hold = 7;    // 8f while rising
     hover_compress_hold = 3;  // 4f while falling
 
+    // Combat: ease bob down so the slash isn't stranded at peak float
+    hover_attack_settle_y = 2;     // slight dip below idle rest (positive = down)
+    hover_attack_settle_rate = 0.32;
+
     hover_time = pi * 0.5;
 
     image_speed = 0;
@@ -65,11 +69,11 @@ function scr_enemy_floating_hover_step() {
         : (2 * pi) / ((variable_instance_exists(id, "hover_cycle_seconds") ? hover_cycle_seconds : 3) * max(1, room_speed)));
 
     image_speed = 0;
-    hover_time += _speed;
-    hover_y_offset = (sin(hover_time) - 1) * _amp;
 
     // Combat poses own image_index — only apply idle breath frames on patrol/chase/stun.
+    // Also settle the bob downward so attack hitboxes aren't floating above the player.
     var _hover_anim = true;
+    var _combat_settle = false;
     if (variable_instance_exists(id, "state")) {
         switch (state) {
             case ENEMY_STATE.NOTICE:
@@ -77,9 +81,25 @@ function scr_enemy_floating_hover_step() {
             case ENEMY_STATE.ATTACK:
             case ENEMY_STATE.RECOIL:
                 _hover_anim = false;
+                _combat_settle = true;
                 break;
         }
     }
+
+    if (_combat_settle) {
+        var _target = variable_instance_exists(id, "hover_attack_settle_y")
+            ? hover_attack_settle_y : 0;
+        var _rate = variable_instance_exists(id, "hover_attack_settle_rate")
+            ? hover_attack_settle_rate : 0.32;
+        hover_y_offset = lerp(hover_y_offset, _target, _rate);
+        // Keep phase matched so leaving combat doesn't pop the sprite back up.
+        var _s = clamp(hover_y_offset / max(0.001, _amp) + 1, -1, 1);
+        hover_time = arcsin(_s);
+    } else {
+        hover_time += _speed;
+        hover_y_offset = (sin(hover_time) - 1) * _amp;
+    }
+
     if (_hover_anim) {
         image_index = scr_enemy_floating_hover_frame_from_time(hover_time, hover_y_offset, _amp);
     }

@@ -45,6 +45,9 @@ display_reset(0, true);   // Forces VSync ON via code
 global.show_debug = false; // Renamed to avoid conflict with built-in variable
 global.debug_enemy_raycast = false; // F3 — enemy LOS / patrol probe overlay
 global.hitstop = 0;       // Hitstop frames (impact freeze); decremented in scr_hitstop_handler
+global.time_scale = 1.0;  // World speed multiplier (Perfect Dodge slow-mo uses ~0.15)
+global.time_scale_accum = 0; // Fractional step accumulator for enemy/world logic
+global.time_scale_logic_tick = true; // Shared per-frame gate from scr_time_scale_begin_frame
 
 // Toggle reflections on/off (for before/after captures)
 global.reflections_enabled = false;

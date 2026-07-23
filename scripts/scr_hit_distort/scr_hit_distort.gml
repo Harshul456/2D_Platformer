@@ -13,9 +13,12 @@ function scr_hit_distort_ensure() {
 /// @param {Real} _x Room X (center of the wave)
 /// @param {Real} _y Room Y
 /// @param {Real} [_strength] Size/intensity multiplier (finishers pass more)
-function scr_hit_distort_add(_x, _y, _strength = 1) {
+/// @param {Real} [_blend] Companion Bulb light color (defaults to HIT_LIGHT_COLOR)
+function scr_hit_distort_add(_x, _y, _strength = 1, _blend = undefined) {
     if (!HIT_DISTORT_ENABLED) return;
     scr_hit_distort_ensure();
+
+    if (_blend == undefined) _blend = HIT_LIGHT_COLOR;
 
     // Cap concurrent ripples; drop the oldest so the shader array never overflows.
     if (array_length(global.hit_distort) >= HIT_DISTORT_MAX) {
@@ -35,7 +38,7 @@ function scr_hit_distort_add(_x, _y, _strength = 1) {
     // lights up (normal-mapped) as the ring spreads. Purely additive lighting; no shadow casting.
     if (HIT_LIGHT_ENABLED && variable_global_exists("bulb_renderer") && global.bulb_renderer != undefined) {
         var _l = new BulbLight(global.bulb_renderer, sLight128, 0, _x, _y);
-        _l.blend        = HIT_LIGHT_COLOR;
+        _l.blend        = _blend;
         _l.intensity    = HIT_LIGHT_INTENSITY * _strength;
         _l.xscale       = HIT_LIGHT_SCALE_START;
         _l.yscale       = HIT_LIGHT_SCALE_START;

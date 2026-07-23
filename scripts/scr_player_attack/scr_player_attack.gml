@@ -187,6 +187,10 @@ function scr_player_attack_end_swing(_post_accel_frames) {
         // Start the post-string cooldown once atk2 begins.
         attackCooldownTimer = attackCooldown;
     }
+
+    if (variable_instance_exists(id, "dodge_counter_strike") && dodge_counter_strike) {
+        scr_player_dodge_counter_finished();
+    }
 }
 
 /// @function scr_player_attack_is_recovery_locked
@@ -255,7 +259,7 @@ function scr_player_attack_dodge_cancel(_dir) {
     dash_input_buffer = 0;
 
     var _dash_sp = (variable_instance_exists(id, "DASH_SPEED") ? DASH_SPEED : 8.5);
-    hsp = _dash_sp * _dir;
+    hsp = _dash_sp * scr_player_dash_speed_mult(0) * _dir;
     runMomentum = hsp;
 
     scr_player_dash_iframes_begin();

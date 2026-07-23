@@ -5,7 +5,7 @@ event_inherited();
 state = ENEMY_STATE.PATROL;
 state_timer = 0;
 
-obj_enemy_health = 100;
+obj_enemy_health = 200;
 moveSpeed = 0.85;
 chaseRange = 500;
 chase_telegraph_hgap_max = 16;    // Edge gap (px) to start attack tell — nearly in range
@@ -59,6 +59,8 @@ enemy_attack_hsp_push = 4.8;
 
 // Downward slash hitboxes — local space from feet origin (+X = facing right), per spr_enemy_attack frame.
 // Derived from pink streak pixels; frames 0–2 = windup (no damage), 3–5 = active slash.
+// x1 starts at 0 (origin); ENEMY_ATTACK_HITBOX_REAR_PAD pulls it through/behind the body so
+// dash-through Perfect Dodge still overlaps while crossing the enemy.
 ENEMY_ATTACK_SLASH_HITBOX = array_create(7);
 ENEMY_ATTACK_SLASH_HITBOX[0] = { active: false, x1: 0, y1: 0, x2: 0, y2: 0 };
 ENEMY_ATTACK_SLASH_HITBOX[1] = { active: false, x1: 0, y1: 0, x2: 0, y2: 0 };
@@ -67,6 +69,7 @@ ENEMY_ATTACK_SLASH_HITBOX[3] = { active: false, x1: 0, y1: 0, x2: 0, y2: 0 };
 ENEMY_ATTACK_SLASH_HITBOX[4] = { active: true,  x1:  0, y1: -55, x2: 31, y2:  -7 };
 ENEMY_ATTACK_SLASH_HITBOX[5] = { active: true,  x1:  0, y1: -55, x2: 23, y2:  -6 };
 ENEMY_ATTACK_SLASH_HITBOX[6] = { active: false, x1: 0, y1: 0, x2: 0, y2: 0 };
+ENEMY_ATTACK_HITBOX_REAR_PAD = 22; // px behind facing (covers body for through-dashes)
 enemy_attack_hitbox_debug = false;
 
 home_x = x;

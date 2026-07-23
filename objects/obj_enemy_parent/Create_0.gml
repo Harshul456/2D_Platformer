@@ -37,7 +37,7 @@ gnd_hurt_stun_frames = 22;
 gnd_hurt_stun_timer = 0;
 gnd_knock_h = 0;
 gnd_hurt_knockback_h = 4.5;
-gnd_hp = 100;
+gnd_hp = 200;
 hit_blink_timer = 0;
 
 gnd_touch_damage = 10;

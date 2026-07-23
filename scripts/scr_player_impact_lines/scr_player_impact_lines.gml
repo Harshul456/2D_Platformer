@@ -120,7 +120,7 @@ function scr_player_attack_impact_sfx(_finisher = false) {
 
 /// @function scr_player_impact_lines_on_hit
 /// @description Spawn directional slash FX aligned to the attack angle.
-function scr_player_impact_lines_on_hit(_x1, _y1, _x2, _y2, _enemy = noone) {
+function scr_player_impact_lines_on_hit(_x1, _y1, _x2, _y2, _enemy = noone, _skip_sfx = false) {
     var _cx = (_x1 + _x2) * 0.5;
     var _cy = (_y1 + _y2) * 0.5;
     if (_enemy != noone && instance_exists(_enemy)) {
@@ -131,7 +131,9 @@ function scr_player_impact_lines_on_hit(_x1, _y1, _x2, _y2, _enemy = noone) {
     var _finisher = (comboCount >= 2);
 
     // Cave-reverb clank with randomized pitch (once per landed hit)
-    scr_player_attack_impact_sfx(_finisher);
+    if (!_skip_sfx) {
+        scr_player_attack_impact_sfx(_finisher);
+    }
 
     var _angle;
 

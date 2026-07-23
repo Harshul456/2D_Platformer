@@ -1,5 +1,7 @@
 // --- IN obj_player STEP EVENT ---
 
+scr_time_scale_begin_frame();
+
 function _player_sprint_deform() {
     // Frame 1 only (Z press): coil squash; every later step while sprinting stays at normal scale.
     if (sprint_squash_coil_frames > 0) {
@@ -28,12 +30,18 @@ function _player_sprint_deform() {
 
 // --- HP DEATH (before hitstop so dissolve can trigger the freeze) ---
 if (obj_player_health <= 0 && state != PLAYER_STATE.DEATH) {
+    scr_time_scale_set(1);
     scr_player_begin_death_dissolve();
 }
 
 // --- HITSTOP CHECK (at the very start of Step Event) ---
 if (scr_hitstop_handler()) {
     if (death_is_dissolve) scr_player_death_sequence_step();
+    // Keep Perfect Dodge window ticking through the trigger punch so it doesn't feel lost.
+    if (state == PLAYER_STATE.PERFECT_DODGE_SLOWMO && perfect_dodge_timer > 0) {
+        perfect_dodge_timer--;
+    }
+    scr_player_perfect_dodge_lighting_step();
     _player_sprint_deform(); // Coil/normal scale ticks during hitstop freeze
     exit;
 }
@@ -45,6 +53,27 @@ if (is_dying || (death_is_dissolve && death_fade_phase != DEATH_SEQ.NONE)) {
     if (is_dying && !death_is_dissolve) scr_player_movement();
     exit;
 }
+
+// Perfect Dodge slow-mo window — attack to Counter, else expire to free.
+if (state == PLAYER_STATE.PERFECT_DODGE_SLOWMO) {
+    scr_player_perfect_dodge_slowmo_step();
+    scr_player_invincibility();
+    scr_player_perfect_dodge_lighting_step();
+    _player_sprint_deform();
+    exit;
+}
+
+// Dodge counter flurry: vanish → streak → reappear (skips normal attack Step).
+if (state == PLAYER_STATE.DODGE_COUNTER) {
+    scr_player_dodge_counter_step();
+    scr_player_invincibility();
+    scr_player_perfect_dodge_lighting_step();
+    _player_sprint_deform();
+    exit;
+}
+
+// Fade slow-mo Bulb lighting after the window / into counter
+scr_player_perfect_dodge_lighting_step();
 
 if (attack_priority_timer > 0) attack_priority_timer--;
 
@@ -73,6 +102,11 @@ scr_player_ground_debris_step();
 scr_player_saber_trail_step();
 scr_player_footsteps_step();
 
+// Dash i-frames through an enemy attack hitbox → Perfect Dodge slow-mo
+if (state == PLAYER_STATE.ALIVE) {
+    scr_player_perfect_dodge_try_trigger();
+}
+
 // Hits can land after attack Step (collision order) or same frame as knockback — never keep swing physics while stunned.
 if (stunTimer > 0 && attacking) {
     attacking = false;
@@ -91,6 +125,7 @@ if (stunTimer > 0 && attacking) {
     image_blend = c_white;
     debug_hitbox_active = false;
     attack_priority_timer = 0;
+    if (dodge_counter_strike) scr_player_dodge_counter_finished();
 }
 
 // attack_lockout must tick down even if attacking was cleared mid-swing (e.g. enemy hit),
@@ -180,12 +215,18 @@ if (attacking && stunTimer <= 0) {
         
         if (_hit_parent != noone) {
             attack_has_hit = true;
+            var _dmg = ATTACK_DAMAGE_PER_HIT;
+            if (dodge_counter_strike) {
+                _dmg = ceil(_dmg * (variable_instance_exists(id, "DODGE_COUNTER_DAMAGE_MULT")
+                    ? DODGE_COUNTER_DAMAGE_MULT : 1.75));
+            }
             with (_hit_parent) {
-                scr_enemy_grounded_apply_damage(other.ATTACK_DAMAGE_PER_HIT, other.x);
+                scr_enemy_grounded_apply_damage(_dmg, other.x);
                 hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
             }
             scr_player_impact_lines_on_hit(x1, y1, x2, y2, _hit_parent);
-            var _hitstop_frames = (comboCount >= 2) ? ATTACK_FINISHER_HITSTOP : ATTACK_LIGHT_HITSTOP;
+            var _hitstop_frames = (comboCount >= 2 || dodge_counter_strike) ? ATTACK_FINISHER_HITSTOP : ATTACK_LIGHT_HITSTOP;
+            if (dodge_counter_strike) _hitstop_frames = max(_hitstop_frames, 8);
             scr_hitstop_trigger(_hitstop_frames);
             hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
             if (comboCount >= 2) {
@@ -194,8 +235,15 @@ if (attacking && stunTimer <= 0) {
             scr_player_attack1_prepare_retreat();
         } else if (_hit_enemy != noone) {
             var _hit_result = { landed: false, intercepted: false, armored_chip: false, super_armor: false };
+            var _counter_combo = dodge_counter_strike ? 2 : comboCount;
             with (_hit_enemy) {
-                _hit_result = scr_enemy_on_player_hit(other.comboCount);
+                _hit_result = scr_enemy_on_player_hit(_counter_combo);
+                if (other.dodge_counter_strike && _hit_result.landed
+                    && variable_instance_exists(id, "obj_enemy_health")) {
+                    // Extra chip on top of finisher hit for the counter flourish
+                    var _bonus = ceil(other.ATTACK_DAMAGE_PER_HIT * 0.35);
+                    obj_enemy_health -= _bonus;
+                }
             }
 
             attack_has_hit = true;
@@ -292,7 +340,9 @@ if (attackCooldownTimer > 0) {
 if (attack_recovery_grace > 0) attack_recovery_grace--;
 
 // Bulb player light (warm glow; follows each Step)
-if (variable_global_exists("bulb_renderer") && global.bulb_renderer != undefined) {
+// Skip while Perfect Dodge slow-mo lighting owns the torch (icy focus).
+if (variable_global_exists("bulb_renderer") && global.bulb_renderer != undefined
+    && !(variable_instance_exists(id, "perfect_dodge_light_t") && perfect_dodge_light_t > 0.01)) {
     if (!BULB_PLAYER_TORCH_ENABLED) {
         if (bulb_light != undefined) {
             bulb_light.visible = false;

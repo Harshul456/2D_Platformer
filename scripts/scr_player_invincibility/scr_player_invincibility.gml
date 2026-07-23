@@ -3,12 +3,19 @@
 function scr_player_dash_iframes_begin() {
     var _frames = (variable_instance_exists(id, "DASH_IFRAME_FRAMES") ? DASH_IFRAME_FRAMES : 10);
     dash_iframe_timer = max(dash_iframe_timer, _frames);
+    if (variable_instance_exists(id, "perfect_dodge_used")) perfect_dodge_used = false;
 }
 
 /// @function scr_player_has_damage_iframes
 /// @description True while hit invincibility, silent dash i-frames, or death sequence are active.
 function scr_player_has_damage_iframes() {
     if (variable_instance_exists(id, "state") && state == PLAYER_STATE.DEATH) return true;
+    // Fade respawn: ALIVE under black/fade — still block hits until control unlocks (no spawn blink).
+    if (variable_instance_exists(id, "death_is_dissolve") && death_is_dissolve
+        && variable_instance_exists(id, "death_fade_phase")
+        && death_fade_phase != DEATH_SEQ.NONE) {
+        return true;
+    }
     if (variable_instance_exists(id, "invincible") && invincible) return true;
     if (variable_instance_exists(id, "dash_iframe_timer") && dash_iframe_timer > 0) return true;
     return false;
@@ -21,14 +28,11 @@ function scr_player_invincibility() {
 
     // Death sequence owns visibility — never blink the hurt/dissolve body.
     if (variable_instance_exists(id, "state") && state == PLAYER_STATE.DEATH) {
-        if (invincible && invincibleTimer < 9000) {
-            // Allow a normal iframe countdown only after respawn (timer reset to INVINCIBILITY_FRAMES).
-            invincibleTimer--;
-            if (invincibleTimer <= 0) {
-                invincible = false;
-                image_alpha = 1;
-            }
-        }
+        return;
+    }
+    if (variable_instance_exists(id, "death_is_dissolve") && death_is_dissolve
+        && variable_instance_exists(id, "death_fade_phase")
+        && death_fade_phase != DEATH_SEQ.NONE) {
         return;
     }
 

@@ -79,6 +79,12 @@ function scr_player_jump_stretch_step() {
 }
 
 function scr_player_draw_main_sprite() {
+    // Flurry counter: body is gone — only the speed-line FX draws
+    if (variable_instance_exists(id, "dodge_counter_hidden") && dodge_counter_hidden) {
+        scr_player_dodge_counter_draw_flurry();
+        return;
+    }
+
     var _draw_x = floor(x);
     var _draw_y = floor(y);
     var _wall_draw_nudge = 0;
