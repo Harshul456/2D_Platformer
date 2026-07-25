@@ -64,6 +64,7 @@ if (death_is_dissolve && death_fade_phase == DEATH_SEQ.FADE_IN) {
 if (state == PLAYER_STATE.PERFECT_DODGE_SLOWMO) {
     scr_player_perfect_dodge_slowmo_step();
     scr_player_invincibility();
+    scr_player_dash_particles_step();
     scr_player_perfect_dodge_lighting_step();
     _player_sprint_deform();
     exit;
@@ -73,6 +74,7 @@ if (state == PLAYER_STATE.PERFECT_DODGE_SLOWMO) {
 if (state == PLAYER_STATE.DODGE_COUNTER) {
     scr_player_dodge_counter_step();
     scr_player_invincibility();
+    scr_player_dash_particles_step();
     scr_player_perfect_dodge_lighting_step();
     _player_sprint_deform();
     exit;
@@ -105,6 +107,7 @@ if (keyboard_check_pressed(DISPLAY_BORDERLESS_TOGGLE_KEY)) {
 // 1. PROCESS NORMAL MOVEMENT
 scr_player_movement();
 scr_player_ground_debris_step();
+scr_player_dash_particles_step();
 scr_player_saber_trail_step();
 scr_player_footsteps_step();
 

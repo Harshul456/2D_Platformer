@@ -157,6 +157,8 @@ function scr_player_perfect_dodge_try_trigger() {
     perfect_dodge_distort_fired = true;
     // Blue focus circle waits until the expanding distort ring finishes
     perfect_dodge_aura_timer = HIT_DISTORT_LIFE;
+    // Icy blue crystal-style motes (front + trail) matching the focus circle
+    scr_player_perfect_dodge_particles_burst();
 
     // Keep brief safety i-frames through the window
     dash_iframe_timer = max(dash_iframe_timer, perfect_dodge_timer);
@@ -812,6 +814,9 @@ function scr_player_perfect_dodge_slowmo_step() {
         perfect_dodge_ghost_tick = 0;
         scr_player_perfect_dodge_spawn_ghost();
     }
+
+    // Blue motes trail the flip body the whole coast window
+    scr_player_perfect_dodge_particles_trail();
 
     if (key_attack) {
         scr_player_begin_dodge_counter();

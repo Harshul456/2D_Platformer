@@ -79,6 +79,10 @@ function scr_player_impact_lines_draw() {
     with (obj_hit_particle) {
         event_perform(ev_draw, 0);
     }
+    // Crystal-style dash motes (additive 1px) — same Post-Draw pass as combat FX
+    with (obj_player) {
+        scr_player_dash_particles_draw();
+    }
 }
 
 /// @function scr_player_attack_impact_sfx
