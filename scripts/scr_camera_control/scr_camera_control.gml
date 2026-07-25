@@ -1,8 +1,32 @@
+/// @function scr_camera_clear_shake
+/// @description Zero any pending screen shake (death / respawn).
+function scr_camera_clear_shake() {
+    if (!instance_exists(obj_camera_controller)) return;
+    with (obj_camera_controller) {
+        cam_shake_mag = 0;
+        cam_shake_timer = 0;
+    }
+}
+
+/// @function scr_camera_death_view_locked
+/// @description True while dissolve holds the camera (shake must not queue or tick here).
+function scr_camera_death_view_locked() {
+    if (!instance_exists(obj_player)) return false;
+    with (obj_player) {
+        if (!variable_instance_exists(id, "death_is_dissolve") || !death_is_dissolve) return false;
+        if (!variable_instance_exists(id, "death_fade_phase")) return false;
+        return (death_fade_phase != DEATH_SEQ.NONE && death_fade_phase != DEATH_SEQ.HURT);
+    }
+    return false;
+}
+
 /// @function scr_camera_trigger_shake
 /// @param {Real} _mag Peak pixel offset
 /// @param {Real} _dur Frames to shake
 function scr_camera_trigger_shake(_mag, _dur) {
     if (!instance_exists(obj_camera_controller)) return;
+    // Wall-kill sparks / late hit juice must not freeze under the death lock and replay on spawn.
+    if (scr_camera_death_view_locked()) return;
     with (obj_camera_controller) {
         cam_shake_mag = max(cam_shake_mag, _mag);
         cam_shake_timer = max(cam_shake_timer, _dur);
@@ -16,10 +40,9 @@ function scr_camera_control() {
 
     var _p = obj_player;
     // Hold the death view after dissolve starts; allow follow during the hurt wind-up.
-    if (variable_instance_exists(_p, "death_is_dissolve") && _p.death_is_dissolve
-        && variable_instance_exists(_p, "death_fade_phase")
-        && _p.death_fade_phase != DEATH_SEQ.NONE
-        && _p.death_fade_phase != DEATH_SEQ.HURT) {
+    if (scr_camera_death_view_locked()) {
+        // Drop any shake that began on the killing blow / wall slam so it can't resume after fade-in.
+        scr_camera_clear_shake();
         // Keep parallax locked to the (possibly snapped) camera so tiles are ready under the fade.
         scr_parallax_update();
         exit;

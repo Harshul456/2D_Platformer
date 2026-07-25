@@ -69,10 +69,9 @@ function scr_player_death_ease(_t) {
 /// @description Instantly center the view on the player (used under blackout).
 function scr_camera_snap_to_player() {
     if (!instance_exists(obj_camera_controller) || !instance_exists(obj_player)) return;
+    scr_camera_clear_shake();
     with (obj_camera_controller) {
         cam_look_ahead = 0;
-        cam_shake_mag = 0;
-        cam_shake_timer = 0;
         camera_prev_player_x = obj_player.x;
         camera_prev_player_y = obj_player.y;
         var _half_h = max(8, (obj_player.bbox_bottom - obj_player.bbox_top) * 0.5);
@@ -117,6 +116,7 @@ function scr_player_respawn(_unlock_move = true) {
     grounded = false;
 
     obj_player_health = obj_player_health_max;
+    scr_player_hud_sync_health();
     // No spawn i-frames — fade sequence blocks damage via death_is_dissolve until control returns.
     invincible = false;
     invincibleTimer = 0;
@@ -283,6 +283,7 @@ function scr_player_death_sequence_step() {
                 blinkCounter = 0;
                 image_alpha = 1;
                 if (variable_global_exists("hitstop")) global.hitstop = 0;
+                scr_camera_clear_shake();
                 scr_player_clear_hurt_state();
                 sprite_index = spr_mc_idle;
                 image_index = 0;

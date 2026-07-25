@@ -282,6 +282,7 @@ jump_stretch_timer = 0;
 
 // --- COMBAT & DAMAGE ---
 obj_player_health = obj_player_health_max;
+scr_player_hud_init(); // Top-left GUI health bar (spr_mc_healthbar)
 stomp_force     = 20;           // Downward force for air-stomp
 attack_timer    = 0;            // Active frames of current swing (Step increments; end-swing gated on this)
 attackCooldown  = 20;           // Wait time between attacks
