@@ -527,11 +527,15 @@ function scr_enemy_death_shatter() {
 
     // Shatter SFX through the cave-reverb combat bus, with a touch of pitch variety.
     var _pitch = random_range(0.9, 1.08);
+    var _gain = 1.35; // Compensates wet combat bus + quieter source mean
     if (variable_global_exists("sfx_combat_emitter")) {
-        audio_play_sound_on(global.sfx_combat_emitter, snd_shatter_death, false, 14, 1, 0, _pitch);
+        audio_play_sound_on(global.sfx_combat_emitter, snd_shatter_death, false, 14, _gain, 0, _pitch);
     } else {
         var _snd = audio_play_sound(snd_shatter_death, 14, false);
-        if (_snd != -1) audio_sound_pitch(_snd, _pitch);
+        if (_snd != -1) {
+            audio_sound_pitch(_snd, _pitch);
+            audio_sound_gain(_snd, _gain, 0);
+        }
     }
 
     var _crystal = (variable_instance_exists(id, "bulb_light") && bulb_light != undefined)

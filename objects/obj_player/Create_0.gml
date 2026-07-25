@@ -60,9 +60,9 @@ FOOTSTEP_PITCH_MAX = 0.70;
 FOOTSTEP_PITCH_JITTER = 0.03;
 FOOTSTEP_PITCH_CAVE = 0.76;               // Global muffling — deeper cave tone
 FOOTSTEP_PITCH_BIAS = 1.5;                // Skew random pitch toward low end (cave echo)
-FOOTSTEP_VOL_MIN = 0.45;
-FOOTSTEP_VOL_MAX = 0.75;
-FOOTSTEP_VOL_CAVE = 0.9;                 // Extra distance muffling on top of pitch
+FOOTSTEP_VOL_MIN = 0.75;                  // Louder dry step so cave reverb doesn't bury it
+FOOTSTEP_VOL_MAX = 1.05;
+FOOTSTEP_VOL_CAVE = 1.15;                 // Compensates wet bus mix (was muffling steps)
 FOOTSTEP_MIN_INTERVAL = 4;                // Frames between steps (anti-double-trigger safety)
 FOOTSTEP_AUDIO_PRIORITY = 8;
 // Landing thud — assign snd_cave_land when you import a dedicated land clip.
@@ -70,13 +70,32 @@ FOOTSTEP_LAND_SOUND = snd_cave_footstep1;
 FOOTSTEP_LAND_PITCH_MIN = 0.44;
 FOOTSTEP_LAND_PITCH_MAX = 0.58;
 FOOTSTEP_LAND_PITCH_CAVE = 0.74;
-FOOTSTEP_LAND_VOL_MIN = 0.55;
-FOOTSTEP_LAND_VOL_MAX = 0.90;
+FOOTSTEP_LAND_VOL_MIN = 0.85;
+FOOTSTEP_LAND_VOL_MAX = 1.15;
 LAND_SOUND_MIN_VSP = 2.5;                 // Ignore micro-grounding blips / tiny falls
 LAND_SOUND_VSP_REF = 8;                   // Fall speed that plays a full-impact land
 LAND_SOUND_MIN_AIR_FRAMES = 4;            // Must be airborne this many frames before land SFX
 FOOTSTEP_LAND_STEP_COOLDOWN = 8;          // Block jog step right after land thud
 FOOTSTEP_REELBACK_CONTACT_FRAMES = [1, 2]; // Skid frames in spr_mc_reelback (3-frame cycle)
+// Armor bed under jog/sprint (quiet chainmail layer — never louder than the stone step)
+FOOTSTEP_ARMOR_ENABLED = true;
+FOOTSTEP_ARMOR_CHANCE_JOG = 0.72;         // Skip some walk steps so it doesn't machine-gun
+FOOTSTEP_ARMOR_CHANCE_SPRINT = 0.95;
+FOOTSTEP_ARMOR_PITCH_MIN = 1.05;          // Brighter jingle vs jump whoosh
+FOOTSTEP_ARMOR_PITCH_MAX = 1.28;
+FOOTSTEP_ARMOR_VOL_MIN = 0.18;            // Bed under cave thud
+FOOTSTEP_ARMOR_VOL_MAX = 0.34;            // Still under sprint step
+FOOTSTEP_ARMOR_REEL_NORM = 0.8;           // Armor intensity on reel-back skid contacts
+footstep_armor_last = -1;
+// Armor rustle pool — snd_chainmail_1..6 for jump / dash / Perfect Dodge
+JUMP_SFX_PITCH_MIN = 0.92;
+JUMP_SFX_PITCH_MAX = 1.18;
+JUMP_SFX_GAIN      = 0.9;
+jump_sfx_last      = -1; // Shared last-clip index across jump / dash
+// Perfect Dodge — snd_air_flip_parry
+PERFECT_DODGE_SFX_PITCH_MIN = 0.88;
+PERFECT_DODGE_SFX_PITCH_MAX = 1.14;
+PERFECT_DODGE_SFX_GAIN      = 0.9;
 // Ground debris — purple kick-up at feet (walk, run, reel-back, land).
 GROUND_DEBRIS_ENABLED = true;
 GROUND_DEBRIS_MAX = 80;
@@ -220,7 +239,8 @@ sprint_air_trail = false;       // Afterimages in air after sprint jump until la
 sprint_reel_active = false;     // spr_mc_reelback playing
 sprint_reel_pending = false;    // Armed after sprint ends — reel when direction released
 sprint_reel_dir_wait = 0;       // Frames to wait for direction to release after Z up before assuming walk intent
-sprint_reel_wall = false;       // Reel forced by dash/sprint into wall — ignore held dir until done
+sprint_reel_wall = false;       // Reel forced by dash/sprint dead-stop into wall
+sprint_reel_wall_dir = 0;       // Direction into the wall when wall-reel armed (cancel if leaving)
 SPRINT_REEL_DIR_WAIT_FRAMES = 14; // ~230ms @60fps — forgiving staggered key release when stopping from sprint
 sprint_committed = false;       // Active sprint / dash session
 sprint_hold_latched = false;    // Hold Z after burst → sustained runsp (directional sprint only)
@@ -322,6 +342,11 @@ DASH_BURST_PARTICLE_LIFE_MAX = 22;
 DASH_BURST_PARTICLE_ALPHA = 0.6;
 DASH_BURST_TRAIL_FRAMES = 7;    // Extra wake motes for a few frames after activate
 PERFECT_DODGE_PARTICLE_COUNT = 10; // Opening burst; trail continues during flip
+DOUBLE_JUMP_PARTICLE_COUNT = 14; // Same motes, outward then gravity-arc fall
+DOUBLE_JUMP_PARTICLE_SPEED_MIN = 1.8;
+DOUBLE_JUMP_PARTICLE_SPEED_MAX = 3.6;
+DOUBLE_JUMP_PARTICLE_LIFE_MIN = 16;
+DOUBLE_JUMP_PARTICLE_LIFE_MAX = 28;
 dash_spark_list = [];
 dash_spark_emit = 0;
 dash_spark_emit_dir = 1;
@@ -463,7 +488,15 @@ saber_trail_prev_tip_y = 0;
 ATTACK_IMPACT_PITCH_MIN = 0.86;
 ATTACK_IMPACT_PITCH_MAX = 1.12;
 ATTACK_IMPACT_GAIN      = 0.9;
+CRYSTAL_HIT_GAIN        = 1.45; // Glass smash needs headroom vs wet combat bus
 attack_clank_last       = -1;   // Last clank clip index (avoids back-to-back repeats)
+attack_crystal_hit_last = -1;
+
+// Saber swing whoosh — snd_swing1 / snd_swing2 + pitch (atk1 & atk2)
+ATTACK_SWING_PITCH_MIN = 0.88;
+ATTACK_SWING_PITCH_MAX = 1.14;
+ATTACK_SWING_GAIN      = 0.85;
+attack_swing_last      = -1;
 
 ENEMY_HIT_PRESSURE_WINDOW_FRAMES = 45;
 HIT_PRESSURE_KB_PER_STACK = 0.08;

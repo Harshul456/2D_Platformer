@@ -83,6 +83,144 @@ function scr_player_footstep_play_cave(_speed_norm) {
     }
 }
 
+/// @function scr_player_footstep_play_armor
+/// @description Soft chainmail bed under a footfall — quieter than the cave step, scales with speed.
+/// @param {Real} [_speed_norm] 0..1 jog→sprint
+/// @param {Bool} [_land] Landing layer (slightly fuller rustle)
+function scr_player_footstep_play_armor(_speed_norm, _land = false) {
+    if (variable_instance_exists(id, "FOOTSTEP_ARMOR_ENABLED") && !FOOTSTEP_ARMOR_ENABLED) return;
+
+    if (argument_count < 1) _speed_norm = scr_player_footsteps_speed_norm();
+
+    // Not every jog step — sprint denser so armor reads with pace
+    var _chance_lo = (variable_instance_exists(id, "FOOTSTEP_ARMOR_CHANCE_JOG")
+        ? FOOTSTEP_ARMOR_CHANCE_JOG : 0.72);
+    var _chance_hi = (variable_instance_exists(id, "FOOTSTEP_ARMOR_CHANCE_SPRINT")
+        ? FOOTSTEP_ARMOR_CHANCE_SPRINT : 0.95);
+    var _chance = _land ? 1 : lerp(_chance_lo, _chance_hi, _speed_norm);
+    if (random(1) > _chance) return;
+
+    var _clips = [
+        snd_chainmail_1, snd_chainmail_2, snd_chainmail_3,
+        snd_chainmail_4, snd_chainmail_5, snd_chainmail_6
+    ];
+    var _pick = irandom(array_length(_clips) - 1);
+    if (variable_instance_exists(id, "footstep_armor_last")
+        && _pick == footstep_armor_last && random(1) < 0.75) {
+        _pick = (_pick + 1 + irandom(2)) mod array_length(_clips);
+    }
+    footstep_armor_last = _pick;
+
+    var _pitch_lo = (variable_instance_exists(id, "FOOTSTEP_ARMOR_PITCH_MIN")
+        ? FOOTSTEP_ARMOR_PITCH_MIN : 1.05);
+    var _pitch_hi = (variable_instance_exists(id, "FOOTSTEP_ARMOR_PITCH_MAX")
+        ? FOOTSTEP_ARMOR_PITCH_MAX : 1.28);
+    var _vol_lo = (variable_instance_exists(id, "FOOTSTEP_ARMOR_VOL_MIN")
+        ? FOOTSTEP_ARMOR_VOL_MIN : 0.18);
+    var _vol_hi = (variable_instance_exists(id, "FOOTSTEP_ARMOR_VOL_MAX")
+        ? FOOTSTEP_ARMOR_VOL_MAX : 0.34);
+
+    // Brighter / quieter than jump-dash whoosh — sits under the stone thud
+    var _pitch = random_range(_pitch_lo, _pitch_hi);
+    var _gain = lerp(_vol_lo, _vol_hi, _speed_norm) * random_range(0.88, 1.05);
+    if (_land) {
+        _pitch *= 0.92;
+        _gain  *= 1.25;
+    }
+
+    var _prio = (variable_instance_exists(id, "FOOTSTEP_AUDIO_PRIORITY")
+        ? max(1, FOOTSTEP_AUDIO_PRIORITY - 1) : 7);
+
+    if (variable_global_exists("sfx_cave_emitter")) {
+        audio_play_sound_on(global.sfx_cave_emitter, _clips[_pick], false, _prio, _gain, 0, _pitch);
+    } else {
+        var _snd_id = audio_play_sound(_clips[_pick], _prio, false);
+        if (_snd_id != -1) {
+            audio_sound_pitch(_snd_id, _pitch);
+            audio_sound_gain(_snd_id, _gain, 0);
+        }
+    }
+}
+
+/// @function scr_player_whoosh_sfx
+/// @description Shared armor rustle (sliced from snd_chainmail_chunks) — jump, dash, Perfect Dodge.
+/// @param {Bool} [_heavy] Double jump / Perfect Dodge — slightly lower + louder.
+function scr_player_whoosh_sfx(_heavy = false) {
+    var _clips = [
+        snd_chainmail_1, snd_chainmail_2, snd_chainmail_3,
+        snd_chainmail_4, snd_chainmail_5, snd_chainmail_6
+    ];
+
+    // Avoid repeating the same clip back-to-back (shared across jump / dash / PD)
+    var _pick = irandom(array_length(_clips) - 1);
+    if (variable_instance_exists(id, "jump_sfx_last")
+        && _pick == jump_sfx_last && random(1) < 0.7) {
+        _pick = (_pick + 1 + irandom(2)) mod array_length(_clips);
+    }
+    jump_sfx_last = _pick;
+
+    var _pitch_lo = (variable_instance_exists(id, "JUMP_SFX_PITCH_MIN") ? JUMP_SFX_PITCH_MIN : 0.88);
+    var _pitch_hi = (variable_instance_exists(id, "JUMP_SFX_PITCH_MAX") ? JUMP_SFX_PITCH_MAX : 1.14);
+    var _gain     = (variable_instance_exists(id, "JUMP_SFX_GAIN") ? JUMP_SFX_GAIN : 0.85);
+
+    var _pitch = random_range(_pitch_lo, _pitch_hi);
+    if (_heavy) {
+        _pitch *= 0.9;
+        _gain  *= 1.1;
+    }
+
+    var _prio = 11;
+    // Same cavern reverb as footstep armor / cave steps (not the combat hit bus)
+    if (variable_global_exists("sfx_cave_emitter")) {
+        return audio_play_sound_on(global.sfx_cave_emitter, _clips[_pick], false, _prio, _gain, 0, _pitch);
+    }
+    if (variable_global_exists("sfx_combat_emitter")) {
+        return audio_play_sound_on(global.sfx_combat_emitter, _clips[_pick], false, _prio, _gain, 0, _pitch);
+    }
+
+    var _snd_id = audio_play_sound(_clips[_pick], _prio, false);
+    if (_snd_id != -1) {
+        audio_sound_pitch(_snd_id, _pitch);
+        audio_sound_gain(_snd_id, _gain, 0);
+    }
+    return _snd_id;
+}
+
+/// @function scr_player_jump_sfx
+/// @description Jump / double-jump whoosh wrapper.
+/// @param {Bool} [_double_jump]
+function scr_player_jump_sfx(_double_jump = false) {
+    return scr_player_whoosh_sfx(_double_jump);
+}
+
+/// @function scr_player_perfect_dodge_sfx
+/// @description Perfect Dodge air-flip parry — pitch variety, same bus pattern as swings/whoosh.
+function scr_player_perfect_dodge_sfx() {
+    var _snd = snd_air_flip_parry;
+    var _pitch_lo = (variable_instance_exists(id, "PERFECT_DODGE_SFX_PITCH_MIN")
+        ? PERFECT_DODGE_SFX_PITCH_MIN : 0.88);
+    var _pitch_hi = (variable_instance_exists(id, "PERFECT_DODGE_SFX_PITCH_MAX")
+        ? PERFECT_DODGE_SFX_PITCH_MAX : 1.14);
+    var _gain = (variable_instance_exists(id, "PERFECT_DODGE_SFX_GAIN")
+        ? PERFECT_DODGE_SFX_GAIN : 0.9);
+    var _pitch = random_range(_pitch_lo, _pitch_hi);
+    var _prio = 12;
+
+    if (variable_global_exists("sfx_combat_emitter")) {
+        return audio_play_sound_on(global.sfx_combat_emitter, _snd, false, _prio, _gain, 0, _pitch);
+    }
+    if (variable_global_exists("sfx_cave_emitter")) {
+        return audio_play_sound_on(global.sfx_cave_emitter, _snd, false, _prio, _gain, 0, _pitch);
+    }
+
+    var _snd_id = audio_play_sound(_snd, _prio, false);
+    if (_snd_id != -1) {
+        audio_sound_pitch(_snd_id, _pitch);
+        audio_sound_gain(_snd_id, _gain, 0);
+    }
+    return _snd_id;
+}
+
 /// @function scr_player_footstep_play_land
 /// @param {Real} _impact_vsp Downward speed on the frame before touchdown (scales pitch/volume).
 function scr_player_footstep_play_land(_impact_vsp) {
@@ -133,6 +271,10 @@ function scr_player_footsteps_land_check() {
         if (_fall_vsp >= _min_vsp && _air_frames >= _min_air) {
             if (variable_instance_exists(id, "FOOTSTEP_CAVE_ENABLED") ? FOOTSTEP_CAVE_ENABLED : true) {
                 scr_player_footstep_play_land(_fall_vsp);
+                // Soft armor settle under the land thud
+                var _land_norm = clamp(_fall_vsp / max(0.01,
+                    (variable_instance_exists(id, "LAND_SOUND_VSP_REF") ? LAND_SOUND_VSP_REF : 8)), 0.35, 1);
+                scr_player_footstep_play_armor(_land_norm, true);
             }
             if (variable_instance_exists(id, "GROUND_DEBRIS_ENABLED") ? GROUND_DEBRIS_ENABLED : true) {
                 scr_player_ground_debris_on_land(_fall_vsp);
@@ -203,8 +345,17 @@ function scr_player_footsteps_step() {
 
     var _speed_norm = scr_player_footsteps_speed_norm();
 
-    if (_sfx_on && sprite_index != spr_mc_reelback) {
-        scr_player_footstep_play_cave(_speed_norm);
+    if (_sfx_on) {
+        if (sprite_index == spr_mc_reelback) {
+            // Skid: chainmail only (no cave thud — feet aren't stepping)
+            // Slightly fuller always-play rustle so the stop reads armored
+            var _reel_armor = (variable_instance_exists(id, "FOOTSTEP_ARMOR_REEL_NORM")
+                ? FOOTSTEP_ARMOR_REEL_NORM : 0.8);
+            scr_player_footstep_play_armor(_reel_armor, true);
+        } else {
+            scr_player_footstep_play_cave(_speed_norm);
+            scr_player_footstep_play_armor(_speed_norm, false);
+        }
     }
     if (_debris_on) {
         scr_player_ground_debris_on_step_contact(_speed_norm);

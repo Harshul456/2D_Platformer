@@ -85,36 +85,85 @@ function scr_player_impact_lines_draw() {
     }
 }
 
-/// @function scr_player_attack_impact_sfx
-/// @description Random clank with pitch variation, played through the cave reverb bus.
-function scr_player_attack_impact_sfx(_finisher = false) {
-    var _clanks = [snd_clank_1, snd_clank_2, snd_clank_3];
+/// @function scr_player_attack_swing_sfx
+/// @description Saber swing whoosh — random clip + pitch, cave reverb bus (atk1 / atk2).
+/// @param {Bool} [_finisher] Atk2 / heavier swing — slightly lower + louder.
+function scr_player_attack_swing_sfx(_finisher = false) {
+    var _swings = [snd_swing1, snd_swing2];
 
     // Avoid repeating the same clip back-to-back
-    var _pick = irandom(array_length(_clanks) - 1);
-    if (variable_instance_exists(id, "attack_clank_last")
-        && _pick == attack_clank_last && random(1) < 0.7) {
-        _pick = (_pick + 1 + irandom(1)) mod array_length(_clanks);
+    var _pick = irandom(array_length(_swings) - 1);
+    if (variable_instance_exists(id, "attack_swing_last")
+        && _pick == attack_swing_last && random(1) < 0.7) {
+        _pick = (_pick + 1) mod array_length(_swings);
     }
-    attack_clank_last = _pick;
+    attack_swing_last = _pick;
+
+    var _pitch_lo = (variable_instance_exists(id, "ATTACK_SWING_PITCH_MIN") ? ATTACK_SWING_PITCH_MIN : 0.88);
+    var _pitch_hi = (variable_instance_exists(id, "ATTACK_SWING_PITCH_MAX") ? ATTACK_SWING_PITCH_MAX : 1.14);
+    var _gain     = (variable_instance_exists(id, "ATTACK_SWING_GAIN") ? ATTACK_SWING_GAIN : 0.85);
+
+    var _pitch = random_range(_pitch_lo, _pitch_hi);
+    if (_finisher) {
+        _pitch *= 0.9;  // Slightly beefier whoosh on atk2
+        _gain  *= 1.1;
+    }
+
+    var _prio = 11;
+    if (variable_global_exists("sfx_combat_emitter")) {
+        return audio_play_sound_on(global.sfx_combat_emitter, _swings[_pick], false, _prio, _gain, 0, _pitch);
+    }
+
+    var _snd_id = audio_play_sound(_swings[_pick], _prio, false);
+    if (_snd_id != -1) {
+        audio_sound_pitch(_snd_id, _pitch);
+        audio_sound_gain(_snd_id, _gain, 0);
+    }
+    return _snd_id;
+}
+
+/// @function scr_player_attack_impact_sfx
+/// @description Random impact with pitch variation (crystal hits on core, else clanks). Cave reverb bus.
+/// @param {Bool} [_finisher]
+/// @param {Id.Instance} [_enemy] Hit target — crystal core uses snd_crystal_hit_*
+function scr_player_attack_impact_sfx(_finisher = false, _enemy = noone) {
+    var _crystal = (_enemy != noone && instance_exists(_enemy)
+        && (_enemy.object_index == obj_enemy
+            || object_is_ancestor(_enemy.object_index, obj_enemy_parent)));
+
+    var _clips = _crystal
+        ? [snd_crystal_hit_1, snd_crystal_hit_2, snd_crystal_hit_3]
+        : [snd_clank_1, snd_clank_2, snd_clank_3];
+
+    // Avoid repeating the same clip back-to-back
+    var _last_name = _crystal ? "attack_crystal_hit_last" : "attack_clank_last";
+    var _pick = irandom(array_length(_clips) - 1);
+    if (variable_instance_exists(id, _last_name)
+        && _pick == variable_instance_get(id, _last_name) && random(1) < 0.7) {
+        _pick = (_pick + 1 + irandom(1)) mod array_length(_clips);
+    }
+    variable_instance_set(id, _last_name, _pick);
 
     var _pitch_lo = (variable_instance_exists(id, "ATTACK_IMPACT_PITCH_MIN") ? ATTACK_IMPACT_PITCH_MIN : 0.86);
     var _pitch_hi = (variable_instance_exists(id, "ATTACK_IMPACT_PITCH_MAX") ? ATTACK_IMPACT_PITCH_MAX : 1.12);
     var _gain     = (variable_instance_exists(id, "ATTACK_IMPACT_GAIN") ? ATTACK_IMPACT_GAIN : 0.9);
+    if (_crystal && variable_instance_exists(id, "CRYSTAL_HIT_GAIN")) {
+        _gain = CRYSTAL_HIT_GAIN;
+    }
 
     var _pitch = random_range(_pitch_lo, _pitch_hi);
     if (_finisher) {
-        _pitch *= 0.85; // Beefier, lower clank on finishers
-        _gain  *= 1.15;
+        _pitch *= 0.85; // Beefier, lower hit on finishers
+        _gain  *= 1.2;
     }
 
     var _prio = 12;
     if (variable_global_exists("sfx_combat_emitter")) {
         // audio_play_sound_on(emitter, sound, loop, priority, gain, offset, pitch)
-        return audio_play_sound_on(global.sfx_combat_emitter, _clanks[_pick], false, _prio, _gain, 0, _pitch);
+        return audio_play_sound_on(global.sfx_combat_emitter, _clips[_pick], false, _prio, _gain, 0, _pitch);
     }
 
-    var _snd_id = audio_play_sound(_clanks[_pick], _prio, false);
+    var _snd_id = audio_play_sound(_clips[_pick], _prio, false);
     if (_snd_id != -1) {
         audio_sound_pitch(_snd_id, _pitch);
         audio_sound_gain(_snd_id, _gain, 0);
@@ -134,9 +183,9 @@ function scr_player_impact_lines_on_hit(_x1, _y1, _x2, _y2, _enemy = noone, _ski
 
     var _finisher = (comboCount >= 2);
 
-    // Cave-reverb clank with randomized pitch (once per landed hit)
+    // Cave-reverb impact with randomized pitch (crystal hits on core)
     if (!_skip_sfx) {
-        scr_player_attack_impact_sfx(_finisher);
+        scr_player_attack_impact_sfx(_finisher, _enemy);
     }
 
     var _angle;

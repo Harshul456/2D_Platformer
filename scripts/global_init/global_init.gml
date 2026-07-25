@@ -95,7 +95,7 @@ if (!variable_global_exists("sfx_cave_emitter")) {
     var _cave_reverb = audio_effect_create(AudioEffectType.Reverb1);
     _cave_reverb.size = 0.85;   // Big, open cavern
     _cave_reverb.damp = 0.40;   // Wet-stone high-frequency damping
-    _cave_reverb.mix  = 0.42;   // Noticeably echoey tail (wetter than combat hits)
+    _cave_reverb.mix  = 0.32;   // Echo tail without burying the dry footstep punch
     global.sfx_cave_bus.effects[0] = _cave_reverb;
 
     global.sfx_cave_reverb = _cave_reverb; // Handle kept for runtime tuning

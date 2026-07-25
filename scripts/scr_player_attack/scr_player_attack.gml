@@ -85,6 +85,9 @@ function scr_player_attack() {
     image_index = 0;
     image_speed = 1;
 
+    // Saber whoosh — random swing clip + pitch (same idea as impact clanks)
+    scr_player_attack_swing_sfx(comboCount >= 2);
+
     // Hard cancel sprint/dash/reel — must not be gated on image_index (float / remap races).
     is_sprinting = false;
     sprint_afterimage_tick = 0;

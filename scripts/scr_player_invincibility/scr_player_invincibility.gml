@@ -94,6 +94,53 @@ function scr_player_dash_particles_burst() {
     scr_player_mote_burst(_dir, _cols, _count, true);
 }
 
+/// @function scr_player_double_jump_particles_burst
+/// @description Same crystal motes as dash, sprayed outward then arcing down under gravity.
+function scr_player_double_jump_particles_burst() {
+    if (!variable_instance_exists(id, "dash_spark_list")) dash_spark_list = [];
+
+    var _cols = [c_white, make_color_rgb(230, 240, 255), make_color_rgb(200, 220, 255)];
+    var _count = variable_instance_exists(id, "DOUBLE_JUMP_PARTICLE_COUNT")
+        ? DOUBLE_JUMP_PARTICLE_COUNT : 14;
+    var _spd_lo = variable_instance_exists(id, "DOUBLE_JUMP_PARTICLE_SPEED_MIN")
+        ? DOUBLE_JUMP_PARTICLE_SPEED_MIN : 1.8;
+    var _spd_hi = variable_instance_exists(id, "DOUBLE_JUMP_PARTICLE_SPEED_MAX")
+        ? DOUBLE_JUMP_PARTICLE_SPEED_MAX : 3.6;
+    var _life_lo = variable_instance_exists(id, "DOUBLE_JUMP_PARTICLE_LIFE_MIN")
+        ? DOUBLE_JUMP_PARTICLE_LIFE_MIN : 16;
+    var _life_hi = variable_instance_exists(id, "DOUBLE_JUMP_PARTICLE_LIFE_MAX")
+        ? DOUBLE_JUMP_PARTICLE_LIFE_MAX : 28;
+
+    // Torso of the flip / double-jump pose (not feet)
+    var _cx = (bbox_left + bbox_right) * 0.5;
+    var _cy = (bbox_top + bbox_bottom) * 0.5;
+
+    while (array_length(dash_spark_list) + _count > 48) {
+        array_delete(dash_spark_list, 0, 1);
+    }
+
+    repeat (_count) {
+        // Left / right outward cone with a slight upward kick → gravity curves the fall
+        var _side = (irandom(1) == 0) ? -1 : 1;
+        var _ang = (_side > 0) ? random_range(-55, 35) : random_range(145, 235);
+        var _spd = random_range(_spd_lo, _spd_hi);
+        var _life = irandom_range(_life_lo, _life_hi);
+        var _up = random_range(0.9, 2.4);
+        array_push(dash_spark_list, {
+            x: _cx + _side * random_range(2, 10) + random_range(-2, 2),
+            y: _cy + random_range(-6, 6),
+            vx: lengthdir_x(_spd, _ang),
+            vy: lengthdir_y(_spd, _ang) * 0.55 - _up,
+            life: _life,
+            max_life: _life,
+            twinkle_phase: random(360),
+            drag: random_range(0.95, 0.985),
+            grav: random_range(0.14, 0.22),
+            col: _cols[irandom(array_length(_cols) - 1)]
+        });
+    }
+}
+
 /// @function scr_player_perfect_dodge_particle_colors
 /// @returns {Array} Icy blues matching the Perfect Dodge focus circle.
 function scr_player_perfect_dodge_particle_colors() {
@@ -206,7 +253,11 @@ function scr_player_dash_particles_step() {
         _p.y += _p.vy;
         _p.vx *= _p.drag;
         _p.vy *= _p.drag;
-        _p.vy -= 0.02;
+        if (variable_struct_exists(_p, "grav")) {
+            _p.vy += _p.grav; // Double-jump arc — outward then fall
+        } else {
+            _p.vy -= 0.02; // Dash / PD motes float slightly
+        }
         _p.twinkle_phase += 14;
 
         if (_p.life <= 0) {
@@ -263,6 +314,7 @@ function scr_player_dash_iframes_begin() {
     dash_iframe_timer = max(dash_iframe_timer, _frames);
     if (variable_instance_exists(id, "perfect_dodge_used")) perfect_dodge_used = false;
     scr_player_dash_particles_burst();
+    scr_player_whoosh_sfx(false); // Same jump whoosh pool as ground jump
 }
 
 /// @function scr_player_has_damage_iframes

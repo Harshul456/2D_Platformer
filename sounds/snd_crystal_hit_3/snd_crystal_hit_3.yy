@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"snd_crystal_hit_3",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":0.775805,
+  "exportDir":"",
+  "name":"snd_crystal_hit_3",
+  "parent":{
+    "name":"crystal_enemy_sfx",
+    "path":"folders/Sounds/sfx/crystal_enemy_sfx.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"snd_crystal_hit_3.wav",
+  "volume":1.0,
+}

@@ -159,6 +159,8 @@ function scr_player_perfect_dodge_try_trigger() {
     perfect_dodge_aura_timer = HIT_DISTORT_LIFE;
     // Icy blue crystal-style motes (front + trail) matching the focus circle
     scr_player_perfect_dodge_particles_burst();
+    // Air-flip parry whoosh (snd_air_flip_parry) — same pitch/gain pattern as swings
+    scr_player_perfect_dodge_sfx();
 
     // Keep brief safety i-frames through the window
     dash_iframe_timer = max(dash_iframe_timer, perfect_dodge_timer);
@@ -320,39 +322,35 @@ function scr_player_dodge_counter_move_toward(_tx, _ty, _rate) {
 }
 
 /// @function scr_player_dodge_counter_flurry_sfx
-/// @description Rapid overlapping clanks — reads as a flurry of hits.
+/// @description Rapid overlapping swings (snd_swing1) — rising pitch reads as a multi-hit flurry.
 function scr_player_dodge_counter_flurry_sfx(_hit_index) {
-    var _clanks = [snd_clank_1, snd_clank_2, snd_clank_3];
-    var _pick = irandom(array_length(_clanks) - 1);
-    if (variable_instance_exists(id, "attack_clank_last")
-        && _pick == attack_clank_last) {
-        _pick = (_pick + 1 + irandom(1)) mod array_length(_clanks);
-    }
-    attack_clank_last = _pick;
+    var _swing = snd_swing1;
+    var _base_gain = (variable_instance_exists(id, "ATTACK_SWING_GAIN") ? ATTACK_SWING_GAIN : 0.85);
 
-    var _pitch = 1.05 + (_hit_index * 0.06) + random_range(-0.04, 0.08);
-    _pitch = clamp(_pitch, 0.95, 1.55);
-    var _gain = 0.55 + min(0.25, _hit_index * 0.03);
+    // Climb pitch across the barrage so it feels like accelerating cuts
+    var _pitch = 0.92 + (_hit_index * 0.07) + random_range(-0.03, 0.06);
+    _pitch = clamp(_pitch, 0.85, 1.55);
+    var _gain = (_base_gain * 0.7) + min(0.22, _hit_index * 0.035);
     var _prio = 13;
 
     if (variable_global_exists("sfx_combat_emitter")) {
-        audio_play_sound_on(global.sfx_combat_emitter, _clanks[_pick], false, _prio, _gain, 0, _pitch);
+        audio_play_sound_on(global.sfx_combat_emitter, _swing, false, _prio, _gain, 0, _pitch);
     } else {
-        var _snd_id = audio_play_sound(_clanks[_pick], _prio, false);
+        var _snd_id = audio_play_sound(_swing, _prio, false);
         if (_snd_id != -1) {
             audio_sound_pitch(_snd_id, _pitch);
             audio_sound_gain(_snd_id, _gain, 0);
         }
     }
 
+    // Every other tick: layer a second higher whoosh for density
     if ((_hit_index mod 2) == 0) {
-        var _pick2 = (_pick + 1 + irandom(1)) mod array_length(_clanks);
-        var _pitch2 = _pitch * random_range(1.08, 1.22);
-        var _gain2 = _gain * 0.65;
+        var _pitch2 = _pitch * random_range(1.1, 1.25);
+        var _gain2 = _gain * 0.55;
         if (variable_global_exists("sfx_combat_emitter")) {
-            audio_play_sound_on(global.sfx_combat_emitter, _clanks[_pick2], false, _prio - 1, _gain2, 0, _pitch2);
+            audio_play_sound_on(global.sfx_combat_emitter, _swing, false, _prio - 1, _gain2, 0, _pitch2);
         } else {
-            var _s2 = audio_play_sound(_clanks[_pick2], _prio - 1, false);
+            var _s2 = audio_play_sound(_swing, _prio - 1, false);
             if (_s2 != -1) {
                 audio_sound_pitch(_s2, _pitch2);
                 audio_sound_gain(_s2, _gain2, 0);

@@ -404,6 +404,7 @@ function scr_player_movement() {
             last_direction = -wall_side;
             jump_buffer_timer = 0;
             jumped_this_frame = true;
+            scr_player_jump_sfx(true); // Wall kick — double-jump weight
             scr_player_ground_debris_on_wall_jump();
             wall_cling_debris_active = false;
             jump_count = 2;
@@ -447,11 +448,14 @@ function scr_player_movement() {
             sprint_reel_active = false;
             sprint_reel_pending = false;
             sprint_reel_wall = false;
-            if (!_jump_from_grounded && jump_count >= 2) {
+            var _is_double_jump = (!_jump_from_grounded && jump_count >= 2);
+            scr_player_jump_sfx(_is_double_jump);
+            if (_is_double_jump) {
                 air_chain_jump_used = true;
                 double_jump_anim_active = true;
                 double_jump_anim_tick = 0;
                 scr_player_jump_stretch_trigger();
+                scr_player_double_jump_particles_burst();
             }
             
             if (_grounded_jump) {
@@ -625,11 +629,12 @@ function scr_player_movement() {
                 sprint_jump_carry = false;
                 hsp = 0;
                 runMomentum = 0;
-                // Dash/sprint into wall — play reel-back (even if still holding into the wall)
+                // Dead-stop into wall only — reel while jammed; cancel if they push off later
                 if (_wall_was_dash && grounded && !jumped_this_frame) {
                     sprint_reel_pending = true;
                     sprint_reel_active = true;
                     sprint_reel_wall = true;
+                    sprint_reel_wall_dir = inputDir; // into-wall dir (blocked probe uses this)
                     sprint_reel_dir_wait = 0;
                 }
             }
@@ -1042,11 +1047,15 @@ function scr_player_movement() {
                             sprint_air_trail = false;
                             sprint_jump_carry = false;
                             sprint_afterimage_tick = 0;
-                            // Initial dash into a wall should reel, not snap straight to idle.
-                            if (_wall_was_dash && grounded) {
+                            // Dead-stop into wall only — skip reel if already holding away to leave
+                            var _into_wall = sign(_h_step);
+                            var _input_wall = (key_right - key_left);
+                            var _dead_stop = (_input_wall == 0 || _input_wall == _into_wall);
+                            if (_wall_was_dash && grounded && _dead_stop) {
                                 sprint_reel_pending = true;
                                 sprint_reel_active = true;
                                 sprint_reel_wall = true;
+                                sprint_reel_wall_dir = _into_wall;
                                 sprint_reel_dir_wait = 0;
                             }
                             // Keep Z latched so releasing off the wall can re-commit sprint immediately.
@@ -1207,6 +1216,7 @@ function scr_player_movement() {
             last_direction = -wall_side;
             jump_buffer_timer = 0;
             jumped_this_frame = true;
+            scr_player_jump_sfx(true); // Wall kick — double-jump weight
             scr_player_ground_debris_on_wall_jump();
             wall_cling_debris_active = false;
             jump_count = 2;
@@ -2171,13 +2181,34 @@ function scr_player_movement() {
                 image_index = 0;
             } else if (is_sprinting || sprint_committed) {
                 sprint_reel_active = false;
+                sprint_reel_wall = false;
+                sprint_reel_wall_dir = 0;
                 if (sprite_index != spr_mc_sprint) { sprite_index = spr_mc_sprint; image_index = 0; }
                 image_speed = 1;
-            } else if (sprint_reel_active || sprite_index == spr_mc_reelback
+            } else {
+            // Wall reel is for a true dead-stop into the wall only. If we start moving
+            // again (or push off the opposite way), drop the lock so jog/sprint can take over.
+            if (sprint_reel_wall) {
+                var _leave_wall_reel = (abs(hsp) > MOVEMENT_THRESHOLD)
+                    || (_input_dir != 0 && sprint_reel_wall_dir != 0 && _input_dir != sprint_reel_wall_dir);
+                if (_leave_wall_reel) {
+                    sprint_reel_wall = false;
+                    sprint_reel_wall_dir = 0;
+                    sprint_reel_active = false;
+                    sprint_reel_pending = false;
+                    // Drop reel pose immediately so sprite_index == reelback can't re-arm this frame
+                    if (sprite_index == spr_mc_reelback) {
+                        sprite_index = (abs(hsp) > MOVEMENT_THRESHOLD) ? spr_mc_jog : spr_mc_idle;
+                        image_index = 0;
+                    }
+                }
+            }
+
+            if (sprint_reel_active || sprite_index == spr_mc_reelback
                 || sprint_reel_wall
                 || (sprint_reel_pending && !(key_left || key_right))) {
                 // Play reel as soon as direction is released — do NOT wait for Z up.
-                // Wall-forced reel keeps playing even while still holding into the wall.
+                // Wall dead-stop: keep reel while jammed into the wall (holding into it / no dir).
                 sprint_reel_active = true;
                 sprint_reel_pending = false;
                 sprint_reel_dir_wait = 0;
@@ -2193,6 +2224,7 @@ function scr_player_movement() {
                 } else if (image_index >= sprite_get_number(spr_mc_reelback) - 0.1) {
                     sprint_reel_active = false;
                     sprint_reel_wall = false;
+                    sprint_reel_wall_dir = 0;
                     sprite_index = spr_mc_idle;
                     image_index = 0;
                 }
@@ -2216,10 +2248,12 @@ function scr_player_movement() {
                     image_index = 0;
                 }
             }
+            } // end ground locomotion (reel / pending / walk-idle)
         } else {
             sprint_reel_active = false;
             sprint_reel_pending = false;
             sprint_reel_wall = false;
+            sprint_reel_wall_dir = 0;
             sprint_reel_dir_wait = 0;
             // Air logic — wall cling / wall-jump pose (MMX wall_slide + wall_jump anim), then jump rise / peak / fall
             if (wall_jump_kick_hold_timer > 0) {
