@@ -46,12 +46,18 @@ if (scr_hitstop_handler()) {
     exit;
 }
 
-// Dead: pit tumble or void dissolve — no combat / anim updates until respawn finishes.
-if (is_dying || (death_is_dissolve && death_fade_phase != DEATH_SEQ.NONE)) {
+// Dead: pit tumble or void dissolve — lock gameplay until spawn fade-in.
+// FADE_IN keeps the veil overlay but allows normal Step so respawn doesn't feel frozen.
+if (is_dying || (death_is_dissolve && death_fade_phase != DEATH_SEQ.NONE
+    && death_fade_phase != DEATH_SEQ.FADE_IN)) {
     if (death_is_dissolve) scr_player_death_sequence_step();
     // Pit fall only — combat death hurt/dissolve is planted inside the death sequence.
     if (is_dying && !death_is_dissolve) scr_player_movement();
     exit;
+}
+// Spawn reveal: tick the fade, then continue into normal movement/combat.
+if (death_is_dissolve && death_fade_phase == DEATH_SEQ.FADE_IN) {
+    scr_player_death_sequence_step();
 }
 
 // Perfect Dodge slow-mo window — attack to Counter, else expire to free.

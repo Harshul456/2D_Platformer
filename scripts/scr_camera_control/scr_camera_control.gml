@@ -10,12 +10,15 @@ function scr_camera_clear_shake() {
 
 /// @function scr_camera_death_view_locked
 /// @description True while dissolve holds the camera (shake must not queue or tick here).
+/// FADE_IN is unlocked so spawn play isn't frozen under the veil.
 function scr_camera_death_view_locked() {
     if (!instance_exists(obj_player)) return false;
     with (obj_player) {
         if (!variable_instance_exists(id, "death_is_dissolve") || !death_is_dissolve) return false;
         if (!variable_instance_exists(id, "death_fade_phase")) return false;
-        return (death_fade_phase != DEATH_SEQ.NONE && death_fade_phase != DEATH_SEQ.HURT);
+        return (death_fade_phase == DEATH_SEQ.HOLD
+            || death_fade_phase == DEATH_SEQ.FADE_OUT
+            || death_fade_phase == DEATH_SEQ.BLACK);
     }
     return false;
 }

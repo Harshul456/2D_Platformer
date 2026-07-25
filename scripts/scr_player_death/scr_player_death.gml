@@ -129,6 +129,9 @@ function scr_player_respawn(_unlock_move = true) {
     sprite_index = spr_mc_idle;
     image_index = 0;
     image_speed = 1;
+    // Always face right on respawn (ignore death facing)
+    last_direction = 1;
+    image_xscale = abs(image_base_scale);
 
     if (variable_instance_exists(id, "bulb_light") && bulb_light != undefined) {
         bulb_light.x = x;
@@ -266,6 +269,13 @@ function scr_player_death_sequence_step() {
             if (death_seq_timer <= 0) {
                 death_fade_phase = DEATH_SEQ.FADE_IN;
                 death_seq_timer = _fin;
+                // Unlock immediately — don't freeze control for the whole fade-in beat.
+                can_move = true;
+                if (variable_global_exists("hitstop")) global.hitstop = 0;
+                scr_camera_clear_shake();
+                scr_player_clear_hurt_state();
+                last_direction = 1;
+                image_xscale = abs(image_base_scale);
             }
             break;
 
@@ -273,6 +283,8 @@ function scr_player_death_sequence_step() {
             death_seq_timer--;
             var _u_in = death_seq_timer / max(1, _fin);
             death_fade_alpha = scr_player_death_ease(_u_in);
+            // Keep hitstop dead during reveal (wall-kill juice must not stall spawn)
+            if (variable_global_exists("hitstop")) global.hitstop = 0;
             if (death_seq_timer <= 0) {
                 death_fade_alpha = 0;
                 death_fade_phase = DEATH_SEQ.NONE;
@@ -285,9 +297,14 @@ function scr_player_death_sequence_step() {
                 if (variable_global_exists("hitstop")) global.hitstop = 0;
                 scr_camera_clear_shake();
                 scr_player_clear_hurt_state();
-                sprite_index = spr_mc_idle;
-                image_index = 0;
+                if (sprite_index != spr_mc_idle && sprite_index != spr_mc_jog
+                    && sprite_index != spr_mc_sprint && !attacking) {
+                    sprite_index = spr_mc_idle;
+                    image_index = 0;
+                }
                 image_speed = 1;
+                last_direction = 1;
+                if (sign(image_xscale) < 0) image_xscale = abs(image_base_scale);
             }
             break;
         }
