@@ -387,4 +387,8 @@ function scr_player_begin_death_dissolve() {
     blinkCounter = 0;
 
     alarm[0] = -1;
+
+    // Stop enemy telegraph/attack immediately — otherwise swing SFX + wall shake can fire after respawn
+    scr_enemy_abort_all_combat();
+    scr_camera_clear_shake();
 }

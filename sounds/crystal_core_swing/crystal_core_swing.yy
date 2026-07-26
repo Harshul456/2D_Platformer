@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"crystal_core_swing",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":0.69659865,
+  "exportDir":"",
+  "name":"crystal_core_swing",
+  "parent":{
+    "name":"crystal core_sfx",
+    "path":"folders/Sounds/sfx/enemy_sfx/crystal core_sfx.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"crystal_core_swing.wav",
+  "volume":1.0,
+}

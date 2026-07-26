@@ -67,6 +67,13 @@ if (!_hitstop_frozen) {
     }
 
     if (enemy_ai_enabled && state == ENEMY_STATE.ATTACK) {
+        // Player already dead / fading — never finish the dash into wall shake / swing SFX
+        if (!scr_enemy_player_is_valid_combat_target()) {
+            scr_enemy_abort_combat();
+        }
+    }
+
+    if (enemy_ai_enabled && state == ENEMY_STATE.ATTACK) {
         dash_sweep_prev_x = _step_prev_x;
         attack_frame++;
         // Resolve the slash BEFORE the forward wall probe. When the player is pinned against a wall the

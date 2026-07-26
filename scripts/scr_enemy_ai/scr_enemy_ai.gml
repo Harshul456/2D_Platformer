@@ -19,6 +19,52 @@ enum ENEMY_STATE {
 #macro ENEMY_DEATH_SHARD_MIN      14   // Min crystal shards on shatter
 #macro ENEMY_DEATH_SHARD_MAX      20   // Max crystal shards on shatter
 
+/// @function scr_enemy_player_is_valid_combat_target
+/// @description False while player is missing, dying, or in the fade-respawn sequence.
+function scr_enemy_player_is_valid_combat_target() {
+    if (!instance_exists(obj_player)) return false;
+    with (obj_player) {
+        if (state == PLAYER_STATE.DEATH) return false;
+        if (variable_instance_exists(id, "is_dying") && is_dying) return false;
+        if (variable_instance_exists(id, "death_is_dissolve") && death_is_dissolve) return false;
+        if (variable_instance_exists(id, "death_fade_phase")
+            && death_fade_phase != DEATH_SEQ.NONE) return false;
+    }
+    return true;
+}
+
+/// @function scr_enemy_abort_combat
+/// @description Cancel attack/telegraph/chase immediately (player death / respawn fade).
+function scr_enemy_abort_combat() {
+    if (state == ENEMY_STATE.DEATH || state == ENEMY_STATE.STUNNED) return;
+
+    hsp = 0;
+    attack_frame = 0;
+    attack_hit_dealt = false;
+    telegraph_shake_x = 0;
+    telegraph_shake_y = 0;
+    telegraph_commit_dir = 0;
+    image_blend = c_white;
+    state_timer = 0;
+
+    // Drop fully out of combat so a mid-swing can't finish after respawn
+    if (state == ENEMY_STATE.TELEGRAPH
+        || state == ENEMY_STATE.ATTACK
+        || state == ENEMY_STATE.RECOIL
+        || state == ENEMY_STATE.NOTICE
+        || state == ENEMY_STATE.CHASE) {
+        scr_enemy_patrol_drop_aggro();
+    }
+}
+
+/// @function scr_enemy_abort_all_combat
+/// @description All living crystal cores abort combat (call on player death).
+function scr_enemy_abort_all_combat() {
+    with (obj_enemy) {
+        if (state != ENEMY_STATE.DEATH) scr_enemy_abort_combat();
+    }
+}
+
 /// @function scr_enemy_facing_sign
 /// @returns {Real} Logical facing (-1 left, 1 right).
 function scr_enemy_facing_sign() {
@@ -197,6 +243,8 @@ function scr_enemy_armor_deflect_feedback() {
 /// @function scr_enemy_begin_telegraph
 /// @description Contact braking → committed warning; dash direction locked at start (anti-bait).
 function scr_enemy_begin_telegraph() {
+    if (!scr_enemy_player_is_valid_combat_target()) return;
+
     var _commit_dir = scr_enemy_facing_sign();
     if (instance_exists(obj_player)) {
         var _toward = scr_enemy_dir_toward_player();
@@ -214,9 +262,37 @@ function scr_enemy_begin_telegraph() {
     scr_enemy_attack_windup_visuals();
 }
 
+/// @function scr_enemy_attack_swing_sfx
+/// @description Crystal core swing whoosh — pitch variety through the combat reverb bus.
+function scr_enemy_attack_swing_sfx() {
+    var _snd = crystal_core_swing;
+    var _pitch_lo = (variable_instance_exists(id, "ENEMY_SWING_PITCH_MIN") ? ENEMY_SWING_PITCH_MIN : 0.88);
+    var _pitch_hi = (variable_instance_exists(id, "ENEMY_SWING_PITCH_MAX") ? ENEMY_SWING_PITCH_MAX : 1.14);
+    var _gain     = (variable_instance_exists(id, "ENEMY_SWING_GAIN") ? ENEMY_SWING_GAIN : 0.85);
+    var _pitch = random_range(_pitch_lo, _pitch_hi);
+    var _prio = 11;
+
+    if (variable_global_exists("sfx_combat_emitter")) {
+        return audio_play_sound_on(global.sfx_combat_emitter, _snd, false, _prio, _gain, 0, _pitch);
+    }
+
+    var _snd_id = audio_play_sound(_snd, _prio, false);
+    if (_snd_id != -1) {
+        audio_sound_pitch(_snd_id, _pitch);
+        audio_sound_gain(_snd_id, _gain, 0);
+    }
+    return _snd_id;
+}
+
 /// @function scr_enemy_begin_attack_dash
 /// @description Locked launch after telegraph — uses committed direction, not live player bait.
 function scr_enemy_begin_attack_dash() {
+    // Don't launch (or play swing SFX) into a dead / fading player
+    if (!scr_enemy_player_is_valid_combat_target()) {
+        scr_enemy_abort_combat();
+        return;
+    }
+
     var _dir = (variable_instance_exists(id, "telegraph_commit_dir") && telegraph_commit_dir != 0)
         ? telegraph_commit_dir : scr_enemy_facing_sign();
     if (_dir == 0) _dir = 1;
@@ -229,6 +305,7 @@ function scr_enemy_begin_attack_dash() {
     hsp = _dir * enemy_attack_dash_hsp;
     image_blend = c_white;
     scr_enemy_set_facing(_dir);
+    scr_enemy_attack_swing_sfx();
 }
 
 /// @function scr_enemy_attack_draw_origin
@@ -292,7 +369,7 @@ function scr_enemy_attack_compute_hitbox() {
 /// @description Damage + knockback when the slash connects (single hit per swing).
 /// @returns {Bool} True if player was struck.
 function scr_enemy_apply_attack_hit() {
-    if (attack_hit_dealt || !instance_exists(obj_player)) return false;
+    if (attack_hit_dealt || !scr_enemy_player_is_valid_combat_target()) return false;
 
     var _hb = scr_enemy_attack_compute_hitbox();
     if (!_hb.active) return false;
@@ -665,7 +742,9 @@ function scr_enemy_impact_spark_draw() {
 function scr_enemy_ai() {
     tilecol_sync_actor_context(vsp, shelf_bb_bottom_prev);
 
-    if (!instance_exists(obj_player)) {
+    // Death / fade-respawn: freeze combat so a telegraph can't finish into swing+shake after spawn
+    if (!scr_enemy_player_is_valid_combat_target()) {
+        scr_enemy_abort_combat();
         hsp = 0;
         return;
     }

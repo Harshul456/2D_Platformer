@@ -96,9 +96,14 @@ function scr_enemy_patrol_drop_aggro(_patrol_dir) {
 /// @function scr_enemy_ai_patrol_core
 /// @description Runs PATROL or CHASE movement + dual-raycast aggro acquire/drop. Call from scr_enemy_ai.
 function scr_enemy_ai_patrol_core() {
-    if (!instance_exists(obj_player)) {
-        if (state == ENEMY_STATE.CHASE || state == ENEMY_STATE.NOTICE) scr_enemy_patrol_drop_aggro();
-        else hsp = 0;
+    if (!scr_enemy_player_is_valid_combat_target()) {
+        if (state == ENEMY_STATE.CHASE || state == ENEMY_STATE.NOTICE
+            || state == ENEMY_STATE.TELEGRAPH || state == ENEMY_STATE.ATTACK
+            || state == ENEMY_STATE.RECOIL) {
+            scr_enemy_abort_combat();
+        } else {
+            hsp = 0;
+        }
         return;
     }
 

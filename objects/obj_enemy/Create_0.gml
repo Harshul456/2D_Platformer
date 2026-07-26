@@ -56,6 +56,10 @@ enemy_approach_slow_mult = 1.75;
 enemy_approach_slow_factor = 0.5;
 enemy_attack_damage = 12;
 enemy_attack_hsp_push = 4.8;
+// Crystal core swing whoosh — crystal_core_swing + pitch (same idea as player swings)
+ENEMY_SWING_PITCH_MIN = 0.88;
+ENEMY_SWING_PITCH_MAX = 1.14;
+ENEMY_SWING_GAIN      = 1.25; // Hotter than player swings so the tell cuts through combat bus
 
 // Downward slash hitboxes — local space from feet origin (+X = facing right), per spr_enemy_attack frame.
 // Derived from pink streak pixels; frames 0–2 = windup (no damage), 3–5 = active slash.

@@ -84,7 +84,7 @@ function scr_player_footstep_play_cave(_speed_norm) {
 }
 
 /// @function scr_player_footstep_play_armor
-/// @description Soft chainmail bed under a footfall — quieter than the cave step, scales with speed.
+/// @description Soft belt/hardware bed under a footfall — quieter than the cave step, scales with speed.
 /// @param {Real} [_speed_norm] 0..1 jog→sprint
 /// @param {Bool} [_land] Landing layer (slightly fuller rustle)
 function scr_player_footstep_play_armor(_speed_norm, _land = false) {
@@ -120,7 +120,7 @@ function scr_player_footstep_play_armor(_speed_norm, _land = false) {
     var _vol_hi = (variable_instance_exists(id, "FOOTSTEP_ARMOR_VOL_MAX")
         ? FOOTSTEP_ARMOR_VOL_MAX : 0.34);
 
-    // Brighter / quieter than jump-dash whoosh — sits under the stone thud
+    // Deeper belt tone — sits under the stone thud (not a bright chain jingle)
     var _pitch = random_range(_pitch_lo, _pitch_hi);
     var _gain = lerp(_vol_lo, _vol_hi, _speed_norm) * random_range(0.88, 1.05);
     if (_land) {
@@ -143,7 +143,7 @@ function scr_player_footstep_play_armor(_speed_norm, _land = false) {
 }
 
 /// @function scr_player_whoosh_sfx
-/// @description Shared armor rustle (sliced from snd_chainmail_chunks) — jump, dash, Perfect Dodge.
+/// @description Shared belt rustle (snd_chainmail_*) — jump / dash.
 /// @param {Bool} [_heavy] Double jump / Perfect Dodge — slightly lower + louder.
 function scr_player_whoosh_sfx(_heavy = false) {
     var _clips = [

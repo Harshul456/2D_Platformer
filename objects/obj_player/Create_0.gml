@@ -77,20 +77,20 @@ LAND_SOUND_VSP_REF = 8;                   // Fall speed that plays a full-impact
 LAND_SOUND_MIN_AIR_FRAMES = 4;            // Must be airborne this many frames before land SFX
 FOOTSTEP_LAND_STEP_COOLDOWN = 8;          // Block jog step right after land thud
 FOOTSTEP_REELBACK_CONTACT_FRAMES = [1, 2]; // Skid frames in spr_mc_reelback (3-frame cycle)
-// Armor bed under jog/sprint (quiet chainmail layer — never louder than the stone step)
+// Armor bed under jog/sprint — deep belt / strap hardware (not bright chain jingle)
 FOOTSTEP_ARMOR_ENABLED = true;
 FOOTSTEP_ARMOR_CHANCE_JOG = 0.72;         // Skip some walk steps so it doesn't machine-gun
 FOOTSTEP_ARMOR_CHANCE_SPRINT = 0.95;
-FOOTSTEP_ARMOR_PITCH_MIN = 1.05;          // Brighter jingle vs jump whoosh
-FOOTSTEP_ARMOR_PITCH_MAX = 1.28;
-FOOTSTEP_ARMOR_VOL_MIN = 0.18;            // Bed under cave thud
-FOOTSTEP_ARMOR_VOL_MAX = 0.34;            // Still under sprint step
+FOOTSTEP_ARMOR_PITCH_MIN = 0.78;          // Deeper belt thump
+FOOTSTEP_ARMOR_PITCH_MAX = 0.94;
+FOOTSTEP_ARMOR_VOL_MIN = 0.22;            // Bed under cave thud
+FOOTSTEP_ARMOR_VOL_MAX = 0.38;            // Still under sprint step
 FOOTSTEP_ARMOR_REEL_NORM = 0.8;           // Armor intensity on reel-back skid contacts
 footstep_armor_last = -1;
-// Armor rustle pool — snd_chainmail_1..6 for jump / dash / Perfect Dodge
-JUMP_SFX_PITCH_MIN = 0.92;
-JUMP_SFX_PITCH_MAX = 1.18;
-JUMP_SFX_GAIN      = 0.9;
+// Belt rustle pool — snd_chainmail_1..6 for jump / dash (deeper than footsteps slightly varied)
+JUMP_SFX_PITCH_MIN = 0.74;
+JUMP_SFX_PITCH_MAX = 0.92;
+JUMP_SFX_GAIN      = 0.95;
 jump_sfx_last      = -1; // Shared last-clip index across jump / dash
 // Perfect Dodge — snd_air_flip_parry
 PERFECT_DODGE_SFX_PITCH_MIN = 0.88;
