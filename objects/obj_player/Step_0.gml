@@ -46,6 +46,18 @@ if (scr_hitstop_handler()) {
     exit;
 }
 
+// Cutscene: freeze in place (camera/fade owned by scr_cutscene). Health unchanged.
+if (state == PLAYER_STATE.CUTSCENE || scr_cutscene_locks_player()) {
+    hsp = 0;
+    vsp = 0;
+    can_move = false;
+    is_sprinting = false;
+    sprint_committed = false;
+    scr_cutscene_force_idle_pose();
+    _player_sprint_deform();
+    exit;
+}
+
 // Dead: pit tumble or void dissolve — lock gameplay until spawn fade-in.
 // FADE_IN keeps the veil overlay but allows normal Step so respawn doesn't feel frozen.
 if (is_dying || (death_is_dissolve && death_fade_phase != DEATH_SEQ.NONE
@@ -97,6 +109,11 @@ if (keyboard_check_pressed(vk_f2)) {
 // Toggle enemy LOS / raycast overlay (F3)
 if (keyboard_check_pressed(vk_f3)) {
     scr_enemy_raycast_debug_toggle();
+}
+
+// Toggle global debug overlays — hitboxes, cutscene triggers, etc. (F1)
+if (keyboard_check_pressed(vk_f1)) {
+    global.show_debug = !global.show_debug;
 }
 
 // Toggle borderless fullscreen (F11)

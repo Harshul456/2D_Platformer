@@ -3,6 +3,8 @@ cam = view_camera[0];
 cam_w = camera_get_view_width(cam);
 cam_h = camera_get_view_height(cam);
 
+scr_cutscene_init_controller();
+
 cam_look_ahead = 0;
 camera_prev_player_x = 0;
 camera_prev_player_y = 0;

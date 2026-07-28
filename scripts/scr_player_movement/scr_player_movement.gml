@@ -21,7 +21,8 @@ function scr_player_movement() {
     shelf_threshold_snap_this_step = false;
     global.player_ledge_bb_prev = shelf_bb_bottom_prev;
     global.player_move_vsp = vsp;
-    tilecol_sync_actor_context(vsp, shelf_bb_bottom_prev);
+    if (bridge_drop_timer > 0) bridge_drop_timer--;
+    tilecol_sync_actor_context(vsp, shelf_bb_bottom_prev, bridge_drop_timer > 0);
 
     if (DEBUG_LEDGE_AIR_STALL && !debug_ledge_hunt_announced) {
         debug_ledge_hunt_announced = true;
@@ -377,6 +378,32 @@ function scr_player_movement() {
     var _pre_sprint_dash_standstill = sprint_dash_standstill;
     jumped_this_frame = false;
     var _grounded_jump_this_step = false;
+
+    // Bridge drop-through: hold Down + Jump (keyboard Up / controller A) while on tiles 88/89.
+    // Consumes jump buffer so you fall instead of hopping.
+    if (stunTimer <= 0 && jump_buffer_timer > 0 && key_down && !attacking) {
+        var _tm_drop = global.tilemap_collision_id;
+        var _on_bridge = (_tm_drop != noone) && tilemap_feet_on_drop_bridge(_tm_drop, p_left, p_center, p_right, feet_y);
+        if (_on_bridge && (grounded || coyote_time_timer > 0 || _s2_grounded_in)) {
+            var _drop_frames = (variable_instance_exists(id, "BRIDGE_DROP_FRAMES") ? BRIDGE_DROP_FRAMES : 14);
+            var _drop_v = (variable_instance_exists(id, "BRIDGE_DROP_NUDGE_VSP") ? BRIDGE_DROP_NUDGE_VSP : 1.75);
+            bridge_drop_timer = _drop_frames;
+            tilecol_sync_actor_context(vsp, shelf_bb_bottom_prev, true);
+            jump_buffer_timer = 0;
+            coyote_time_timer = 0;
+            grounded = false;
+            lip_ground_bless = 0;
+            lip_s2_edge_air_streak = 0;
+            // Left the platform without jumping — keep one air jump banked.
+            if (jump_count < 1) jump_count = 1;
+            if (vsp < _drop_v) vsp = _drop_v;
+            sprint_reel_active = false;
+            sprint_reel_pending = false;
+            sprint_reel_wall = false;
+            // Do not spend jump_count — this is a fall, not a jump.
+        }
+    }
+
     if (stunTimer <= 0 && jump_buffer_timer > 0 && !attacking) {
         var _head_room_ok = !check_tile_collision(p_center, head_y - WALL_JUMP_CEIL_CLEAR, true, feet_y);
         // Wall kick only while falling into the slide; stricter vsp when double jump still banked (mid nub / 3-tile wall).
@@ -930,7 +957,7 @@ function scr_player_movement() {
     }
 
     global.player_move_vsp = vsp;
-    tilecol_sync_actor_context(vsp, shelf_bb_bottom_prev);
+    tilecol_sync_actor_context(vsp, shelf_bb_bottom_prev, bridge_drop_timer > 0);
 
     // Landing onto shelf 1/5/34/36: detect window so wall shove / magnet / ledge-mount stay off.
     // Do NOT kill air hsp or force crouch here — that made shelf landings feel laggy.

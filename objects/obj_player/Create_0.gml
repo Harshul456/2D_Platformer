@@ -1,5 +1,5 @@
 // --- STATUS & STATE ---
-state           = PLAYER_STATE.ALIVE; // Combat life (ALIVE / DEATH dissolve)
+state           = PLAYER_STATE.ALIVE; // Combat life (ALIVE / DEATH / CUTSCENE / dodge states)
 is_dying        = false;        // Trigger for pit death/abyss fall / HP dissolve
 death_is_dissolve = false;      // True = void death sequence active (hurt → dissolve → fade)
 death_fade_phase = DEATH_SEQ.NONE;
@@ -24,6 +24,10 @@ coyote_time_max = 6;            // Grace period frames for late jumps
 coyote_time_timer = 0;          // Countdown
 jump_buffer_max = 11;           // Frames to "remember" a jump press (wall cling + late wall jump; see §2c slide pause)
 jump_buffer_timer = 0;          // Countdown
+// Bridge drop-through (tiles 88/89): hold Down + Jump / Down + A
+BRIDGE_DROP_FRAMES = 14;        // Ignore bridge solidity this many frames after drop
+BRIDGE_DROP_NUDGE_VSP = 1.75;   // Small downward push so you clear the top band
+bridge_drop_timer = 0;
 attack_buffer_max = 12;         // Frames to "remember" an attack press (idle only — not refilled while swinging)
 attack_buffer_timer = 0;        // Countdown
 attack_chain_buffer_max = 8;    // Legacy decay timer (kept for debug); chain uses attack_chain_latched

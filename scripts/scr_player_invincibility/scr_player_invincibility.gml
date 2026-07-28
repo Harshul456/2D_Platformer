@@ -321,6 +321,8 @@ function scr_player_dash_iframes_begin() {
 /// @description True while hit invincibility, silent dash i-frames, or death sequence are active.
 function scr_player_has_damage_iframes() {
     if (variable_instance_exists(id, "state") && state == PLAYER_STATE.DEATH) return true;
+    if (variable_instance_exists(id, "state") && state == PLAYER_STATE.CUTSCENE) return true;
+    if (scr_cutscene_locks_player()) return true;
     // Fade respawn: ALIVE under black/fade — still block hits until control unlocks (no spawn blink).
     if (variable_instance_exists(id, "death_is_dissolve") && death_is_dissolve
         && variable_instance_exists(id, "death_fade_phase")

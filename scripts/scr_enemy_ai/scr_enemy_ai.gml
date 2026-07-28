@@ -25,6 +25,8 @@ function scr_enemy_player_is_valid_combat_target() {
     if (!instance_exists(obj_player)) return false;
     with (obj_player) {
         if (state == PLAYER_STATE.DEATH) return false;
+        if (state == PLAYER_STATE.CUTSCENE) return false;
+        if (scr_cutscene_locks_player()) return false;
         if (variable_instance_exists(id, "is_dying") && is_dying) return false;
         if (variable_instance_exists(id, "death_is_dissolve") && death_is_dissolve) return false;
         if (variable_instance_exists(id, "death_fade_phase")

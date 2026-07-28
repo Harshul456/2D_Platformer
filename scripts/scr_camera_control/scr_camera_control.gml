@@ -8,6 +8,63 @@ function scr_camera_clear_shake() {
     }
 }
 
+/// @function scr_camera_zone_activate
+/// @description Apply this obj_camera_zone's bounds / look-ahead / vbor to globals.
+function scr_camera_zone_activate() {
+    global.camera_current_zone = id;
+    if (zone_apply_bounds) {
+        global.camera_min_x = zone_min_x;
+        global.camera_min_y = zone_min_y;
+        global.camera_max_x = zone_max_x;
+        global.camera_max_y = zone_max_y;
+    }
+    global.camera_look_ahead_mult = zone_look_ahead_mult;
+    global.camera_look_ahead_bonus = zone_look_ahead_bonus;
+    global.camera_look_ahead_trail_margin = zone_look_ahead_trail_margin;
+    if (zone_apply_vbor) {
+        global.camera_vbor_min_y = zone_vbor_min_y;
+        global.camera_vbor_max_y = zone_vbor_max_y;
+    }
+}
+
+/// @function scr_camera_zone_find_at
+/// @description Best camera zone containing (_px,_py). Prefers non-default, then higher priority.
+/// @param {Real} _px
+/// @param {Real} _py
+/// @param {Id.Instance} [_exclude] Zone to skip (usually the one just left)
+/// @returns {Id.Instance}
+function scr_camera_zone_find_at(_px, _py) {
+    var _exclude = noone;
+    if (argument_count > 2) _exclude = argument[2];
+
+    var _best = noone;
+    var _best_pri = -1000000;
+    var _best_default = true;
+
+    with (obj_camera_zone) {
+        if (id == _exclude) continue;
+        if (!point_in_rectangle(_px, _py, zone_min_x, zone_min_y, zone_max_x, zone_max_y)) continue;
+
+        var _take = false;
+        if (_best == noone) {
+            _take = true;
+        } else if (default_zone && !_best_default) {
+            _take = false; // keep specialized
+        } else if (!default_zone && _best_default) {
+            _take = true;
+        } else if (zone_priority > _best_pri) {
+            _take = true;
+        }
+
+        if (_take) {
+            _best = id;
+            _best_pri = zone_priority;
+            _best_default = default_zone;
+        }
+    }
+    return _best;
+}
+
 /// @function scr_camera_death_view_locked
 /// @description True while dissolve holds the camera (shake must not queue or tick here).
 /// FADE_IN is unlocked so spawn play isn't frozen under the veil.
@@ -64,29 +121,50 @@ function scr_camera_control() {
     var _wall_cling_cam = (!_p.grounded && _p.wall_side != 0 && _p.vsp > 0
         && _p.wall_jump_kick_hold_timer <= 0 && _p.wall_jump_extend_timer <= 0);
 
+    var _look_mult = (variable_global_exists("camera_look_ahead_mult") ? global.camera_look_ahead_mult : 1);
+    var _look_bonus = (variable_global_exists("camera_look_ahead_bonus") ? global.camera_look_ahead_bonus : 0);
+
     if (_wall_cling_cam) {
         cam_look_ahead = lerp(cam_look_ahead, 0, 0.18);
     } else if (global.hitstop <= 0) {
-        // --- Look-ahead (state-based; does not lerp the view itself) ---
+        // --- Look-ahead (state-based; zone mult/bonus for per-section framing) ---
         var _look_target = 0;
         var _look_speed = 0.12;
+        var _face = (_p.last_direction != 0) ? _p.last_direction : sign(_p.image_xscale);
+        if (_face == 0) _face = 1;
+
         if (_p.attacking) {
-            _look_target = 90 * _p.last_direction;
+            _look_target = 90 * _face;
             _look_speed = 0.08;
         } else if (_p.is_sprinting) {
-            _look_target = 130 * _p.last_direction;
+            _look_target = 130 * _face;
             _look_speed = 0.14;
         } else if (!_p.grounded) {
-            _look_target = 100 * _p.last_direction;
+            _look_target = 100 * _face;
             _look_speed = 0.10;
         } else if (abs(_p.hsp) > 0.5) {
-            _look_target = 120 * _p.last_direction;
+            _look_target = 120 * _face;
             _look_speed = 0.12;
         } else {
-            _look_target = 40 * _p.last_direction;
+            _look_target = 40 * _face;
             _look_speed = 0.06;
         }
+
+        _look_target = _look_target * _look_mult + _look_bonus * _face;
+        // Cap by trailing-edge margin so the player never leaves the screen.
+        // lower margin => more look-ahead (run-jump zone only sets this aggressively).
+        var _trail = (variable_global_exists("camera_look_ahead_trail_margin")
+            ? global.camera_look_ahead_trail_margin : 0.16);
+        _trail = clamp(_trail, 0.08, 0.35);
+        var _look_cap = max(40, cam_w * (0.5 - _trail));
+        if (abs(_look_target) > _look_cap) _look_target = _look_cap * sign(_look_target);
+        if (_look_mult > 1.01 || abs(_look_bonus) > 0.5) {
+            _look_speed = max(_look_speed, 0.14);
+        }
         cam_look_ahead = lerp(cam_look_ahead, _look_target, _look_speed);
+        if (abs(cam_look_ahead) > _look_cap) {
+            cam_look_ahead = _look_cap * sign(cam_look_ahead);
+        }
     }
 
     var _half_h = (_p.bbox_bottom - _p.bbox_top) * 0.5;
@@ -126,8 +204,13 @@ function scr_camera_control() {
     var _xspeed = _dx;
     var _yspeed = _dy;
     if (global.hitstop <= 0) {
-        // Min scroll only when the player actually moved on that axis (avoids vertical jitter on horizontal dash).
-        if (_dx > 0.001) _xspeed = max(_dx, global.camera_scroll_min_x);
+        // Match player motion; never race ahead of them on look-ahead alone.
+        if (_dx > 0.001) {
+            _xspeed = max(_dx, global.camera_scroll_min_x);
+        } else if (abs(_ox) > 0.5 && (_look_mult > 1.01 || abs(_look_bonus) > 0.5)) {
+            // Soft settle into boosted framing while nearly still — keep it slow.
+            _xspeed = global.camera_scroll_min_x;
+        }
         if (_dy > 0.001) {
             _yspeed = max(_dy, global.camera_scroll_min_y);
         } else if (_p.grounded && abs(_oy) > 0.5) {

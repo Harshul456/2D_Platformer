@@ -34,6 +34,9 @@ global.camera_vbor_min_y = -48;  // Airborne: scroll up only if player is |min|+
 global.camera_vbor_max_y = 48;   // Airborne: scroll down only if this far below view center
 global.camera_scroll_min_x = 5;  // Min horizontal view scroll speed (px/step)
 global.camera_scroll_min_y = 3;  // Min vertical view scroll speed (px/step)
+global.camera_look_ahead_mult = 1;   // Per-zone multiplier on state look-ahead
+global.camera_look_ahead_bonus = 0;  // Per-zone extra px ahead (facing dir)
+global.camera_look_ahead_trail_margin = 0.16; // Player stays at least this far from trailing edge
 
 // Force the game to render at your specific resolution without sub-pixel blurring
 surface_resize(application_surface, 1280, 720); // Match your Viewport Width/Height

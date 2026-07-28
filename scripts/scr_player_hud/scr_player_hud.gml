@@ -215,6 +215,7 @@ function scr_player_hud_draw() {
             || death_fade_phase == DEATH_SEQ.BLACK)) {
         return;
     }
+    if (scr_cutscene_fade_hiding_hud()) return;
 
     var _max_hp = max(1, obj_player_health_max);
     var _target = clamp(obj_player_health, 0, _max_hp);

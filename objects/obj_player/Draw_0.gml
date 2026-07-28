@@ -173,6 +173,9 @@ if (global.show_debug) {
         draw_set_color(c_lime);
         draw_rectangle(debug_hitbox_x1 - 1, debug_hitbox_y1 - 1, debug_hitbox_x2 + 1, debug_hitbox_y2 + 1, false);  // Outer edge so outline is visible
     }
+
+    // Cutscene trigger volumes (same draw path as foot dots)
+    scr_cutscene_debug_draw();
 }
 
 draw_set_alpha(1.0);

@@ -30,7 +30,9 @@ scr_player_death_fx_draw();
 
 scr_cave_vignette_draw();
 scr_player_perfect_dodge_fx_draw();
+scr_cutscene_debug_draw();
 scr_player_death_fade_draw();
+scr_cutscene_draw_fade();
 
 if (normal_map_hud_timer > 0) {
     var _cam = view_camera[0];

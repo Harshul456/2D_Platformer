@@ -2,8 +2,9 @@
 // Probe inside the cell using tile index + local pixel (lx, ly). Mirror/flip on the tile transform
 // is applied to (lx, ly) before tests.
 //
-// TileSet2 / spr_test — indices **1**, **5**, **34**, **35**, **36**: one-way **walkable line** ledges.
+// TileSet2 / spr_test — indices **1**, **5**, **34**, **35**, **36**, **88**, **89**: one-way **walkable line** ledges.
 // Hardcoded local X ranges (after mirror) + top band ly 0–3; no ellipse/fraction caps.
+// 88/89 = full-width rope bridges (same one-way rules, walkable lx spans the whole tile).
 // Rising: global.player_move_vsp < 0 → ignored. Falling: one-way uses global.player_ledge_bb_prev with TILEMAP_LEDGE_ONEWAY_BELOW_SLACK so micro-sink still reads as "from above".
 // Landing snap: tilemap_shelf_threshold_land_dy (+ magnet); side-entry: tilemap_shelf_side_entry_land_dy (min vsp, air frames, hsp intent, tighter _catch_win).
 
@@ -41,10 +42,13 @@ function tilecol_actor_ledge_bb_prev_get() {
 }
 
 /// @function tilecol_sync_actor_context
-/// @description Push per-actor vsp + prior bbox_bottom for one-way shelf tiles (indices 1,5,34,35,36).
+/// @description Push per-actor vsp + prior bbox_bottom (+ optional bridge drop) for one-way shelves.
 function tilecol_sync_actor_context(_vsp, _ledge_bb_prev) {
     global.tilecol_actor_vsp = _vsp;
     global.tilecol_actor_ledge_bb_prev = _ledge_bb_prev;
+    if (argument_count > 2) {
+        global.tilecol_bridge_drop_active = argument[2];
+    }
 }
 
 /// Shelf indices 1/5/34/35/36: true only when probe hits the walkable cap band (not empty lip in same cell).
@@ -75,6 +79,9 @@ function tilecol_shape_for_tile_index(_idx) {
         case 34: return TILECOL_SHAPE_CAP_TL;
         case 35: return TILECOL_SHAPE_FULL;
         case 36: return TILECOL_SHAPE_CAP_TR;
+        // Full-width bridge tops — one-way path uses walkable range; shape is fallback only.
+        case 88: return TILECOL_SHAPE_FULL;
+        case 89: return TILECOL_SHAPE_FULL;
     }
     if (TILECOL_CAP_TL_IDX_LO >= 0 && _idx >= TILECOL_CAP_TL_IDX_LO && _idx <= TILECOL_CAP_TL_IDX_HI) {
         return TILECOL_SHAPE_CAP_TL;
@@ -115,7 +122,29 @@ function tilecol_solid_cap_tr(_lx, _ly, _tw, _th) {
 }
 
 function tilecol_one_way_shelf_tile_index(_idx) {
-    return (_idx == 1 || _idx == 5 || _idx == 34 || _idx == 35 || _idx == 36);
+    return (_idx == 1 || _idx == 5 || _idx == 34 || _idx == 35 || _idx == 36
+        || _idx == 88 || _idx == 89);
+}
+
+/// Rope bridges — one-way shelves you can drop through (hold down + jump).
+function tilecol_is_drop_through_bridge(_idx) {
+    return (_idx == 88 || _idx == 89);
+}
+
+function tilecol_bridge_drop_active_get() {
+    return variable_global_exists("tilecol_bridge_drop_active") && global.tilecol_bridge_drop_active;
+}
+
+/// True when L/C/R feet probes sit on a drop-through bridge cap (88/89).
+function tilemap_feet_on_drop_bridge(_tm, _pl, _pc, _pr, _feet_y) {
+    if (_tm == noone || _tm == -1) return false;
+    for (var _dj = -1; _dj <= 2; _dj++) {
+        var _py = _feet_y + _dj;
+        if (tilecol_is_drop_through_bridge(tilemap_shelf_index_at_pixel(_tm, _pl, _py))) return true;
+        if (tilecol_is_drop_through_bridge(tilemap_shelf_index_at_pixel(_tm, _pc, _py))) return true;
+        if (tilecol_is_drop_through_bridge(tilemap_shelf_index_at_pixel(_tm, _pr, _py))) return true;
+    }
+    return false;
 }
 
 /// True if the cell directly ABOVE (_px,_py)'s cell contains any collision tile.
@@ -143,6 +172,7 @@ function tilemap_shelf_tile_is_buried(_tm, _px, _py) {
 
 /// True if a 1px step in `_dir` would leave shelf feet with no floor/shelf support.
 /// Used to kill jump→land momentum into the empty lip of tiles 1/5/34/36 (no position snap).
+/// Full-width bridges 88/89 use the same helper (rarely voids mid-span).
 function tilemap_shelf_step_into_void(_tm, _pl, _pc, _pr, _feet_y, _dir) {
     if (_tm == noone || _tm == -1 || _dir == 0) return false;
     if (!tilemap_shelf_cap_near_feet(_tm, _pl, _pc, _pr, _feet_y)) {
@@ -188,6 +218,9 @@ function tilemap_ledge_walkable_range(_idx, _tw) {
         case 34: return { lo: 16, hi: 31 };
         case 36: return { lo: 0,  hi: 16 };
         case 35: return { lo: 0,  hi: _tw - 1 };
+        // Rope bridges — full 32px top line (no ledge lip inset).
+        case 88: return { lo: 0,  hi: _tw - 1 };
+        case 89: return { lo: 0,  hi: _tw - 1 };
         default: return { lo: -1, hi: -1 };
     }
 }
@@ -256,6 +289,7 @@ function tilemap_shelf_threshold_land_dy(_tm, _pl, _pc, _pr, _bb_now, _bb_prev_f
                 if (td == 0) continue;
                 var idx = tile_get_index(td);
                 if (!tilecol_one_way_shelf_tile_index(idx)) continue;
+                if (tilecol_is_drop_through_bridge(idx) && tilecol_bridge_drop_active_get()) continue;
                 var tcx = tilemap_get_cell_x_at_pixel(_tm, _px, _py);
                 var tcy = tilemap_get_cell_y_at_pixel(_tm, _px, _py);
                 var cell_left = tmx + tcx * tw;
@@ -292,6 +326,7 @@ function tilemap_shelf_side_entry_land_dy(_tm, _pl, _pc, _pr, _bb_now, _catch_wi
             var td = tilemap_get_at_pixel(_tm, _px, _py);
             if (td == 0) continue;
             var idx = tile_get_index(td);
+            if (tilecol_is_drop_through_bridge(idx) && tilecol_bridge_drop_active_get()) continue;
             var tcx = tilemap_get_cell_x_at_pixel(_tm, _px, _py);
             var tcy = tilemap_get_cell_y_at_pixel(_tm, _px, _py);
             var cell_left = tmx + tcx * tw;
@@ -389,6 +424,8 @@ function tilemap_point_solid(_tm, _px, _py) {
     }
     if (_ignore_shelf && tilecol_one_way_shelf_tile_index(idx)) return false;
     if (tilecol_one_way_shelf_tile_index(idx)) {
+        // Drop-through bridges: temporarily non-solid while falling through.
+        if (tilecol_is_drop_through_bridge(idx) && tilecol_bridge_drop_active_get()) return false;
         if (tilecol_actor_vsp_get() < 0) return false;
         if (!tilecol_one_way_cap_shelf_hit(idx, lx, ly, tw, th)) return false;
         var _prevbb = tilecol_actor_ledge_bb_prev_get();
@@ -588,6 +625,7 @@ function tilemap_ledge_down_snap_dy(_tm, _pl, _pc, _pr, _probe_y, _bbox_bottom) 
         if (td == 0) continue;
         var idx = tile_get_index(td);
         if (!tilecol_one_way_shelf_tile_index(idx)) continue;
+        if (tilecol_is_drop_through_bridge(idx) && tilecol_bridge_drop_active_get()) continue;
         var tcx = tilemap_get_cell_x_at_pixel(_tm, _px, _probe_y);
         var tcy = tilemap_get_cell_y_at_pixel(_tm, _px, _probe_y);
         var cell_left = tmx + tcx * tw;

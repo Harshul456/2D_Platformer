@@ -1,5 +1,6 @@
 // Player input — keyboard + first connected gamepad (Switch Pro / paired Joy-Cons on PC).
-// Switch face layout: A=jump, ZR=sprint, X=attack, L/ZL=wall cling. Left stick + D-pad = move.
+// Switch face layout: A=jump (also bridge drop with Down), ZR=sprint, X=attack, L/ZL=wall cling.
+// Left stick + D-pad = move. Bridge drop: hold Down (stick/D-pad) + A / hold Down + Up.
 
 #macro GP_MOVE_DEADZONE       0.35
 #macro GP_BTN_JUMP            gp_face1   // Switch A (bottom)

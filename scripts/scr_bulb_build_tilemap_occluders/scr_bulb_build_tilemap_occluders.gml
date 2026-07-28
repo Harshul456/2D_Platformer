@@ -10,7 +10,7 @@ function scr_bulb_tilemap_cell_occupied(_tm, _cell_x, _cell_y) {
 }
 
 /// @description Shadow bake mode per cell on lay_collision only.
-/// Platforms/ledges (1,5,34,35,36) and caps never cast — only full solid blocks.
+/// Platforms/ledges (1,5,34,35,36,88,89) and caps never cast — only full solid blocks.
 function scr_bulb_tilemap_cell_occlude_style(_tm, _cell_x, _cell_y, _occlude_mode) {
     if (!scr_bulb_tilemap_cell_occupied(_tm, _cell_x, _cell_y)) return "none";
     if (_occlude_mode != "lay_collision") return "none";
