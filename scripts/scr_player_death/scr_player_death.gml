@@ -341,6 +341,8 @@ function scr_player_begin_death_dissolve() {
 
     // Clear combat so nothing keeps swinging into the death hurt
     attacking = false;
+    attack_is_air = false;
+    attack_no_lunge = false;
     attack_lockout = 0;
     attack_commit_lock = 0;
     attack_recovery_lock = 0;

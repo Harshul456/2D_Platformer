@@ -48,10 +48,20 @@
 
 // Player torch BulbLight (warm glow centered on the player).
 #macro BULB_PLAYER_TORCH_ENABLED        true
-#macro BULB_PLAYER_TORCH_INTENSITY      1.2
-#macro BULB_PLAYER_TORCH_SCALE          1.58
+#macro BULB_PLAYER_TORCH_INTENSITY      1.32
+#macro BULB_PLAYER_TORCH_SCALE          1.62
 #macro BULB_PLAYER_TORCH_Y_OFFSET       -12
 #macro BULB_PLAYER_TORCH_CRYSTAL_DIM    0.94
+
+// Always-on readability rim — soft cool edge so the player holds silhouette in dark cave areas.
+// Not a thick cartoon outline; additive 1px catch-light (stronger during Perfect Dodge).
+#macro BULB_PLAYER_READABILITY_RIM_ENABLED   true
+#macro BULB_PLAYER_READABILITY_RIM_DIST      1
+#macro BULB_PLAYER_READABILITY_RIM_ALPHA     0.16
+#macro BULB_PLAYER_READABILITY_RIM_PD_MULT   1.55
+#macro BULB_PLAYER_READABILITY_RIM_R         210
+#macro BULB_PLAYER_READABILITY_RIM_G         230
+#macro BULB_PLAYER_READABILITY_RIM_B         255
 
 // Crystal light height for normal-map shading. Side-mounted crystals need a LOWER Z than an
 // on-body torch — high Z makes the light come from almost straight above, so Lambert dot(N,L)

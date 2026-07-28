@@ -66,6 +66,42 @@ function scr_bulb_draw_crystal_rim(_spr, _img, _dx, _dy, _xscale, _yscale, _crys
     gpu_set_blendmode(bm_normal);
 }
 
+/// @description Soft always-on cool rim so the player silhouette survives dark cave contrast.
+/// @param {Asset.GMSprite} _spr
+/// @param {Real} _img
+/// @param {Real} _dx
+/// @param {Real} _dy
+/// @param {Real} _xscale
+/// @param {Real} _yscale
+/// @param {Real} _alpha Base sprite alpha
+function scr_bulb_draw_player_readability_rim(_spr, _img, _dx, _dy, _xscale, _yscale, _alpha) {
+    if (!BULB_PLAYER_READABILITY_RIM_ENABLED) return;
+    if (_alpha <= 0.02) return;
+
+    var _rim_a = _alpha * BULB_PLAYER_READABILITY_RIM_ALPHA;
+    // Perfect Dodge: push the edge a bit so the counter window still reads in slow-mo
+    if (variable_instance_exists(id, "state") && state == PLAYER_STATE.PERFECT_DODGE_SLOWMO) {
+        _rim_a *= BULB_PLAYER_READABILITY_RIM_PD_MULT;
+    }
+    if (_rim_a <= 0.01) return;
+
+    var _col = make_colour_rgb(
+        BULB_PLAYER_READABILITY_RIM_R,
+        BULB_PLAYER_READABILITY_RIM_G,
+        BULB_PLAYER_READABILITY_RIM_B
+    );
+    var _d = BULB_PLAYER_READABILITY_RIM_DIST;
+
+    var _old_blend = gpu_get_blendmode();
+    gpu_set_blendmode(bm_add);
+    // Cardinal 1px offsets — tight catch-light, not a fat outline
+    draw_sprite_ext(_spr, _img, _dx + _d, _dy, _xscale, _yscale, 0, _col, _rim_a);
+    draw_sprite_ext(_spr, _img, _dx - _d, _dy, _xscale, _yscale, 0, _col, _rim_a);
+    draw_sprite_ext(_spr, _img, _dx, _dy + _d, _xscale, _yscale, 0, _col, _rim_a);
+    draw_sprite_ext(_spr, _img, _dx, _dy - _d, _xscale, _yscale, 0, _col, _rim_a);
+    gpu_set_blendmode(_old_blend);
+}
+
 /// @description Emissive alpha for a glow tile — synced to the nearest crystal BulbLight pulse.
 /// @param {Real} _px
 /// @param {Real} _py

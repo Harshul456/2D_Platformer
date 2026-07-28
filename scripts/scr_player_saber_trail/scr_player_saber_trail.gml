@@ -15,6 +15,45 @@ function scr_player_attack_compute_hitbox() {
 
     if (!attacking) return _hb;
 
+    // Dedicated air slash — per-frame boxes that track the blade (active from frame 0).
+    if (attack_is_air) {
+        var _a0 = (variable_instance_exists(id, "AIR_ATTACK_HIT_START") ? AIR_ATTACK_HIT_START : 0);
+        var _a1 = (variable_instance_exists(id, "AIR_ATTACK_HIT_END") ? AIR_ATTACK_HIT_END : 1);
+        var _idx = floor(image_index);
+        if (_idx < _a0 || _idx > _a1) return _hb;
+        if (!variable_instance_exists(id, "AIR_ATTACK_HITBOX") || !is_array(AIR_ATTACK_HITBOX)) return _hb;
+        if (_idx >= array_length(AIR_ATTACK_HITBOX)) return _hb;
+
+        var _box = AIR_ATTACK_HITBOX[_idx];
+        if (!is_array(_box) || array_length(_box) < 4) return _hb;
+        // Degenerate recovery entries are [0,0,0,0]
+        if (_box[0] == 0 && _box[1] == 0 && _box[2] == 0 && _box[3] == 0) return _hb;
+
+        var _face = (last_direction != 0) ? last_direction : sign(image_xscale);
+        if (_face == 0) _face = 1;
+
+        var _ox1 = _box[0];
+        var _oy1 = _box[1];
+        var _ox2 = _box[2];
+        var _oy2 = _box[3];
+        var _x1 = (_face > 0) ? (x + _ox1) : (x - _ox2);
+        var _x2 = (_face > 0) ? (x + _ox2) : (x - _ox1);
+        var _y1 = y + _oy1;
+        var _y2 = y + _oy2;
+
+        _hb.active = true;
+        _hb.downward = (scr_player_is_downward_air_strike());
+        _hb.facing = _face;
+        _hb.x1 = _x1;
+        _hb.y1 = _y1;
+        _hb.x2 = _x2;
+        _hb.y2 = _y2;
+        _hb.edge_x = (_face > 0) ? _x2 : _x1;
+        _hb.edge_y1 = _y1;
+        _hb.edge_y2 = _y2;
+        return _hb;
+    }
+
     var _downward = scr_player_is_downward_air_strike();
     var _start = (variable_instance_exists(id, "ATTACK_HIT_ACTIVE_START_INDEX")
         ? ATTACK_HIT_ACTIVE_START_INDEX : 1);

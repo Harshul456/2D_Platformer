@@ -28,6 +28,7 @@ DEFAULT_SPRITES = [
     "spr_mc_reelback",
     "spr_asta_attack1",
     "spr_mc_attack2",
+    "spr_mc_air_attack",
     "spr_mc_hurt",
     "spr_mc_hurt_air",
     "spr_enemy",
@@ -90,8 +91,9 @@ def clone_sprite_with_normals(source_name: str) -> bool:
         targets = [
             dest_dir / f"{frame_name}.png",
         ]
-        layer_matches = list(dest_dir.glob(f"layers/*/{frame_name}.png"))
-        targets.extend(layer_matches)
+        # GM stores layers as layers/<frame>/<layer>.png (common) or layers/<layer>/<frame>.png
+        targets.extend(dest_dir.glob(f"layers/{frame_name}/*.png"))
+        targets.extend(dest_dir.glob(f"layers/*/{frame_name}.png"))
 
         seen: set[Path] = set()
         for target in targets:

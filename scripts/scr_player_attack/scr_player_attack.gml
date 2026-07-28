@@ -8,17 +8,18 @@ function scr_player_apply_attack_facing() {
 }
 
 /// @function scr_player_try_attack_start
-/// @description Start a buffered ground swing if allowed. Call before sprint/reel so dash/run cancel wins.
+/// @description Start a buffered ground or air swing if allowed. Call before sprint/reel so dash/run cancel wins.
 /// @returns {Bool} True if a new swing began.
 function scr_player_try_attack_start() {
     if (attacking || stunTimer > 0) return false;
     if (attack_lockout > 0 || attack_recovery_grace > 0 || attack_recovery_lock > 0) return false;
     if (attack_buffer_timer <= 0) return false;
     // Combo 1→2 must not wait on attackCooldown (that caused atk1→idle→atk2 when mashing).
-    var _combo_followup = (comboTimer > 0 && comboCount == 1);
+    var _combo_followup = (comboTimer > 0 && comboCount == 1 && (grounded || coyote_time_timer > 0));
     if (attackCooldownTimer > 0 && !_combo_followup) return false;
-    // Coyote: dash/run floor probes can flicker one frame at speed.
-    if (!grounded && coyote_time_timer <= 0) return false;
+
+    var _want_air = (!grounded && coyote_time_timer <= 0);
+    if (_want_air && air_attack_used) return false;
 
     scr_player_attack();
     if (!attacking) return false;
@@ -27,66 +28,92 @@ function scr_player_try_attack_start() {
     // Cooldown gates the next string after this swing (1→2 skips the wait above).
     attackCooldownTimer = attackCooldown;
     attack_has_hit = false;
-    if (!attack_no_lunge) {
+    if (!attack_no_lunge && !attack_is_air) {
         attack_shift_remaining = (comboCount == 1) ? ATTACK_SHIFT_PX_1 : ATTACK_SHIFT_PX_2;
     }
     return true;
 }
 
 function scr_player_attack() {
-    // Lenient ground during dash/run — floor probes can flicker one frame at speed.
-    if (!grounded && coyote_time_timer <= 0) return;
-
     if (attacking) {
-        if (image_index > image_number * 0.4) combo_buffer = true;
+        if (!attack_is_air && image_index > image_number * 0.4) combo_buffer = true;
         return;
     }
 
-    // Only valid mid-combo step is 1→2 (no third hit from buffer/timer).
-    if (comboTimer > 0 && comboCount == 1) comboCount = 2;
-    else comboCount = 1;
+    var _air = (!grounded && coyote_time_timer <= 0);
+    if (_air && air_attack_used) return;
 
     scr_player_apply_attack_facing();
 
     attacking = true;
+    attack_is_air = _air;
     combo_buffer = false;
     attack_chain_latched = false;
     attack_has_hit = false;
     attack_recovery_cut = false;
     attack_timer = 0;
-    comboTimer = comboCooldown;
     attack_priority_timer = 14; // Startup priority — does not beat enemy telegraph armor or super-armor dash
     scr_player_saber_trail_clear();
 
-    // Sprite first, THEN reset index — never inherit sprint/reel image_index into end-swing checks.
-    switch (comboCount) {
-        case 1:
-            sprite_index = spr_asta_attack1;
-            image_blend = c_white;
-            attack_commit_lock = 0;
-            hsp = last_direction * 3;
-            break;
-        case 2:
-            scr_player_apply_attack_facing();
-            var _lunge = (variable_instance_exists(id, "ATTACK2_COMBO_LUNGE_HSP") ? ATTACK2_COMBO_LUNGE_HSP : 5.5);
-            hsp = last_direction * _lunge;
-            sprite_index = spr_mc_attack2;
-            image_blend = c_lime;
-            attack_commit_lock = (variable_instance_exists(id, "ATTACK2_COMMIT_LOCK_FRAMES")
-                ? ATTACK2_COMMIT_LOCK_FRAMES : 0);
-            break;
-        case 3:
-            hsp = last_direction * 5;
-            sprite_index = spr_asta_attack1;
-            image_blend = c_aqua;
-            attack_commit_lock = 0;
-            break;
+    if (_air) {
+        // One air slash per airborne — no ground combo / lunge overwrite.
+        comboCount = 0;
+        comboTimer = 0;
+        attack_no_lunge = true;
+        attack_shift_remaining = 0;
+        attack_commit_lock = 0;
+        air_attack_used = true;
+        sprite_index = spr_mc_air_attack;
+        image_blend = c_white;
+        // Don't resume the double-jump flip after this slash — fall pose instead.
+        double_jump_anim_active = false;
+        double_jump_anim_tick = 0;
+
+        // Keep air momentum (dead-stop was lunge overwrite + ground friction).
+        var _keep = (variable_instance_exists(id, "AIR_ATTACK_MOMENTUM_KEEP") ? AIR_ATTACK_MOMENTUM_KEEP : 1);
+        hsp *= _keep;
+        var _min_h = (variable_instance_exists(id, "AIR_ATTACK_MIN_HSP") ? AIR_ATTACK_MIN_HSP : 1.2);
+        if (abs(hsp) < _min_h && last_direction != 0) {
+            hsp = last_direction * _min_h;
+        }
+        runMomentum = hsp;
+    } else {
+        // Lenient ground during dash/run — floor probes can flicker one frame at speed.
+        // Only valid mid-combo step is 1→2 (no third hit from buffer/timer).
+        if (comboTimer > 0 && comboCount == 1) comboCount = 2;
+        else comboCount = 1;
+
+        attack_no_lunge = false;
+        comboTimer = comboCooldown;
+
+        // Sprite first, THEN reset index — never inherit sprint/reel image_index into end-swing checks.
+        switch (comboCount) {
+            case 1:
+                sprite_index = spr_asta_attack1;
+                image_blend = c_white;
+                attack_commit_lock = 0;
+                hsp = last_direction * 3;
+                break;
+            case 2:
+                scr_player_apply_attack_facing();
+                var _lunge = (variable_instance_exists(id, "ATTACK2_COMBO_LUNGE_HSP") ? ATTACK2_COMBO_LUNGE_HSP : 5.5);
+                hsp = last_direction * _lunge;
+                sprite_index = spr_mc_attack2;
+                image_blend = c_lime;
+                attack_commit_lock = (variable_instance_exists(id, "ATTACK2_COMMIT_LOCK_FRAMES")
+                    ? ATTACK2_COMMIT_LOCK_FRAMES : 0);
+                break;
+        }
+        runMomentum = 0;
     }
+
     image_index = 0;
-    image_speed = 1;
+    image_speed = _air
+        ? (variable_instance_exists(id, "AIR_ATTACK_IMAGE_SPEED") ? AIR_ATTACK_IMAGE_SPEED : 0.85)
+        : 1;
 
     // Saber whoosh — random swing clip + pitch (same idea as impact clanks)
-    scr_player_attack_swing_sfx(comboCount >= 2);
+    scr_player_attack_swing_sfx(!_air && comboCount >= 2);
 
     // Hard cancel sprint/dash/reel — must not be gated on image_index (float / remap races).
     is_sprinting = false;
@@ -104,7 +131,6 @@ function scr_player_attack() {
     sprint_z_idle_charged = false;
     sprint_resume_hold = false;
     sprint_dir_gap = 0;
-    runMomentum = 0;
     // Leftover Z buffer must not instantly dodge-cancel this swing (MIN_INDEX can be 0).
     dash_input_buffer = 0;
 }
@@ -112,6 +138,7 @@ function scr_player_attack() {
 /// @function scr_player_attack1_prepare_retreat
 /// @description Hit endlag setup — atk1 can chain-forward or retreat; atk2 always early-cuts like solo atk1.
 function scr_player_attack1_prepare_retreat() {
+    if (attack_is_air) return;
     if (comboCount < 1) return;
 
     attack_shift_remaining = 0;
@@ -150,14 +177,27 @@ function scr_player_attack_end_swing(_post_accel_frames) {
 
     var _keep_combo_window = (comboCount == 1 && comboTimer > 0);
     var _was_atk2 = (comboCount >= 2);
+    var _was_air = attack_is_air;
 
     attacking = false;
+    attack_is_air = false;
+    attack_no_lunge = false;
     attack_timer = 0;
     attack_lockout = 0;
     attack_commit_lock = 0;
     image_blend = c_white;
     attack_recovery_cut = false;
     debug_hitbox_active = false;
+
+    // After air slash: normal jump fall pose (not double-jump flip end frames).
+    if (_was_air && !grounded) {
+        double_jump_anim_active = false;
+        double_jump_anim_tick = 0;
+        sprite_index = spr_mc_jump;
+        image_speed = 0;
+        image_index = 5;
+        hair_flicker_counter = 0;
+    }
 
     // Atk1 poke: almost zero recovery grace. Atk2 uses the same (no recovery_lock).
     attack_recovery_grace = 0;
@@ -221,6 +261,8 @@ function scr_player_attack_dodge_cancel(_dir) {
     if (_dir == 0) return;
 
     attacking = false;
+    attack_is_air = false;
+    attack_no_lunge = false;
     attack_timer = 0;
     attack_lockout = 0;
     attack_buffer_timer = 0;
@@ -273,9 +315,15 @@ function scr_player_attack_dodge_cancel(_dir) {
 }
 
 /// @function scr_player_is_attack_active
-/// @description Active hitbox frames (subimages 1–3).
+/// @description Active hitbox frames (ground: subimages 1–3; air: 0–1).
 function scr_player_is_attack_active() {
-    return attacking && image_index >= ATTACK_HIT_ACTIVE_START_INDEX && image_index <= 3;
+    if (!attacking) return false;
+    if (attack_is_air) {
+        var _a0 = (variable_instance_exists(id, "AIR_ATTACK_HIT_START") ? AIR_ATTACK_HIT_START : 0);
+        var _a1 = (variable_instance_exists(id, "AIR_ATTACK_HIT_END") ? AIR_ATTACK_HIT_END : 1);
+        return (image_index >= _a0 && image_index <= _a1);
+    }
+    return image_index >= ATTACK_HIT_ACTIVE_START_INDEX && image_index <= 3;
 }
 
 /// @function scr_player_has_attack_priority
@@ -300,6 +348,8 @@ function scr_player_apply_nail_pogo() {
     air_chain_jump_used = false;
     coyote_time_timer = 0;
     attacking = false;
+    attack_is_air = false;
+    attack_no_lunge = false;
     attack_lockout = 0;
     attack_buffer_timer = 0;
     attack_chain_buffer_timer = 0;

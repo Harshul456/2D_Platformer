@@ -525,7 +525,13 @@ function scr_player_movement() {
     // Melee preempt (after grounded/coyote): start swing BEFORE sprint/reel so dash/run → attack wins this frame.
     scr_player_try_attack_start();
 
-    vsp += grv;
+    if (attacking && attack_is_air) {
+        var _gmul = (variable_instance_exists(id, "AIR_ATTACK_GRAV_MUL") ? AIR_ATTACK_GRAV_MUL : 0.85);
+        vsp += grv * _gmul;
+    } else {
+        vsp += grv;
+    }
+    // Soften fall slightly during air slash so momentum reads through the swing.
     // Short-hop: release jump early caps rise speed (jump_cut_multiplier)
     if (vsp < 0 && !key_jump_held) vsp = max(vsp, jumpsp * (-jump_cut_multiplier));
     // Wall slide: MMX wall_slide only while falling — don’t cling on rise past a ledge
@@ -642,7 +648,7 @@ function scr_player_movement() {
             // Hold Z while idle — direction later starts sprint (not standstill dash)
             if (!_recovery_locked && key_sprint && inputDir == 0 && grounded && !jumped_this_frame && vsp >= 0
                 && (sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
-                && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && !sprint_reel_active)
+                && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_air_attack && !sprint_reel_active)
                 && !sprint_committed) {
                 sprint_z_idle_charged = true;
             }
@@ -651,7 +657,7 @@ function scr_player_movement() {
             if (!_recovery_locked && !_sprint_wall_blocked && key_sprint && sprint_hold_latched && grounded && !jumped_this_frame && vsp >= 0
                 && inputDir != 0 && !sprint_committed
                 && ((sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
-                    && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && !sprint_reel_active)
+                    && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_air_attack && !sprint_reel_active)
                     || (sprint_resume_hold && key_sprint))) {
                 sprint_committed = true;
                 sprint_dash_standstill = false;
@@ -1935,6 +1941,7 @@ function scr_player_movement() {
         air_chain_jump_used = false;
     }
     if (grounded && vsp > 0.001 && stunTimer <= 0) vsp = 0;
+    if (grounded) air_attack_used = false;
 
     // Land frame on shelf: only plant/cancel sprint when holding into wall or shelf→void (keep walk snappy otherwise).
     if (grounded && !_s2_grounded_in && !jumped_this_frame && stunTimer <= 0
@@ -2112,7 +2119,7 @@ function scr_player_movement() {
             var _hold_full_lip_pose = FULL_BLOCK_EDGE_GROUND_FORGIVE && !_shelf_any_near_feet_pose && (full_lip_anim_sticky > 0 || _teeter_anim)
                 && !_feet_embed_pose
                 && !is_sprinting && sprite_index != spr_mc_sprint && sprite_index != spr_mc_reelback
-                && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_walljump
+                && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_air_attack && sprite_index != spr_mc_walljump
                 && sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump; // allow landing crouch on full-block lip edges
             if (_hold_full_lip_pose) {
                 // No dedicated teeter art yet — keep stable *ground* visuals on full-block lip (after jump land anim finishes).
@@ -2175,7 +2182,7 @@ function scr_player_movement() {
                 sprite_index = spr_mc_jump;
                 image_index = ANIM_LAND_CROUCH_START;
                 force_landing_crouch = true;
-            } else if (sprite_index == spr_mc_attack2 || sprite_index == spr_asta_attack1) {
+            } else if (sprite_index == spr_mc_attack2 || sprite_index == spr_asta_attack1 || sprite_index == spr_mc_air_attack) {
                 // Attack just ended — transition to jog/idle
                 sprite_index = (abs(hsp) > MOVEMENT_THRESHOLD) ? spr_mc_jog : spr_mc_idle;
                 image_index = 0;
@@ -2346,12 +2353,16 @@ function scr_player_movement() {
         }
     } else {
         // Keep attack swing art; never let reel/sprint pose win mid-slash.
-        image_speed = 1;
-        var _want_atk = (comboCount >= 2) ? spr_mc_attack2 : spr_asta_attack1;
+        var _want_atk = attack_is_air
+            ? spr_mc_air_attack
+            : ((comboCount >= 2) ? spr_mc_attack2 : spr_asta_attack1);
         if (sprite_index != _want_atk) {
             sprite_index = _want_atk;
             image_index = 0;
         }
+        image_speed = attack_is_air
+            ? (variable_instance_exists(id, "AIR_ATTACK_IMAGE_SPEED") ? AIR_ATTACK_IMAGE_SPEED : 0.85)
+            : 1;
     }
 
     // --- 7b. LANDING CROUCH MOVEMENT LOCK (animation runs after §5 hsp — zero slide during crouch) ---
@@ -2571,7 +2582,7 @@ function scr_player_sprint_try_begin(_early) {
 
     var _reel_blocked = sprint_reel_active || sprint_reel_pending || (sprite_index == spr_mc_reelback);
     var _sprint_sprite_ok = (sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
-        && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && !sprint_reel_active);
+        && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_air_attack && !sprint_reel_active);
     var _dash_lock = (variable_instance_exists(id, "dash_lock_timer") ? dash_lock_timer : 0);
     var _dash_sprite_ok = _sprint_sprite_ok && !_reel_blocked && _dash_lock <= 0;
     var _sprint_start_ok = _sprint_sprite_ok || (sprint_resume_hold && key_sprint);

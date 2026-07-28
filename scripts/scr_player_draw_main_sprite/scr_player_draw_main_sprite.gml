@@ -106,16 +106,21 @@ function scr_player_draw_main_sprite() {
         }
     }
 
-    draw_sprite_ext(sprite_index, image_index, _draw_x + _wall_draw_nudge, _draw_y,
+    var _px = _draw_x + _wall_draw_nudge;
+
+    // Soft cool rim first so dark cave backgrounds don't swallow the silhouette
+    scr_bulb_draw_player_readability_rim(sprite_index, image_index, _px, _draw_y, _sx, _sy, image_alpha);
+
+    draw_sprite_ext(sprite_index, image_index, _px, _draw_y,
         _sx, _sy, 0, _draw_col, image_alpha);
 
     if (_crystal != undefined && _crystal.strength > 0) {
         if (variable_global_exists("bulb_renderer") && global.bulb_renderer != undefined && global.bulb_renderer.normalMap) {
             var _wrap = { strength: _crystal.strength, blend: _crystal.blend, dir: (_crystal.dir + 180) mod 360 };
-            scr_bulb_draw_crystal_rim(sprite_index, image_index, _draw_x + _wall_draw_nudge, _draw_y,
+            scr_bulb_draw_crystal_rim(sprite_index, image_index, _px, _draw_y,
                 _sx, _sy, _wrap, image_alpha * 0.32);
         } else {
-            scr_bulb_draw_crystal_rim(sprite_index, image_index, _draw_x + _wall_draw_nudge, _draw_y,
+            scr_bulb_draw_crystal_rim(sprite_index, image_index, _px, _draw_y,
                 _sx, _sy, _crystal, image_alpha);
         }
     }

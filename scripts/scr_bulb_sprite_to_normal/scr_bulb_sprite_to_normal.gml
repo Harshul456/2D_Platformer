@@ -13,6 +13,7 @@ function scr_bulb_sprite_to_normal(_diffuse) {
         case spr_mc_reelback:   return spr_mc_reelback_n;
         case spr_asta_attack1:  return spr_asta_attack1_n;
         case spr_mc_attack2:    return spr_mc_attack2_n;
+        case spr_mc_air_attack: return spr_mc_air_attack_n;
         case spr_mc_hurt:       return spr_mc_hurt_n;
         case spr_mc_hurt_air:   return spr_mc_hurt_air_n;
         case spr_enemy:         return spr_enemy_n;

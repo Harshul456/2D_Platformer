@@ -435,6 +435,23 @@ ATTACK_HITBOX_BOT_PAD_1 = 14;
 ATTACK_HITBOX_BOT_PAD_2 = 0;
 ATTACK_HITBOX_X_INSET = 4;
 
+// Air slash — facing-right local boxes from feet origin (ox1,oy1,ox2,oy2) per subimage.
+// Active on frames 0–1 (blade + arc); 2–3 are recovery (no hitbox).
+attack_is_air = false;
+air_attack_used = false;
+AIR_ATTACK_HIT_START = 0;
+AIR_ATTACK_HIT_END = 1;
+AIR_ATTACK_HITBOX = [
+    [4, -44, 48, -16],   // frame 0 — horizontal blade thrust
+    [2, -62, 44, -14],   // frame 1 — forward slash arc
+    [0, 0, 0, 0],        // frame 2 — recovery
+    [0, 0, 0, 0]         // frame 3 — recovery
+];
+AIR_ATTACK_MOMENTUM_KEEP = 1.0;   // Keep full air hsp (no dead-stop lunge overwrite)
+AIR_ATTACK_MIN_HSP = 1.2;         // Tiny push if nearly still so the swing still carries
+AIR_ATTACK_GRAV_MUL = 0.85;       // Slight float during swing (does not freeze fall)
+AIR_ATTACK_IMAGE_SPEED = 1.2;    // Multiplier on sprite playback (sprite is 10 FPS)
+
 // Blue saber trail — grip/tip keyframes follow full swing (waist↔head↔feet).
 SABER_TRAIL_ENABLED = true;
 SABER_TRAIL_MAX = 120;

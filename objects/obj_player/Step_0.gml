@@ -119,6 +119,8 @@ if (state == PLAYER_STATE.ALIVE) {
 // Hits can land after attack Step (collision order) or same frame as knockback — never keep swing physics while stunned.
 if (stunTimer > 0 && attacking) {
     attacking = false;
+    attack_is_air = false;
+    attack_no_lunge = false;
     attack_lockout = 0;
     attack_commit_lock = 0;
     attack_recovery_lock = 0;
@@ -152,20 +154,30 @@ if (!attacking) {
 if (attacking && stunTimer <= 0) {
     attack_timer++;
 
+    // Land mid-air-slash: end cleanly so ground locomotion can take over.
+    if (attack_is_air && grounded && vsp >= 0) {
+        scr_player_attack_end_swing(0);
+    } else {
     // Pin swing art so reel/sprint pose cannot stick after cancel.
-    var _swing_sprite = (comboCount >= 2) ? spr_mc_attack2 : spr_asta_attack1;
+    var _swing_sprite = attack_is_air
+        ? spr_mc_air_attack
+        : ((comboCount >= 2) ? spr_mc_attack2 : spr_asta_attack1);
     if (sprite_index != _swing_sprite) {
         sprite_index = _swing_sprite;
         image_index = 0;
     }
-    image_speed = 1;
+    image_speed = attack_is_air
+        ? (variable_instance_exists(id, "AIR_ATTACK_IMAGE_SPEED") ? AIR_ATTACK_IMAGE_SPEED : 0.85)
+        : 1;
 
-    // --- STRONGER LUNGE FRICTION ---
-    hsp = lerp(hsp, 0, ATTACK_LUNGE_FRICTION);
-    if (abs(hsp) < ATTACK_LUNGE_CUTOFF) hsp = 0;
+    // Ground swings use heavy lunge friction. Air keeps carry momentum (no dead stop).
+    if (!attack_is_air) {
+        hsp = lerp(hsp, 0, ATTACK_LUNGE_FRICTION);
+        if (abs(hsp) < ATTACK_LUNGE_CUTOFF) hsp = 0;
+    }
     
     // Optional sustained mid-swing hsp (disabled when ATTACK_COMBO_LUNGE_PER_FRAME is 0 in Create).
-    if (ATTACK_COMBO_LUNGE_PER_FRAME != 0) {
+    if (!attack_is_air && ATTACK_COMBO_LUNGE_PER_FRAME != 0) {
         var _lunge_end = image_number * ATTACK_COMBO_LUNGE_FRAME_END;
         if (!attack_has_hit && !attack_no_lunge && image_index >= 1 && image_index <= _lunge_end) {
             var _ld = last_direction;
@@ -176,10 +188,10 @@ if (attacking && stunTimer <= 0) {
     }
     
     // --- STOP ON HIT ---
-    if (attack_has_hit) hsp *= ATTACK_ON_HIT_HSLOW;
+    if (attack_has_hit && !attack_is_air) hsp *= ATTACK_ON_HIT_HSLOW;
 
     // --- FORWARD SLIDE (small, smooth) ---
-    if (!attack_no_lunge && attack_shift_remaining > 0) {
+    if (!attack_is_air && !attack_no_lunge && attack_shift_remaining > 0) {
         var _step = (last_direction != 0) ? last_direction : (image_xscale >= 0 ? 1 : -1);
         var _n = min(ATTACK_SHIFT_PX_PER_FRAME, attack_shift_remaining);
         var _shifted = 0;
@@ -237,14 +249,18 @@ if (attacking && stunTimer <= 0) {
             var _hitstop_frames = (comboCount >= 2 || dodge_counter_strike) ? ATTACK_FINISHER_HITSTOP : ATTACK_LIGHT_HITSTOP;
             if (dodge_counter_strike) _hitstop_frames = max(_hitstop_frames, 8);
             scr_hitstop_trigger(_hitstop_frames);
-            hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
-            if (comboCount >= 2) {
-                hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
+            if (!attack_is_air) {
+                hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
+                if (comboCount >= 2) {
+                    hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
+                }
+                scr_player_attack1_prepare_retreat();
+            } else {
+                hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK * 0.35;
             }
-            scr_player_attack1_prepare_retreat();
         } else if (_hit_enemy != noone) {
             var _hit_result = { landed: false, intercepted: false, armored_chip: false, super_armor: false };
-            var _counter_combo = dodge_counter_strike ? 2 : comboCount;
+            var _counter_combo = dodge_counter_strike ? 2 : (attack_is_air ? 1 : comboCount);
             with (_hit_enemy) {
                 _hit_result = scr_enemy_on_player_hit(_counter_combo);
                 if (other.dodge_counter_strike && _hit_result.landed
@@ -280,8 +296,10 @@ if (attacking && stunTimer <= 0) {
                 var _hitstop_frames = (comboCount >= 2) ? ATTACK_FINISHER_HITSTOP : ATTACK_LIGHT_HITSTOP;
                 scr_hitstop_trigger(_hitstop_frames);
 
-                if (scr_player_is_downward_air_strike() && bbox_bottom <= _hit_enemy.bbox_top + 28) {
+                if (attack_is_air && scr_player_is_downward_air_strike() && bbox_bottom <= _hit_enemy.bbox_top + 28) {
                     scr_player_apply_nail_pogo();
+                } else if (attack_is_air) {
+                    hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK * 0.35;
                 } else {
                     hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
                     if (comboCount >= 2) {
@@ -295,7 +313,7 @@ if (attacking && stunTimer <= 0) {
     if (!_hb.active) debug_hitbox_active = false;
 
     // Optional commit lock (ATTACK2_COMMIT_LOCK_FRAMES > 0) — brakes hsp while locked.
-    if (attack_commit_lock > 0) {
+    if (!attack_is_air && attack_commit_lock > 0) {
         attack_commit_lock--;
         hsp = lerp(hsp, 0, 0.45);
         if (abs(hsp) < 0.4) hsp = 0;
@@ -304,7 +322,7 @@ if (attacking && stunTimer <= 0) {
     // Early endlag after hit — same cancel window for atk1 and atk2.
     // attack_timer guard: dash/run cancel must not end on the startup frame from a stale image_index.
     var _can_end = (attack_timer >= 3) && (sprite_index == _swing_sprite);
-    if (_can_end && attack_recovery_cut && comboCount >= 1) {
+    if (!attack_is_air && _can_end && attack_recovery_cut && comboCount >= 1) {
         var _cancel_after = (comboCount >= 2)
             ? (variable_instance_exists(id, "ATTACK2_HIT_CANCEL_AFTER_INDEX") ? ATTACK2_HIT_CANCEL_AFTER_INDEX : 2)
             : (variable_instance_exists(id, "ATTACK1_HIT_CANCEL_AFTER_INDEX") ? ATTACK1_HIT_CANCEL_AFTER_INDEX : 2);
@@ -315,16 +333,17 @@ if (attacking && stunTimer <= 0) {
             scr_player_attack_end_swing(_post_accel);
         }
     } else if (_can_end && image_index >= image_number - 1) {
-        var _post_accel = POST_ATTACK_ACCEL_FRAMES;
-        if (attack_has_hit && comboCount == 1) {
+        var _post_accel = attack_is_air ? 0 : POST_ATTACK_ACCEL_FRAMES;
+        if (!attack_is_air && attack_has_hit && comboCount == 1) {
             _post_accel = (variable_instance_exists(id, "ATTACK1_HIT_POST_ACCEL_FRAMES")
                 ? ATTACK1_HIT_POST_ACCEL_FRAMES : 4);
-        } else if (attack_has_hit && comboCount >= 2) {
+        } else if (!attack_is_air && attack_has_hit && comboCount >= 2) {
             _post_accel = (variable_instance_exists(id, "ATTACK2_HIT_POST_ACCEL_FRAMES")
                 ? ATTACK2_HIT_POST_ACCEL_FRAMES : 4);
         }
         scr_player_attack_end_swing(_post_accel);
     }
+    } // end else (not landing cancel)
 }
 
 // Hit / interrupt can leave attacking=false while debug_hitbox_active was true — clear it here.
