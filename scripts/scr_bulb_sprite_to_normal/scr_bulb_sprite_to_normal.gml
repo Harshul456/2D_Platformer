@@ -16,9 +16,10 @@ function scr_bulb_sprite_to_normal(_diffuse) {
         case spr_mc_air_attack: return spr_mc_air_attack_n;
         case spr_mc_hurt:       return spr_mc_hurt_n;
         case spr_mc_hurt_air:   return spr_mc_hurt_air_n;
-        case spr_enemy:         return spr_enemy_n;
-        case spr_enemy_windup:  return spr_enemy_windup_n;
-        case spr_enemy_attack:  return spr_enemy_attack_n;
+        case spr_crystal_core:         return spr_crystal_core_n;
+        case spr_crystal_core_windup:  return spr_crystal_core_windup_n;
+        case spr_crystal_core_attack:  return spr_crystal_core_attack_n;
+        case spr_ancient_rock:         return spr_ancient_rock_n;
         default:                return -1;
     }
 }

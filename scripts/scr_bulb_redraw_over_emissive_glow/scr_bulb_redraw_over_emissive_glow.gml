@@ -67,7 +67,7 @@ function scr_bulb_draw_player_lit_sprite(_lit_surface, _cam) {
         sprite_index, image_index, image_xscale, image_yscale, 0, 1);
 }
 
-/// @description Restore the already-lit obj_enemy sprite over emissive overlays.
+/// @description Restore the already-lit obj_crystal_core sprite over emissive overlays.
 function scr_bulb_draw_enemy_lit_sprite(_lit_surface, _cam) {
     var _shake_x = (variable_instance_exists(id, "telegraph_shake_x") ? telegraph_shake_x : 0);
     var _shake_y = (variable_instance_exists(id, "telegraph_shake_y") ? telegraph_shake_y : 0);
@@ -78,7 +78,8 @@ function scr_bulb_draw_enemy_lit_sprite(_lit_surface, _cam) {
 
 /// @description Restore the already-lit obj_enemy_parent sprite over emissive overlays.
 function scr_bulb_draw_enemy_parent_lit_sprite(_lit_surface, _cam) {
-    scr_bulb_draw_lit_sprite_ext(_lit_surface, _cam, floor(x), floor(y),
+    var _hover_y = scr_enemy_floating_hover_draw_offset_y();
+    scr_bulb_draw_lit_sprite_ext(_lit_surface, _cam, floor(x), floor(y) + _hover_y,
         sprite_index, image_index, image_xscale, image_yscale, image_angle, image_alpha);
 }
 
@@ -121,7 +122,7 @@ function scr_bulb_redraw_over_emissive_glow(_lit_surface = -1) {
     with (obj_enemy_parent) {
         if (!visible) continue;
 
-        if (object_index == obj_enemy) {
+        if (object_index == obj_crystal_core) {
             if (_use_lit) {
                 scr_bulb_draw_enemy_lit_sprite(_lit_surface, _cam);
             } else {

@@ -18,16 +18,40 @@ function scr_player_ground_debris_feet_xy() {
     };
 }
 
+/// @function scr_player_ground_debris_feet_on_bridge
+/// @description True when feet sit on drop-through bridge tiles (88/89).
+function scr_player_ground_debris_feet_on_bridge() {
+    var _tm = (variable_global_exists("tilemap_collision_id") ? global.tilemap_collision_id : noone);
+    if (_tm == noone || _tm == -1) return false;
+    var _pl = floor(bbox_left) + 2;
+    var _pc = floor((bbox_left + bbox_right) * 0.5);
+    var _pr = floor(bbox_right) - 2;
+    var _fy = floor(bbox_bottom);
+    return tilemap_feet_on_drop_bridge(_tm, _pl, _pc, _pr, _fy);
+}
+
 /// @function scr_player_ground_debris_pick_color
 function scr_player_ground_debris_pick_color() {
-    if (variable_instance_exists(id, "GROUND_DEBRIS_COLORS") && array_length(GROUND_DEBRIS_COLORS) > 0) {
-        return GROUND_DEBRIS_COLORS[irandom(array_length(GROUND_DEBRIS_COLORS) - 1)];
+    // Bridge planks → wood browns; cave floor → purple dirt
+    var _palette = undefined;
+    if (scr_player_ground_debris_feet_on_bridge()
+        && variable_instance_exists(id, "GROUND_DEBRIS_COLORS_BRIDGE")
+        && array_length(GROUND_DEBRIS_COLORS_BRIDGE) > 0) {
+        _palette = GROUND_DEBRIS_COLORS_BRIDGE;
+    } else if (variable_instance_exists(id, "GROUND_DEBRIS_COLORS")
+        && array_length(GROUND_DEBRIS_COLORS) > 0) {
+        _palette = GROUND_DEBRIS_COLORS;
     }
+
+    if (_palette != undefined) {
+        return _palette[irandom(array_length(_palette) - 1)];
+    }
+
     var _cols = [
-        make_color_rgb(94, 74, 102),   // #5E4A66 ground mid
-        make_color_rgb(74, 59, 82),    // #4A3B52 ground base
-        make_color_rgb(46, 36, 51),    // #2E2433 ground shadow
-        make_color_rgb(125, 101, 133)  // #7D6585 tile edge highlight
+        make_color_rgb(94, 74, 102),
+        make_color_rgb(74, 59, 82),
+        make_color_rgb(46, 36, 51),
+        make_color_rgb(125, 101, 133)
     ];
     return _cols[irandom(array_length(_cols) - 1)];
 }

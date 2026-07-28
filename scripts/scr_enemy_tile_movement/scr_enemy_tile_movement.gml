@@ -71,7 +71,7 @@ function scr_enemy_horizontal_lead_x(_h_step) {
 }
 
 /// @function scr_enemy_foot_probes
-/// @description Narrow foot probes at spike tips — spr_enemy bbox is ~42px wide (shoulder wings) but feet are ~6px at center.
+/// @description Narrow foot probes at spike tips — spr_crystal_core bbox is ~42px wide (shoulder wings) but feet are ~6px at center.
 function scr_enemy_foot_probes() {
     var _cx = floor((bbox_left + bbox_right) * 0.5);
     var _hw = (variable_instance_exists(id, "ENEMY_FOOT_PROBE_HALF_WIDTH") ? ENEMY_FOOT_PROBE_HALF_WIDTH : 3);
@@ -222,7 +222,7 @@ function scr_enemy_vertical_fall_step(_tm, _fall_inset) {
 }
 
 /// @function scr_enemy_tile_movement
-/// @description Tilemap collision for obj_enemy — player-equivalent shelf/edge rules (indices 1,5,34,35,36).
+/// @description Tilemap collision for obj_crystal_core — player-equivalent shelf/edge rules (indices 1,5,34,35,36).
 function scr_enemy_tile_movement() {
     var _tm = global.tilemap_collision_id;
     var _ledge_win = (variable_instance_exists(id, "ENEMY_HORIZONTAL_LEDGE_WINDOW_PX")

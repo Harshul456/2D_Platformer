@@ -24,7 +24,7 @@ function scr_bulb_player_crystal_influence(_px, _py) {
         }
     }
 
-    with (obj_enemy) {
+    with (obj_crystal_core) {
         if (bulb_light == undefined) continue;
 
         var _reach = 96 * max(bulb_light.xscale, bulb_light.yscale);
@@ -36,6 +36,23 @@ function scr_bulb_player_crystal_influence(_px, _py) {
 
         if (_t > _best_str) {
             _best_str = _t;
+            _best_blend = bulb_light.blend;
+            _best_dir = point_direction(bulb_light.x, bulb_light.y, _px, _py);
+        }
+    }
+
+    with (obj_ancient_rock) {
+        if (bulb_light == undefined) continue;
+
+        var _reach_b = 96 * max(bulb_light.xscale, bulb_light.yscale);
+        var _dist_b = point_distance(_px, _py, bulb_light.x, bulb_light.y);
+        if (_dist_b >= _reach_b) continue;
+
+        var _tb = 1 - (_dist_b / _reach_b);
+        _tb = power(_tb, 1.2);
+
+        if (_tb > _best_str) {
+            _best_str = _tb;
             _best_blend = bulb_light.blend;
             _best_dir = point_direction(bulb_light.x, bulb_light.y, _px, _py);
         }
@@ -122,7 +139,7 @@ function scr_bulb_crystal_glow_alpha_at(_px, _py, _match_radius = 24) {
         _best_alpha = glow_pulse_alpha;
     }
 
-    with (obj_enemy) {
+    with (obj_crystal_core) {
         if (bulb_light == undefined) continue;
         if (!variable_instance_exists(id, "glow_pulse_alpha")) continue;
 
@@ -130,6 +147,17 @@ function scr_bulb_crystal_glow_alpha_at(_px, _py, _match_radius = 24) {
         if (_d >= _best_dist) continue;
 
         _best_dist = _d;
+        _best_alpha = glow_pulse_alpha;
+    }
+
+    with (obj_ancient_rock) {
+        if (bulb_light == undefined) continue;
+        if (!variable_instance_exists(id, "glow_pulse_alpha")) continue;
+
+        var _d_b = point_distance(_px, _py, bulb_light.x, bulb_light.y);
+        if (_d_b >= _best_dist) continue;
+
+        _best_dist = _d_b;
         _best_alpha = glow_pulse_alpha;
     }
 

@@ -41,9 +41,9 @@ DEFAULT_SPRITES = [
     "spr_mc_air_attack",
     "spr_mc_hurt",
     "spr_mc_hurt_air",
-    "spr_enemy",
-    "spr_enemy_windup",
-    "spr_enemy_attack",
+    "spr_crystal_core",
+    "spr_crystal_core_windup",
+    "spr_crystal_core_attack",
 ]
 
 LAIGTER_SEARCH_PATHS = [

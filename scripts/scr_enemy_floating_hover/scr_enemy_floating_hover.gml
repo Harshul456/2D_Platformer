@@ -101,7 +101,10 @@ function scr_enemy_floating_hover_step() {
     }
 
     if (_hover_anim) {
-        image_index = scr_enemy_floating_hover_frame_from_time(hover_time, hover_y_offset, _amp);
+        var _frame = scr_enemy_floating_hover_frame_from_time(hover_time, hover_y_offset, _amp);
+        // Single-frame sprites (e.g. spr_ancient_rock) clamp safely
+        var _nmax = max(0, sprite_get_number(sprite_index) - 1);
+        image_index = clamp(_frame, 0, _nmax);
     }
 
     if (variable_instance_exists(id, "enemy_is_floating") && enemy_is_floating) {
@@ -120,4 +123,27 @@ function scr_enemy_floating_hover_sync_anchor() {
 function scr_enemy_floating_hover_draw_offset_y() {
     if (!variable_instance_exists(id, "hover_y_offset")) return 0;
     return hover_y_offset;
+}
+
+/// @function scr_enemy_air_anchor_above_floor
+/// @description Snap to collision floor then lift to air altitude (editor can place on ground).
+/// @param {Real} [_altitude] Pixels above floor. Uses enemy_air_altitude when omitted.
+/// @returns {Bool}
+function scr_enemy_air_anchor_above_floor() {
+    var _alt = 112;
+    if (argument_count > 0) _alt = argument[0];
+    else if (variable_instance_exists(id, "enemy_air_altitude")) _alt = enemy_air_altitude;
+
+    var _placed_y = y;
+    if (scr_enemy_snap_to_collision_floor()) {
+        y -= max(0, _alt);
+    } else {
+        // No floor under spawn — keep editor Y as the float anchor
+        y = _placed_y;
+    }
+    ystart = y;
+    enemy_grounded = false;
+    vsp = 0;
+    scr_enemy_floating_hover_sync_anchor();
+    return true;
 }

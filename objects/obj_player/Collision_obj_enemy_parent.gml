@@ -1,4 +1,21 @@
 // --- obj_player Collision with obj_enemy_parent (grounded tilemap FSM) ---
+// Crystal core uses HK slash damage only — skip parent touch HP (still separate below if needed)
+if (other.object_index == obj_crystal_core
+    || (variable_instance_exists(other, "gnd_touch_enabled") && !other.gnd_touch_enabled)) {
+    // Separation only for non-damaging bodies (ancient rock / crystal)
+    if (place_meeting(x, y, other)) {
+        var _push_away0 = sign(x - other.x);
+        if (_push_away0 == 0) _push_away0 = -last_direction;
+        var _old_x0 = x;
+        x += _push_away0 * COLLISION_SEPARATION_PUSH;
+        var _in_tile0 = (global.tilemap_collision_id != noone) && (
+            check_tile_collision(bbox_left, bbox_top) || check_tile_collision(bbox_right, bbox_top) ||
+            check_tile_collision(bbox_left, bbox_bottom) || check_tile_collision(bbox_right, bbox_bottom));
+        var _in_hazard0 = place_meeting(x, y, obj_hazard_parent);
+        if (_in_tile0 || _in_hazard0) x = _old_x0;
+    }
+    // Damage skip (crystal Collision_obj_crystal_core handles slash backup)
+} else {
 var _st = variable_instance_exists(other, "gnd_state") ? other.gnd_state : -1;
 var _enemy_incapacitated = (_st == GND_STATE_DAMAGED) || (_st == GND_STATE_DEAD);
 var _attack_startup_prio = (attacking && attack_priority_timer > 0)
@@ -18,7 +35,10 @@ if (place_meeting(x, y, other)) {
     if (_in_tile || _in_hazard) x = _old_x;
 }
 
-if (!scr_player_has_damage_iframes() && !_protected) {
+// Some enemies (e.g. ancient rock) only damage via projectiles / hitboxes
+if (variable_instance_exists(other, "gnd_touch_enabled") && !other.gnd_touch_enabled) {
+    // Separation above still runs; skip HP / knockback
+} else if (!scr_player_has_damage_iframes() && !_protected) {
     var _dmg = ENEMY_COLLISION_DAMAGE;
     if (variable_instance_exists(other, "gnd_touch_damage")) _dmg = other.gnd_touch_damage;
     if (_st == GND_STATE_CHASE && variable_instance_exists(other, "gnd_touch_damage_chase")) {
@@ -64,3 +84,4 @@ if (!scr_player_has_damage_iframes() && !_protected) {
     invincible = true;
     invincibleTimer = INVINCIBILITY_FRAMES;
 }
+} // end else (touch-damage enemies)

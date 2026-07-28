@@ -11,7 +11,13 @@ function scr_bulb_set_normal_maps_enabled(_enabled) {
         if (bulb_light != undefined) bulb_light.normalMap = _enabled;
     }
 
-    with (obj_enemy) {
+    with (obj_crystal_core) {
+        if (variable_instance_exists(id, "bulb_light") && bulb_light != undefined) {
+            bulb_light.normalMap = _enabled;
+        }
+    }
+
+    with (obj_ancient_rock) {
         if (variable_instance_exists(id, "bulb_light") && bulb_light != undefined) {
             bulb_light.normalMap = _enabled;
         }

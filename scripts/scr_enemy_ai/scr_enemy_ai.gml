@@ -60,10 +60,24 @@ function scr_enemy_abort_combat() {
 }
 
 /// @function scr_enemy_abort_all_combat
-/// @description All living crystal cores abort combat (call on player death).
+/// @description All living combat enemies abort (call on player death).
 function scr_enemy_abort_all_combat() {
-    with (obj_enemy) {
+    with (obj_crystal_core) {
         if (state != ENEMY_STATE.DEATH) scr_enemy_abort_combat();
+    }
+    with (obj_ancient_rock) {
+        if (gnd_state == GND_STATE_DEAD) continue;
+        rock_charge_timer = 0;
+        rock_light_release = 0;
+        rock_cooldown = max(rock_cooldown, 40);
+        scr_ancient_rock_charge_visuals_reset();
+        if (gnd_state == GND_STATE_ATTACK || gnd_state == GND_STATE_CHASE) {
+            gnd_state = GND_STATE_PATROL;
+            hsp = 0;
+        }
+    }
+    with (obj_ancient_rock_bolt) {
+        instance_destroy();
     }
 }
 
@@ -214,6 +228,17 @@ function scr_enemy_notice_visuals() {
 /// @description Active armor intercept rules for committed enemy phases.
 /// @returns {Struct} { intercept, take_damage, take_stun, take_knockback, damage_mult }
 function scr_enemy_hit_armor_policy() {
+    // Ancient rock charge — chip OK, windup cannot be interrupted (anti air-spam)
+    if (object_index == obj_ancient_rock
+        && variable_instance_exists(id, "gnd_state")
+        && gnd_state == GND_STATE_ATTACK) {
+        return { intercept: false, take_damage: true, take_stun: false, take_knockback: false, damage_mult: 1 };
+    }
+
+    if (!variable_instance_exists(id, "state")) {
+        return { intercept: false, take_damage: true, take_stun: true, take_knockback: true, damage_mult: 1 };
+    }
+
     switch (state) {
         case ENEMY_STATE.NOTICE:
             return { intercept: true, take_damage: false, take_stun: false, take_knockback: false, damage_mult: 0 };
@@ -329,7 +354,7 @@ function scr_enemy_attack_compute_hitbox() {
     var _hb = { active: false, x1: 0, y1: 0, x2: 0, y2: 0 };
 
     if (state != ENEMY_STATE.ATTACK || attack_frame <= 0) return _hb;
-    if (sprite_index != spr_enemy_attack) return _hb;
+    if (sprite_index != spr_crystal_core_attack) return _hb;
 
     var _table = (variable_instance_exists(id, "ENEMY_ATTACK_SLASH_HITBOX")
         ? ENEMY_ATTACK_SLASH_HITBOX : undefined);
@@ -499,11 +524,11 @@ function scr_enemy_on_player_hit(_combo_count) {
     }
 
     hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
-    obj_enemy_health -= other.ATTACK_DAMAGE_PER_HIT * _policy.damage_mult;
+    obj_crystal_core_health -= other.ATTACK_DAMAGE_PER_HIT * _policy.damage_mult;
     scr_enemy_hit_react_trigger(_combo_count >= 2 ? 1.4 : 1);
 
     // Lethal blow — hand off to the explosive shatter sequence.
-    if (obj_enemy_health <= 0 && state != ENEMY_STATE.DEATH) {
+    if (obj_crystal_core_health <= 0 && state != ENEMY_STATE.DEATH) {
         scr_enemy_begin_death();
         return { landed: true, intercepted: false, armored_chip: false, super_armor: false };
     }
@@ -624,6 +649,12 @@ function scr_enemy_death_shatter() {
         _crystal,
         merge_colour(_crystal, c_white, 0.5)
     ];
+    // Per-enemy shatter colors (e.g. ancient rock → purple + grey rock)
+    if (variable_instance_exists(id, "enemy_shard_palette")
+        && is_array(enemy_shard_palette)
+        && array_length(enemy_shard_palette) > 0) {
+        _palette = enemy_shard_palette;
+    }
 
     repeat (irandom_range(ENEMY_DEATH_SHARD_MIN, ENEMY_DEATH_SHARD_MAX)) {
         var _sh = instance_create_layer(_mid_x, _mid_y, _layer, obj_enemy_shard);
@@ -634,9 +665,13 @@ function scr_enemy_death_shatter() {
 /// @function scr_enemy_get_glow_sprite
 /// @description Emissive overlay matched to the active body sheet (not FSM — avoids idle glow on attack).
 function scr_enemy_get_glow_sprite() {
+    // Per-enemy override (ancient rock uses body sheet as blue self-glow)
+    if (variable_instance_exists(id, "ENEMY_GLOW_SPRITE") && sprite_exists(ENEMY_GLOW_SPRITE)) {
+        return ENEMY_GLOW_SPRITE;
+    }
     if (variable_instance_exists(id, "sprite_index")) {
-        if (sprite_index == spr_enemy_windup) return BULB_ENEMY_GLOW_SPRITE_WINDUP;
-        if (sprite_index == spr_enemy_attack) return BULB_ENEMY_GLOW_SPRITE_ATTACK;
+        if (sprite_index == spr_crystal_core_windup) return BULB_ENEMY_GLOW_SPRITE_WINDUP;
+        if (sprite_index == spr_crystal_core_attack) return BULB_ENEMY_GLOW_SPRITE_ATTACK;
     }
     return BULB_ENEMY_GLOW_SPRITE;
 }
@@ -644,9 +679,9 @@ function scr_enemy_get_glow_sprite() {
 /// @function scr_enemy_update_combat_sprite
 /// @description Swap body sprite + scrub frame for telegraph windup and attack dash.
 function scr_enemy_update_combat_sprite() {
-    var _idle = (variable_instance_exists(id, "ENEMY_SPRITE_IDLE") ? ENEMY_SPRITE_IDLE : spr_enemy);
-    var _windup = (variable_instance_exists(id, "ENEMY_SPRITE_WINDUP") ? ENEMY_SPRITE_WINDUP : spr_enemy_windup);
-    var _attack = (variable_instance_exists(id, "ENEMY_SPRITE_ATTACK") ? ENEMY_SPRITE_ATTACK : spr_enemy_attack);
+    var _idle = (variable_instance_exists(id, "ENEMY_SPRITE_IDLE") ? ENEMY_SPRITE_IDLE : spr_crystal_core);
+    var _windup = (variable_instance_exists(id, "ENEMY_SPRITE_WINDUP") ? ENEMY_SPRITE_WINDUP : spr_crystal_core_windup);
+    var _attack = (variable_instance_exists(id, "ENEMY_SPRITE_ATTACK") ? ENEMY_SPRITE_ATTACK : spr_crystal_core_attack);
 
     switch (state) {
         case ENEMY_STATE.TELEGRAPH:
@@ -854,7 +889,7 @@ function scr_enemy_ai() {
         } break;
 
         case ENEMY_STATE.STUNNED:
-            // Velocity handled in obj_enemy Step (knockback slide + gravity).
+            // Velocity handled in obj_crystal_core Step (knockback slide + gravity).
             break;
     }
 

@@ -245,56 +245,60 @@ if (attacking && stunTimer <= 0) {
         var y1 = _hb.y1;
         var x2 = _hb.x2;
         var y2 = _hb.y2;
-        var _hit_enemy = collision_rectangle(x1, y1, x2, y2, obj_enemy, false, true);
-        var _hit_parent = noone;
-        if (_hit_enemy == noone) {
-            _hit_parent = collision_rectangle(x1, y1, x2, y2, obj_enemy_parent, false, true);
-        }
-        
-        if (_hit_parent != noone) {
+
+        // Hit ALL overlapping enemies (crystal + ancient rock can share a swing)
+        var _hit_list = ds_list_create();
+        var _hit_n = collision_rectangle_list(x1, y1, x2, y2, obj_enemy_parent, false, true, _hit_list, false);
+        if (_hit_n > 0) {
             attack_has_hit = true;
             var _dmg = ATTACK_DAMAGE_PER_HIT;
             if (dodge_counter_strike) {
                 _dmg = ceil(_dmg * (variable_instance_exists(id, "DODGE_COUNTER_DAMAGE_MULT")
                     ? DODGE_COUNTER_DAMAGE_MULT : 1.75));
             }
-            with (_hit_parent) {
-                scr_enemy_grounded_apply_damage(_dmg, other.x);
-                hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
-            }
-            scr_player_impact_lines_on_hit(x1, y1, x2, y2, _hit_parent);
-            var _hitstop_frames = (comboCount >= 2 || dodge_counter_strike) ? ATTACK_FINISHER_HITSTOP : ATTACK_LIGHT_HITSTOP;
-            if (dodge_counter_strike) _hitstop_frames = max(_hitstop_frames, 8);
-            scr_hitstop_trigger(_hitstop_frames);
-            if (!attack_is_air) {
-                hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;
-                if (comboCount >= 2) {
-                    hsp -= last_direction * ATTACK_COMBO2_PLAYER_RECOIL;
-                }
-                scr_player_attack1_prepare_retreat();
-            } else {
-                hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK * 0.35;
-            }
-        } else if (_hit_enemy != noone) {
-            var _hit_result = { landed: false, intercepted: false, armored_chip: false, super_armor: false };
             var _counter_combo = dodge_counter_strike ? 2 : (attack_is_air ? 1 : comboCount);
-            with (_hit_enemy) {
-                _hit_result = scr_enemy_on_player_hit(_counter_combo);
-                if (other.dodge_counter_strike && _hit_result.landed
-                    && variable_instance_exists(id, "obj_enemy_health")) {
-                    // Extra chip on top of finisher hit for the counter flourish
-                    var _bonus = ceil(other.ATTACK_DAMAGE_PER_HIT * 0.35);
-                    obj_enemy_health -= _bonus;
-                }
-            }
+            var _hit_result = { landed: false, intercepted: false, armored_chip: false, super_armor: false };
+            var _fx_target = noone;
+            var _pogo_enemy = noone;
 
-            attack_has_hit = true;
-            // Always spark on contact — landed / chip / intercept all get juice.
-            scr_player_impact_lines_on_hit(x1, y1, x2, y2, _hit_enemy);
+            for (var _hi = 0; _hi < _hit_n; _hi++) {
+                var _inst = _hit_list[| _hi];
+                if (!instance_exists(_inst)) continue;
+
+                var _r = { landed: false, intercepted: false, armored_chip: false, super_armor: false };
+                with (_inst) {
+                    if (object_index == obj_crystal_core) {
+                        _r = scr_enemy_on_player_hit(_counter_combo);
+                        if (other.dodge_counter_strike && _r.landed
+                            && variable_instance_exists(id, "obj_crystal_core_health")) {
+                            var _bonus = ceil(other.ATTACK_DAMAGE_PER_HIT * 0.35);
+                            obj_crystal_core_health -= _bonus;
+                        }
+                    } else {
+                        _r = scr_enemy_grounded_apply_damage(_dmg, other.x);
+                        hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
+                    }
+                }
+
+                if (_r.landed) _hit_result.landed = true;
+                if (_r.armored_chip) _hit_result.armored_chip = true;
+                if (_r.intercepted) {
+                    _hit_result.intercepted = true;
+                    if (variable_struct_exists(_r, "super_armor") && _r.super_armor) {
+                        _hit_result.super_armor = true;
+                    }
+                }
+                if (_fx_target == noone) _fx_target = _inst;
+                if (_inst.object_index == obj_crystal_core) _pogo_enemy = _inst;
+            }
+            ds_list_destroy(_hit_list);
+
+            if (_fx_target != noone) {
+                scr_player_impact_lines_on_hit(x1, y1, x2, y2, _fx_target);
+            }
 
             if (_hit_result.intercepted) {
                 if (_hit_result.super_armor) {
-                    // Super armor dash — disrespect punished; enemy keeps slicing.
                     scr_hitstop_trigger(4);
                     hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK * 1.4;
                     attack_shift_remaining = 0;
@@ -306,14 +310,16 @@ if (attacking && stunTimer <= 0) {
                     hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK * 0.35;
                 }
             } else if (_hit_result.armored_chip) {
-                // Regular armor telegraph — chip damage only, tell continues.
                 scr_hitstop_trigger(1);
                 hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK * 0.15;
             } else if (_hit_result.landed) {
-                var _hitstop_frames = (comboCount >= 2) ? ATTACK_FINISHER_HITSTOP : ATTACK_LIGHT_HITSTOP;
+                var _hitstop_frames = (comboCount >= 2 || dodge_counter_strike)
+                    ? ATTACK_FINISHER_HITSTOP : ATTACK_LIGHT_HITSTOP;
+                if (dodge_counter_strike) _hitstop_frames = max(_hitstop_frames, 8);
                 scr_hitstop_trigger(_hitstop_frames);
 
-                if (attack_is_air && scr_player_is_downward_air_strike() && bbox_bottom <= _hit_enemy.bbox_top + 28) {
+                if (_pogo_enemy != noone && attack_is_air && scr_player_is_downward_air_strike()
+                    && bbox_bottom <= _pogo_enemy.bbox_top + 28) {
                     scr_player_apply_nail_pogo();
                 } else if (attack_is_air) {
                     hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK * 0.35;
@@ -325,6 +331,8 @@ if (attacking && stunTimer <= 0) {
                     scr_player_attack1_prepare_retreat();
                 }
             }
+        } else {
+            ds_list_destroy(_hit_list);
         }
     }
     if (!_hb.active) debug_hitbox_active = false;

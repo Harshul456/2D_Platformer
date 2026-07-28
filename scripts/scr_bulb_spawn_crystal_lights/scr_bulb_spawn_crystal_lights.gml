@@ -88,6 +88,13 @@ function scr_bulb_crystal_light_apply(_inst, _scale_mul = 1.0) {
                 bulb_light.xscale = 1.35 * _scale_mul;
                 bulb_light.yscale = 1.35 * _scale_mul;
                 break;
+            case 2: // blue (ancient rock / cool emissives)
+                bulb_light.intensity = BULB_ANCIENT_ROCK_LIGHT_INTENSITY;
+                bulb_light.blend = BULB_ANCIENT_ROCK_LIGHT_BLEND;
+                bulb_light.penumbraSize = 0;
+                bulb_light.xscale = 1.30 * _scale_mul;
+                bulb_light.yscale = 1.30 * _scale_mul;
+                break;
             default: // pink
                 bulb_light.intensity = 1.28;
                 bulb_light.blend = make_colour_rgb(220, 115, 170);
@@ -106,7 +113,7 @@ function scr_bulb_crystal_light_apply(_inst, _scale_mul = 1.0) {
 }
 
 /// @description Subtle dim breathe — circle scale, Bulb intensity, and tile glow alpha share one phase.
-/// @param {Id.Instance} _inst obj_bulb_crystal_light or obj_enemy with bulb_light + glow_* vars
+/// @param {Id.Instance} _inst obj_bulb_crystal_light or obj_crystal_core with bulb_light + glow_* vars
 function scr_bulb_crystal_light_pulse_step(_inst) {
     with (_inst) {
         if (bulb_light == undefined) return;

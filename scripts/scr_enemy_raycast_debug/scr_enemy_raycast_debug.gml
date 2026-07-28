@@ -203,7 +203,7 @@ function scr_enemy_raycast_debug_draw() {
     draw_text(floor(x), _y, _would_aggro ? "WOULD NOTICE" : "no spot");
 
     // --- Screen legend (first enemy only) ---
-    if (id == instance_find(obj_enemy, 0)) {
+    if (id == instance_find(obj_crystal_core, 0)) {
         var _cam = view_camera[0];
         var _vx = camera_get_view_x(_cam);
         var _vy = camera_get_view_y(_cam);

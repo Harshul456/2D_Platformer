@@ -43,7 +43,8 @@ function scr_crystal_spark_step(_inst) {
         var _pulse = variable_instance_exists(id, "glow_pulse_t") ? glow_pulse_t : 0.5;
         var _cx = x;
         var _cy = y + BULB_CRYSTAL_SPARK_CENTER_Y;
-        if (object_index == obj_enemy && bulb_light != undefined) {
+        if ((object_index == obj_crystal_core || object_index == obj_ancient_rock)
+            && bulb_light != undefined) {
             _cx = bulb_light.x;
             _cy = bulb_light.y;
         }
@@ -124,7 +125,7 @@ function scr_crystal_spark_draw_all() {
         }
     }
 
-    with (obj_enemy) {
+    with (obj_crystal_core) {
         if (!variable_instance_exists(id, "spark_list")) continue;
 
         var _pulse = scr_enemy_glow_pulse_alpha();
@@ -143,6 +144,29 @@ function scr_crystal_spark_draw_all() {
             var _py = floor(_p.y);
             draw_rectangle(_px, _py, _px, _py, false);
         }
+    }
+
+    with (obj_ancient_rock) {
+        if (!variable_instance_exists(id, "spark_list")) continue;
+
+        var _pulse_b = scr_enemy_glow_pulse_alpha();
+        draw_set_color(BULB_ANCIENT_ROCK_LIGHT_BLEND);
+
+        for (var _j = 0; _j < array_length(spark_list); _j++) {
+            var _pb = spark_list[_j];
+            var _life_tb = _pb.life / _pb.max_life;
+            var _fade_in_b = min(1, (1 - _life_tb) * 6);
+            var _fade_out_b = min(1, _life_tb * 3);
+            var _twinkle_b = 0.45 + 0.55 * ((dsin(_pb.twinkle_phase) + 1) * 0.5);
+            var _ab = _fade_in_b * _fade_out_b * _pulse_b * _twinkle_b * BULB_CRYSTAL_SPARK_ALPHA;
+            if (_ab <= 0.01) continue;
+
+            draw_set_alpha(_ab);
+            var _pxb = floor(_pb.x);
+            var _pyb = floor(_pb.y);
+            draw_rectangle(_pxb, _pyb, _pxb, _pyb, false);
+        }
+        draw_set_color(c_white);
     }
 
     gpu_set_texfilter(_old_tex);

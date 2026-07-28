@@ -128,7 +128,7 @@ function scr_player_attack_swing_sfx(_finisher = false) {
 /// @param {Id.Instance} [_enemy] Hit target — crystal core uses snd_crystal_hit_*
 function scr_player_attack_impact_sfx(_finisher = false, _enemy = noone) {
     var _crystal = (_enemy != noone && instance_exists(_enemy)
-        && (_enemy.object_index == obj_enemy
+        && (_enemy.object_index == obj_crystal_core
             || object_is_ancestor(_enemy.object_index, obj_enemy_parent)));
 
     var _clips = _crystal

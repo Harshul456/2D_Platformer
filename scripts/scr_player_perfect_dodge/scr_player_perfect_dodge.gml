@@ -66,6 +66,22 @@ function scr_player_find_perfect_dodge_threat() {
         }
         if (_threat != noone) break;
     }
+    if (_threat != noone) return _threat;
+
+    // Ancient rock bolt — dash through the projectile, counter the owner (same flurry path)
+    with (obj_ancient_rock_bolt) {
+        if (variable_instance_exists(id, "hit_dealt") && hit_dealt) continue;
+        if (!instance_exists(owner)) continue;
+        if (variable_instance_exists(owner, "gnd_state") && owner.gnd_state == GND_STATE_DEAD) continue;
+
+        var _r = ROCK_BOLT_RADIUS + 4;
+        if (collision_circle(x, y, _r, other, false, true) == noone) continue;
+
+        _threat = owner;
+        // Parry consumes the bolt
+        instance_destroy();
+        break;
+    }
     return _threat;
 }
 
@@ -104,6 +120,11 @@ function scr_player_perfect_dodge_try_trigger() {
     sprint_burst_tick = 0;
     sprint_hold_latched = false;
     sprint_dash_standstill = false;
+    dash_input_buffer = 0;
+    sprint_resume_hold = false;
+    sprint_z_idle_charged = false;
+    sprint_jump_carry = false;
+    sprint_air_trail = false;
 
     // Travel direction: dash direction (into them), falling back to toward the threat
     var _through = (last_direction != 0) ? last_direction : sign(image_xscale);
@@ -177,6 +198,19 @@ function scr_player_perfect_dodge_end_slowmo() {
     image_speed = 1;
     image_blend = c_white;
     double_jump_anim_active = false;
+
+    // Don't inherit the dash that triggered the PD — landing + direction alone must not re-dash.
+    // If sprint is still held, arm idle-charge so direction + Z can start a fresh sprint intentionally.
+    dash_input_buffer = 0;
+    sprint_resume_hold = false;
+    sprint_hold_latched = false;
+    sprint_committed = false;
+    sprint_dash_standstill = false;
+    sprint_burst_tick = 0;
+    is_sprinting = false;
+    sprint_jump_carry = false;
+    sprint_air_trail = false;
+    sprint_z_idle_charged = key_sprint;
 }
 
 /// @function scr_player_dodge_counter_compute_landing
@@ -193,10 +227,18 @@ function scr_player_dodge_counter_compute_landing() {
     if (instance_exists(perfect_dodge_target)) {
         // Stand on the side we're attacking from (face toward enemy center)
         dodge_counter_to_x = perfect_dodge_target.x - _face * _off;
-        dodge_counter_to_y = perfect_dodge_target.y;
-        // Keep roughly our current feet height if possible
-        if (variable_instance_exists(id, "bbox_bottom") && variable_instance_exists(perfect_dodge_target, "bbox_bottom")) {
+        // Align feet to target feet — floating foes (ancient rock) put you in the air beside them
+        if (variable_instance_exists(id, "bbox_bottom")
+            && variable_instance_exists(perfect_dodge_target, "bbox_bottom")) {
             dodge_counter_to_y = y + (perfect_dodge_target.bbox_bottom - bbox_bottom);
+        } else {
+            dodge_counter_to_y = perfect_dodge_target.y;
+        }
+        // Floating enemies: prefer body center so the flurry reads mid-crystal
+        if (variable_instance_exists(perfect_dodge_target, "enemy_is_floating")
+            && perfect_dodge_target.enemy_is_floating) {
+            var _mid = (perfect_dodge_target.bbox_top + perfect_dodge_target.bbox_bottom) * 0.5;
+            dodge_counter_to_y = _mid + (y - (bbox_top + bbox_bottom) * 0.5);
         }
     }
 }
@@ -239,6 +281,7 @@ function scr_player_begin_dodge_counter() {
     dodge_counter_hit_cd = 0;
     dodge_counter_hit_count = 0;
     dodge_counter_land_hold = 0;
+    dodge_counter_air_reappear = false;
     scr_player_saber_trail_clear();
     scr_player_dodge_counter_compute_landing();
 
@@ -382,11 +425,11 @@ function scr_player_dodge_counter_apply_chip(_target, _dmg) {
     var _landed = false;
 
     with (_target) {
-        if (variable_instance_exists(id, "obj_enemy_health")) {
+        if (variable_instance_exists(id, "obj_crystal_core_health")) {
             var _policy = scr_enemy_hit_armor_policy();
             if (!_policy.intercept) {
                 hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
-                obj_enemy_health -= _dmg * _policy.damage_mult;
+                obj_crystal_core_health -= _dmg * _policy.damage_mult;
 
                 // Same distortion glow circle as a normal light hit (full strength each tick)
                 scr_enemy_hit_react_trigger(1);
@@ -397,7 +440,7 @@ function scr_player_dodge_counter_apply_chip(_target, _dmg) {
                 knockback_pending_lift = false;
                 hsp = 0;
 
-                if (obj_enemy_health <= 0 && state != ENEMY_STATE.DEATH) {
+                if (obj_crystal_core_health <= 0 && state != ENEMY_STATE.DEATH) {
                     scr_enemy_begin_death();
                 } else if (_policy.take_stun && state != ENEMY_STATE.DEATH) {
                     state = ENEMY_STATE.STUNNED;
@@ -408,21 +451,32 @@ function scr_player_dodge_counter_apply_chip(_target, _dmg) {
             }
         } else if (variable_instance_exists(id, "gnd_hp")) {
             if (gnd_state != GND_STATE_DEAD) {
-                gnd_hp -= _dmg;
-                hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
-                gnd_knock_h = 0;
-                // Grounded foes still get the screen-space shockwave + light burst
-                scr_hit_distort_add(x, (bbox_top + bbox_bottom) * 0.5, 1);
-                if (gnd_hp <= 0) {
-                    gnd_state = GND_STATE_DEAD;
+                var _policy = scr_enemy_hit_armor_policy();
+                if (_policy.intercept) {
+                    scr_enemy_armor_deflect_feedback();
+                    _landed = false;
                 } else {
-                    gnd_state = GND_STATE_DAMAGED;
-                    gnd_hurt_stun_timer = max(
-                        variable_instance_exists(id, "gnd_hurt_stun_timer") ? gnd_hurt_stun_timer : 0,
-                        8
-                    );
+                    gnd_hp -= _dmg * _policy.damage_mult;
+                    hit_blink_timer = other.ATTACK_HIT_BLINK_FRAMES;
+                    gnd_knock_h = 0;
+                    // Ancient rock / crystal-light foes — same hit-react glow + distort as nail hits
+                    if (variable_instance_exists(id, "bulb_light") && bulb_light != undefined) {
+                        scr_enemy_hit_react_trigger(1);
+                    } else {
+                        scr_hit_distort_add(x, (bbox_top + bbox_bottom) * 0.5, 1);
+                    }
+                    if (gnd_hp <= 0) {
+                        gnd_state = GND_STATE_DEAD;
+                    } else if (_policy.take_stun) {
+                        gnd_state = GND_STATE_DAMAGED;
+                        gnd_hurt_stun_timer = max(
+                            variable_instance_exists(id, "gnd_hurt_stun_timer") ? gnd_hurt_stun_timer : 0,
+                            8
+                        );
+                    }
+                    // else armored charge — chip only, keep ATTACK / charge going
+                    _landed = true;
                 }
-                _landed = true;
             }
         }
     }
@@ -436,15 +490,26 @@ function scr_player_dodge_counter_target_dead() {
     if (!instance_exists(perfect_dodge_target)) return true;
     with (perfect_dodge_target) {
         if (variable_instance_exists(id, "state") && state == ENEMY_STATE.DEATH) return true;
-        if (variable_instance_exists(id, "obj_enemy_health") && obj_enemy_health <= 0) return true;
+        if (variable_instance_exists(id, "obj_crystal_core_health") && obj_crystal_core_health <= 0) return true;
         if (variable_instance_exists(id, "gnd_state") && gnd_state == GND_STATE_DEAD) return true;
         if (variable_instance_exists(id, "gnd_hp") && gnd_hp <= 0) return true;
     }
     return false;
 }
 
+/// @function scr_player_dodge_counter_is_air_reappear
+/// @description True when the counter should end in mid-air (floating foe), not landing crouch.
+function scr_player_dodge_counter_is_air_reappear() {
+    if (instance_exists(perfect_dodge_target)
+        && variable_instance_exists(perfect_dodge_target, "enemy_is_floating")
+        && perfect_dodge_target.enemy_is_floating) {
+        return true;
+    }
+    return false;
+}
+
 /// @function scr_player_dodge_counter_begin_reappear
-/// @description Jump from vanish/flurry into the soft landing reappear.
+/// @description Jump from vanish/flurry into soft reappear (land crouch on ground, fall pose in air).
 function scr_player_dodge_counter_begin_reappear() {
     scr_player_dodge_counter_move_toward(dodge_counter_to_x, dodge_counter_to_y, 1);
     dodge_counter_phase = DODGE_COUNTER_PHASE.REAPPEAR;
@@ -453,17 +518,28 @@ function scr_player_dodge_counter_begin_reappear() {
     dodge_counter_hidden = false;
     debug_hitbox_active = false;
 
+    dodge_counter_air_reappear = scr_player_dodge_counter_is_air_reappear();
     sprite_index = spr_mc_jump;
-    var _land0 = variable_instance_exists(id, "ANIM_LAND_CROUCH_START")
-        ? ANIM_LAND_CROUCH_START : 8;
-    image_index = _land0;
     image_speed = 0;
-    dodge_counter_land_hold = variable_instance_exists(id, "DODGE_COUNTER_LAND_FRAME_HOLD")
-        ? DODGE_COUNTER_LAND_FRAME_HOLD : 5;
-    force_landing_crouch = true;
+
+    if (dodge_counter_air_reappear) {
+        // Falling portion of jump (hair-flicker frames 5↔6) — not landing crouch
+        image_index = 5;
+        force_landing_crouch = false;
+        hair_flicker_counter = 0;
+        dodge_counter_land_hold = 0;
+    } else {
+        var _land0 = variable_instance_exists(id, "ANIM_LAND_CROUCH_START")
+            ? ANIM_LAND_CROUCH_START : 8;
+        image_index = _land0;
+        dodge_counter_land_hold = variable_instance_exists(id, "DODGE_COUNTER_LAND_FRAME_HOLD")
+            ? DODGE_COUNTER_LAND_FRAME_HOLD : 5;
+        force_landing_crouch = true;
+        scr_player_land_squash_trigger(4);
+    }
+
     image_alpha = 0;
     image_blend = make_color_rgb(180, 240, 255);
-    scr_player_land_squash_trigger(4);
     instance_create_depth(x, y - 8, depth - 1, obj_dodge_shing_flare);
     scr_player_perfect_dodge_spawn_ghost();
 }
@@ -495,7 +571,7 @@ function scr_player_dodge_counter_try_hit() {
     if (instance_exists(perfect_dodge_target)) {
         _target = perfect_dodge_target;
     } else {
-        _target = collision_rectangle(_x1, _y1, _x2, _y2, obj_enemy, false, true);
+        _target = collision_rectangle(_x1, _y1, _x2, _y2, obj_crystal_core, false, true);
         if (_target == noone) {
             _target = collision_rectangle(_x1, _y1, _x2, _y2, obj_enemy_parent, false, true);
         }
@@ -605,47 +681,87 @@ function scr_player_dodge_counter_step() {
             dodge_counter_hidden = false;
             debug_hitbox_active = false;
 
-            // Scrub landing crouch (jump frames ANIM_LAND_CROUCH_START..END)
             sprite_index = spr_mc_jump;
             image_speed = 0;
-            var _land0 = variable_instance_exists(id, "ANIM_LAND_CROUCH_START")
-                ? ANIM_LAND_CROUCH_START : 8;
-            var _land1 = variable_instance_exists(id, "ANIM_LAND_CROUCH_END")
-                ? ANIM_LAND_CROUCH_END : 10;
-            var _lhold = max(1, variable_instance_exists(id, "DODGE_COUNTER_LAND_FRAME_HOLD")
-                ? DODGE_COUNTER_LAND_FRAME_HOLD : 5);
 
-            if (image_index < _land0) image_index = _land0;
-            if (image_index < _land1) {
-                dodge_counter_land_hold--;
-                if (dodge_counter_land_hold <= 0) {
-                    image_index = min(image_index + 1, _land1);
-                    dodge_counter_land_hold = _lhold;
-                }
-            }
-
-            // Wait for both fade + landing crouch to finish
-            var _land_done = (image_index >= _land1);
+            var _air = variable_instance_exists(id, "dodge_counter_air_reappear")
+                && dodge_counter_air_reappear;
             var _fade_done = (dodge_counter_phase_timer <= 0);
-            if (_fade_done && _land_done) {
-                image_alpha = 1;
-                image_blend = c_white;
-                image_speed = 1;
-                sprite_index = spr_mc_idle;
-                image_index = 0;
-                force_landing_crouch = false;
-                attacking = false;
-                attack_timer = 0;
-                comboCount = 0;
-                comboTimer = 0;
-                post_attack_accel_timer = variable_instance_exists(id, "POST_ATTACK_ACCEL_FRAMES")
-                    ? POST_ATTACK_ACCEL_FRAMES : 12;
-                scr_player_dodge_counter_finished();
-            } else if (_fade_done && !_land_done) {
-                // Hold at full opacity while the last crouch frames play out
-                dodge_counter_phase_timer = 0;
-                image_alpha = 1;
-                image_blend = c_white;
+
+            if (_air) {
+                // Falling jump frames (same hair flicker as mid-air fall)
+                if (!variable_instance_exists(id, "hair_flicker_counter")) hair_flicker_counter = 0;
+                hair_flicker_counter++;
+                var _flick_iv = variable_instance_exists(id, "ANIM_HAIR_FLICKER_INTERVAL")
+                    ? ANIM_HAIR_FLICKER_INTERVAL : 5;
+                var _flick_th = variable_instance_exists(id, "ANIM_HAIR_FLICKER_THRESHOLD")
+                    ? ANIM_HAIR_FLICKER_THRESHOLD : 2.5;
+                if (hair_flicker_counter >= _flick_iv) hair_flicker_counter = 0;
+                image_index = (hair_flicker_counter < _flick_th) ? 5 : 6;
+
+                if (_fade_done) {
+                    image_alpha = 1;
+                    image_blend = c_white;
+                    force_landing_crouch = false;
+                    attacking = false;
+                    attack_timer = 0;
+                    comboCount = 0;
+                    comboTimer = 0;
+                    // Resume falling from the air strike — don't plant into idle/land crouch
+                    grounded = false;
+                    vsp = max(vsp, 2.2);
+                    jump_count = max(jump_count, 1);
+                    sprite_index = spr_mc_jump;
+                    image_index = 5;
+                    image_speed = 0;
+                    post_attack_accel_timer = variable_instance_exists(id, "POST_ATTACK_ACCEL_FRAMES")
+                        ? POST_ATTACK_ACCEL_FRAMES : 12;
+                    scr_player_dodge_counter_finished();
+                    // finished() restores image_speed — keep fall pose locked until movement anim takes over
+                    sprite_index = spr_mc_jump;
+                    image_index = 5;
+                    image_speed = 0;
+                }
+            } else {
+                // Scrub landing crouch (jump frames ANIM_LAND_CROUCH_START..END)
+                var _land0 = variable_instance_exists(id, "ANIM_LAND_CROUCH_START")
+                    ? ANIM_LAND_CROUCH_START : 8;
+                var _land1 = variable_instance_exists(id, "ANIM_LAND_CROUCH_END")
+                    ? ANIM_LAND_CROUCH_END : 10;
+                var _lhold = max(1, variable_instance_exists(id, "DODGE_COUNTER_LAND_FRAME_HOLD")
+                    ? DODGE_COUNTER_LAND_FRAME_HOLD : 5);
+
+                if (image_index < _land0) image_index = _land0;
+                if (image_index < _land1) {
+                    dodge_counter_land_hold--;
+                    if (dodge_counter_land_hold <= 0) {
+                        image_index = min(image_index + 1, _land1);
+                        dodge_counter_land_hold = _lhold;
+                    }
+                }
+
+                // Wait for both fade + landing crouch to finish
+                var _land_done = (image_index >= _land1);
+                if (_fade_done && _land_done) {
+                    image_alpha = 1;
+                    image_blend = c_white;
+                    image_speed = 1;
+                    sprite_index = spr_mc_idle;
+                    image_index = 0;
+                    force_landing_crouch = false;
+                    attacking = false;
+                    attack_timer = 0;
+                    comboCount = 0;
+                    comboTimer = 0;
+                    post_attack_accel_timer = variable_instance_exists(id, "POST_ATTACK_ACCEL_FRAMES")
+                        ? POST_ATTACK_ACCEL_FRAMES : 12;
+                    scr_player_dodge_counter_finished();
+                } else if (_fade_done && !_land_done) {
+                    // Hold at full opacity while the last crouch frames play out
+                    dodge_counter_phase_timer = 0;
+                    image_alpha = 1;
+                    image_blend = c_white;
+                }
             }
             break;
     }

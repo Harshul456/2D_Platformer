@@ -14,11 +14,17 @@ function scr_hit_distort_ensure() {
 /// @param {Real} _y Room Y
 /// @param {Real} [_strength] Size/intensity multiplier (finishers pass more)
 /// @param {Real} [_blend] Companion Bulb light color (defaults to HIT_LIGHT_COLOR)
-function scr_hit_distort_add(_x, _y, _strength = 1, _blend = undefined) {
+/// @param {Real} [_light_intensity] Peak Bulb intensity (defaults to HIT_LIGHT_INTENSITY)
+/// @param {Real} [_light_scale_end] End sLight128 scale as the ring spreads (defaults to HIT_LIGHT_SCALE_END)
+/// @param {Real} [_light_fade] Intensity falloff power (defaults to HIT_LIGHT_FADE_POWER; lower = lights area longer)
+function scr_hit_distort_add(_x, _y, _strength = 1, _blend = undefined, _light_intensity = undefined, _light_scale_end = undefined, _light_fade = undefined) {
     if (!HIT_DISTORT_ENABLED) return;
     scr_hit_distort_ensure();
 
     if (_blend == undefined) _blend = HIT_LIGHT_COLOR;
+    if (_light_intensity == undefined) _light_intensity = HIT_LIGHT_INTENSITY;
+    if (_light_scale_end == undefined) _light_scale_end = HIT_LIGHT_SCALE_END;
+    if (_light_fade == undefined) _light_fade = HIT_LIGHT_FADE_POWER;
 
     // Cap concurrent ripples; drop the oldest so the shader array never overflows.
     if (array_length(global.hit_distort) >= HIT_DISTORT_MAX) {
@@ -31,7 +37,10 @@ function scr_hit_distort_add(_x, _y, _strength = 1, _blend = undefined) {
         y: _y,
         age: 0,
         strength: _strength,
-        light: undefined
+        light: undefined,
+        light_intensity: _light_intensity,
+        light_scale_end: _light_scale_end,
+        light_fade: _light_fade
     };
 
     // Companion Bulb light — a bright core that expands with the shockwave so the surrounding cave
@@ -39,7 +48,7 @@ function scr_hit_distort_add(_x, _y, _strength = 1, _blend = undefined) {
     if (HIT_LIGHT_ENABLED && variable_global_exists("bulb_renderer") && global.bulb_renderer != undefined) {
         var _l = new BulbLight(global.bulb_renderer, sLight128, 0, _x, _y);
         _l.blend        = _blend;
-        _l.intensity    = HIT_LIGHT_INTENSITY * _strength;
+        _l.intensity    = _light_intensity * _strength;
         _l.xscale       = HIT_LIGHT_SCALE_START;
         _l.yscale       = HIT_LIGHT_SCALE_START;
         _l.penumbraSize = 0;
@@ -75,10 +84,13 @@ function scr_hit_distort_step() {
         if (variable_struct_exists(_r, "light") && _r.light != undefined) {
             var _t = clamp(_r.age / HIT_DISTORT_LIFE, 0, 1);
             var _ease = 1 - power(1 - _t, 2);
-            var _sc = lerp(HIT_LIGHT_SCALE_START, HIT_LIGHT_SCALE_END * (0.8 + 0.4 * _r.strength), _ease);
+            var _scale_end = variable_struct_exists(_r, "light_scale_end") ? _r.light_scale_end : HIT_LIGHT_SCALE_END;
+            var _inten = variable_struct_exists(_r, "light_intensity") ? _r.light_intensity : HIT_LIGHT_INTENSITY;
+            var _fade = variable_struct_exists(_r, "light_fade") ? _r.light_fade : HIT_LIGHT_FADE_POWER;
+            var _sc = lerp(HIT_LIGHT_SCALE_START, _scale_end * (0.8 + 0.4 * _r.strength), _ease);
             _r.light.xscale    = _sc;
             _r.light.yscale    = _sc;
-            _r.light.intensity = HIT_LIGHT_INTENSITY * _r.strength * power(1 - _t, HIT_LIGHT_FADE_POWER);
+            _r.light.intensity = _inten * _r.strength * power(1 - _t, _fade);
         }
 
         if (_r.age >= HIT_DISTORT_LIFE) {

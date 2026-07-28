@@ -100,7 +100,7 @@ jump_sfx_last      = -1; // Shared last-clip index across jump / dash
 PERFECT_DODGE_SFX_PITCH_MIN = 0.88;
 PERFECT_DODGE_SFX_PITCH_MAX = 1.14;
 PERFECT_DODGE_SFX_GAIN      = 0.9;
-// Ground debris — purple kick-up at feet (walk, run, reel-back, land).
+// Ground debris — purple cave dirt kick-up; bridge tiles 88/89 use wood browns.
 GROUND_DEBRIS_ENABLED = true;
 GROUND_DEBRIS_MAX = 80;
 GROUND_DEBRIS_GRAVITY = 0.2;
@@ -110,6 +110,13 @@ GROUND_DEBRIS_COLORS = [
     make_color_rgb(74, 59, 82),    // #4A3B52 — ground base
     make_color_rgb(46, 36, 51),    // #2E2433 — ground shadow
     make_color_rgb(125, 101, 133)  // #7D6585 — tile edge highlight
+];
+// Rope bridge planks (tiles 88/89) — warm wood matching bridge art
+GROUND_DEBRIS_COLORS_BRIDGE = [
+    make_color_rgb(196, 122, 58),  // amber highlight on plank tops
+    make_color_rgb(148, 92, 48),   // medium tan / mid plank
+    make_color_rgb(92, 54, 32),    // dark chocolate shadow
+    make_color_rgb(62, 36, 22)     // deep post / rope brown
 ];
 ground_debris_list = [];
 footstep_anim_prev_index = 0;
@@ -331,7 +338,7 @@ ATTACK_HIT_ACTIVE_START_INDEX = 1;
 ATTACK_ON_HIT_HSLOW   = 0.5;    // Multiply hsp when attack hits (stop sliding through)
 ATTACK_ON_HIT_PUSHBACK = 2.5;   // Player pushback on hit (prevent overlap)
 
-// Damage/knockback when player is hit by enemy (Collision_obj_enemy)
+// Damage/knockback when player is hit by enemy (Collision_obj_crystal_core)
 ENEMY_COLLISION_DAMAGE  = 10;   // Health lost per touch
 ENEMY_KNOCKBACK_X       = 4;    // Horizontal knockback
 ENEMY_KNOCKBACK_Y       = -3;   // Vertical knockback (up)
@@ -402,6 +409,7 @@ dodge_counter_flurry_hold = 0;
 dodge_counter_hit_cd = 0;
 dodge_counter_hit_count = 0;
 dodge_counter_land_hold = 0;
+dodge_counter_air_reappear = false;
 dodge_counter_from_x = 0;
 dodge_counter_from_y = 0;
 dodge_counter_to_x = 0;

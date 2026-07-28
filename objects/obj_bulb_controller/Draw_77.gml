@@ -24,7 +24,9 @@ scr_crystal_spark_draw_all();
 var _cam_imp = view_camera[0];
 if (instance_exists(obj_camera_controller)) _cam_imp = obj_camera_controller.cam;
 camera_apply(_cam_imp);
+scr_ancient_rock_charge_motes_draw_all();
 scr_player_impact_lines_draw();
+scr_ancient_rock_bolts_draw_all();
 scr_enemy_shards_draw();
 scr_player_death_fx_draw();
 

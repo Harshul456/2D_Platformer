@@ -507,19 +507,52 @@ function scr_enemy_grounded_state_dead() {
 }
 
 /// @function scr_enemy_grounded_apply_damage
+/// @description Apply nail damage. Honors charge armor (chip, no interrupt) via scr_enemy_hit_armor_policy.
+/// @returns {Struct} { landed, intercepted, armored_chip }
 function scr_enemy_grounded_apply_damage(_amount, _attacker_x) {
-    if (gnd_state == GND_STATE_DEAD) return;
-    gnd_hp -= _amount;
+    if (gnd_state == GND_STATE_DEAD) {
+        return { landed: false, intercepted: false, armored_chip: false };
+    }
+
+    var _policy = scr_enemy_hit_armor_policy();
+
+    // Full intercept (no damage) — clang feedback
+    if (_policy.intercept) {
+        var _cd = (variable_instance_exists(id, "armor_deflect_cooldown") ? armor_deflect_cooldown : 0);
+        if (_cd <= 0) {
+            var _cd_max = (variable_instance_exists(id, "armor_deflect_cooldown_frames")
+                ? armor_deflect_cooldown_frames : 10);
+            armor_deflect_cooldown = _cd_max;
+            scr_enemy_armor_deflect_feedback();
+        }
+        return { landed: false, intercepted: true, armored_chip: false };
+    }
+
+    if (_policy.take_damage) {
+        gnd_hp -= _amount * _policy.damage_mult;
+        scr_enemy_hit_react_trigger(1);
+    }
+
     if (gnd_hp <= 0) {
         gnd_state = GND_STATE_DEAD;
-        return;
+        return { landed: true, intercepted: false, armored_chip: false };
     }
+
+    // Charge / telegraph-style armor — take chip, keep current state (no stun knock)
+    if (!_policy.take_stun && !_policy.take_knockback) {
+        if (variable_instance_exists(id, "hit_blink_timer")) {
+            hit_blink_timer = max(hit_blink_timer, 8);
+        }
+        return { landed: true, intercepted: false, armored_chip: true };
+    }
+
     gnd_state = GND_STATE_DAMAGED;
     gnd_hurt_stun_timer = variable_instance_exists(id, "gnd_hurt_stun_frames") ? gnd_hurt_stun_frames : 22;
     var _k = variable_instance_exists(id, "gnd_hurt_knockback_h") ? gnd_hurt_knockback_h : 4.5;
     var _dir = sign(x - _attacker_x);
     if (_dir == 0) _dir = -scr_enemy_grounded_facing_sign();
-    gnd_knock_h = _dir * _k;
+    gnd_knock_h = _policy.take_knockback ? (_dir * _k) : 0;
+    return { landed: true, intercepted: false, armored_chip: false };
 }
 
 /// @function scr_player_grounded_damaged_hmove

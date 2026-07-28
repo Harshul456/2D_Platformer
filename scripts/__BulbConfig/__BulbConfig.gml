@@ -88,12 +88,18 @@
 // Moving crystal enemies — self-emissive light + additive glow overlay (same pipeline as tile crystals).
 #macro BULB_ENEMY_CRYSTAL_LIGHT_ENABLED        true
 #macro BULB_ENEMY_GLOW_ENABLED                 true
-#macro BULB_ENEMY_GLOW_SPRITE                  spr_enemy_glow  // Idle / patrol / chase
-#macro BULB_ENEMY_GLOW_SPRITE_WINDUP           spr_enemy_windup_glow
-#macro BULB_ENEMY_GLOW_SPRITE_ATTACK           spr_enemy_attack_glow
+#macro BULB_ENEMY_GLOW_SPRITE                  spr_crystal_core_glow  // Idle / patrol / chase
+#macro BULB_ENEMY_GLOW_SPRITE_WINDUP           spr_crystal_core_windup_glow
+#macro BULB_ENEMY_GLOW_SPRITE_ATTACK           spr_crystal_core_attack_glow
 #macro BULB_ENEMY_GLOW_ALPHA                   1.0    // Scales flare alpha (tile glow uses art color + pulse only)
 #macro BULB_ENEMY_LIGHT_SCALE                  0.88   // Bulb circle vs tile crystal lights
 #macro BULB_ENEMY_LIGHT_Y_OFFSET               -14    // Light anchor above feet (sprite center mass)
+#macro BULB_ANCIENT_ROCK_LIGHT_SCALE           0.92   // Soft air-enemy blue halo
+#macro BULB_ANCIENT_ROCK_GLOW_BLEND            make_colour_rgb(72, 168, 255)  // Cool blue emissive tint
+#macro BULB_ANCIENT_ROCK_LIGHT_BLEND           make_colour_rgb(90, 175, 255)  // Bulb circle blue
+#macro BULB_ANCIENT_ROCK_LIGHT_INTENSITY       1.32
+#macro BULB_ANCIENT_ROCK_CRYSTAL_KIND          2      // Blue kind in scr_bulb_crystal_light_apply
+#macro BULB_ANCIENT_ROCK_CORE_Y_OFFSET         -30    // Teal diamond center (64px sprite, bottom origin)
 
 // Enemy hit reaction — emissive flare + expanding light ripple (glow driven by hits, not breathe).
 #macro BULB_ENEMY_GLOW_BASE                    0.5    // Resting emissive glow when not hit (decoupled from breathe)

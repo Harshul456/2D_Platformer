@@ -64,7 +64,7 @@ function scr_bulb_draw_normal_map(_renderer) {
 
 
 
-    with (obj_enemy) {
+    with (obj_crystal_core) {
 
         if (!visible) continue;
 
@@ -77,6 +77,26 @@ function scr_bulb_draw_normal_map(_renderer) {
             image_index,
             floor(x + _shake_x),
             floor(y + _shake_y) + _hover_y,
+            scr_enemy_draw_xscale(),
+            image_yscale,
+            scr_enemy_draw_lean_angle()
+        );
+
+    }
+
+    with (obj_ancient_rock) {
+
+        if (!visible) continue;
+
+        var _shake_x_r = (variable_instance_exists(id, "telegraph_shake_x") ? telegraph_shake_x : 0);
+        var _shake_y_r = (variable_instance_exists(id, "telegraph_shake_y") ? telegraph_shake_y : 0);
+        var _hover_y_r = scr_enemy_floating_hover_draw_offset_y();
+
+        scr_bulb_draw_laigter_normal(
+            sprite_index,
+            image_index,
+            floor(x + _shake_x_r),
+            floor(y + _shake_y_r) + _hover_y_r,
             scr_enemy_draw_xscale(),
             image_yscale,
             scr_enemy_draw_lean_angle()

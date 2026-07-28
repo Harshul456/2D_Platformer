@@ -4,7 +4,7 @@ function scr_hitstop_freeze_anims() {
     with (obj_player) {
         if (instance_exists(id)) image_speed = 0;
     }
-    with (obj_enemy) {
+    with (obj_crystal_core) {
         if (instance_exists(id)) image_speed = 0;
     }
 }
@@ -36,6 +36,6 @@ function scr_hitstop_handler() {
             }
         }
     }
-    // obj_enemy uses code-driven breath frames (scr_enemy_floating_hover), not image_speed
+    // obj_crystal_core uses code-driven breath frames (scr_enemy_floating_hover), not image_speed
     return false;
 }

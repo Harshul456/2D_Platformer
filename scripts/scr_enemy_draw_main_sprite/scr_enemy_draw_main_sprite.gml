@@ -1,13 +1,17 @@
-/// @description obj_enemy body + crystal tint/rim (no debug). Call from Draw or over emissive glow.
+/// @description obj_crystal_core body + crystal tint/rim (no debug). Call from Draw or over emissive glow.
 function scr_enemy_crystal_light_init() {
     bulb_light = undefined;
     scr_enemy_hit_react_init();
     if (!BULB_ENEMY_CRYSTAL_LIGHT_ENABLED) return;
     if (!variable_global_exists("bulb_renderer") || global.bulb_renderer == undefined) return;
 
-    crystal_kind = 0; // Pink crystal body — matches tile kind 0
+    // Default pink crystal; callers may pre-set crystal_kind (e.g. blue ancient rock = 2)
+    if (!variable_instance_exists(id, "crystal_kind")) crystal_kind = 0;
+    var _scale = BULB_ENEMY_LIGHT_SCALE;
+    if (variable_instance_exists(id, "enemy_bulb_light_scale")) _scale = enemy_bulb_light_scale;
+
     bulb_light = new BulbLight(global.bulb_renderer, sLight128, 0, x, y);
-    scr_bulb_crystal_light_apply(id, BULB_ENEMY_LIGHT_SCALE);
+    scr_bulb_crystal_light_apply(id, _scale);
 }
 
 /// @description Follow enemy + pulse BulbLight / spark phase (tile crystal parity).
@@ -20,6 +24,7 @@ function scr_enemy_crystal_light_step() {
 
     var _hover_y = scr_enemy_floating_hover_draw_offset_y();
     var _y_off = BULB_ENEMY_LIGHT_Y_OFFSET;
+    if (variable_instance_exists(id, "enemy_light_y_offset")) _y_off = enemy_light_y_offset;
     bulb_light.x = x;
     bulb_light.y = y + _y_off + _hover_y;
     bulb_light.visible = visible;
@@ -109,10 +114,11 @@ function scr_enemy_draw_lean_angle() {
     return image_angle;
 }
 
-/// @description Additive emissive overlay — spr_enemy_glow on top of spr_enemy (tiles_glow parity).
+/// @description Additive emissive overlay — spr_crystal_core_glow on top of spr_crystal_core (tiles_glow parity).
 function scr_enemy_draw_emissive_glow() {
     if (!BULB_ENEMY_GLOW_ENABLED) return;
     if (variable_instance_exists(id, "state") && state == ENEMY_STATE.DEATH) return;
+    if (variable_instance_exists(id, "gnd_state") && gnd_state == GND_STATE_DEAD) return;
 
     var _glow_spr = scr_enemy_get_glow_sprite();
     if (!sprite_exists(_glow_spr)) return;
@@ -129,17 +135,19 @@ function scr_enemy_draw_emissive_glow() {
     var _xscale = scr_enemy_draw_xscale();
     var _lean = scr_enemy_draw_lean_angle();
 
-    // Align glow origin to body sprite (spr_enemy_glow may use a different origin in the IDE).
+    // Align glow origin to body sprite (spr_crystal_core_glow may use a different origin in the IDE).
     var _gx = _draw_x + sprite_get_xoffset(sprite_index) - sprite_get_xoffset(_glow_spr);
     var _gy = _draw_y + sprite_get_yoffset(sprite_index) - sprite_get_yoffset(_glow_spr);
     var _glow_img = clamp(floor(image_index), 0, sprite_get_number(_glow_spr) - 1);
 
     draw_set_alpha(_alpha);
+    var _glow_col = c_white;
+    if (variable_instance_exists(id, "enemy_glow_blend")) _glow_col = enemy_glow_blend;
     draw_sprite_ext(_glow_spr, _glow_img, _gx, _gy,
-        _xscale, image_yscale, _lean, c_white, _alpha);
+        _xscale, image_yscale, _lean, _glow_col, _alpha);
 }
 
-/// @description Draw all obj_enemy emissive overlays in Post Draw (after lit body redraw).
+/// @description Draw all obj_crystal_core emissive overlays in Post Draw (after lit body redraw).
 function scr_bulb_draw_enemy_emissive_glow_all() {
     if (!BULB_ENEMY_GLOW_ENABLED) return;
 
@@ -159,7 +167,11 @@ function scr_bulb_draw_enemy_emissive_glow_all() {
     gpu_set_blendmode(bm_add);
     draw_set_color(c_white);
 
-    with (obj_enemy) {
+    with (obj_crystal_core) {
+        if (!visible) continue;
+        scr_enemy_draw_emissive_glow();
+    }
+    with (obj_ancient_rock) {
         if (!visible) continue;
         scr_enemy_draw_emissive_glow();
     }
@@ -280,11 +292,11 @@ function scr_enemy_parent_draw_main_sprite() {
         }
     }
 
-    draw_sprite_ext(sprite_index, image_index, floor(x), floor(y),
+    draw_sprite_ext(sprite_index, image_index, floor(x), floor(y) + scr_enemy_floating_hover_draw_offset_y(),
         image_xscale, image_yscale, image_angle, _draw_col, image_alpha);
 
     if (_crystal != undefined && _crystal.strength > 0) {
-        scr_bulb_draw_crystal_rim(sprite_index, image_index, floor(x), floor(y),
+        scr_bulb_draw_crystal_rim(sprite_index, image_index, floor(x), floor(y) + scr_enemy_floating_hover_draw_offset_y(),
             image_xscale, image_yscale, _crystal, image_alpha);
     }
 }

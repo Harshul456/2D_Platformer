@@ -2587,6 +2587,8 @@ function scr_player_dash_speed_mult(_u) {
 /// @returns {Bool} True if a new dash or sprint session started.
 function scr_player_sprint_try_begin(_early) {
     if (is_dying || stunTimer > 0 || sprint_committed) return false;
+    // Perfect-dodge window owns movement — don't start a dash from buffered Z mid-flip
+    if (state == PLAYER_STATE.PERFECT_DODGE_SLOWMO || state == PLAYER_STATE.DODGE_COUNTER) return false;
 
     var _dash_wants = (key_sprint_press || dash_input_buffer > 0);
     if (!_dash_wants) return false;

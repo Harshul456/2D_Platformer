@@ -2,7 +2,10 @@
 // Buffer Z during atk1 for poke→dash; startup lockout + buffer clear on attack start protect dash→attack.
 if (stunTimer <= 0) {
     scr_player_input_poll();
-    if (key_sprint_press) {
+    if (state == PLAYER_STATE.PERFECT_DODGE_SLOWMO || state == PLAYER_STATE.DODGE_COUNTER) {
+        // Swallow dash buffer during PD / counter so landing + direction can't auto-dash
+        dash_input_buffer = 0;
+    } else if (key_sprint_press) {
         dash_input_buffer = (variable_instance_exists(id, "DASH_INPUT_BUFFER_FRAMES") ? DASH_INPUT_BUFFER_FRAMES : 0);
     }
 }

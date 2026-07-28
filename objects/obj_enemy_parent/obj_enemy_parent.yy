@@ -32,12 +32,12 @@
   "resourceVersion":"2.0",
   "solid":false,
   "spriteId":{
-    "name":"spr_enemy",
-    "path":"sprites/spr_enemy/spr_enemy.yy",
+    "name":"spr_crystal_core",
+    "path":"sprites/spr_crystal_core/spr_crystal_core.yy",
   },
   "spriteMaskId":{
-    "name":"spr_enemy",
-    "path":"sprites/spr_enemy/spr_enemy.yy",
+    "name":"spr_crystal_core",
+    "path":"sprites/spr_crystal_core/spr_crystal_core.yy",
   },
   "visible":true,
 }
