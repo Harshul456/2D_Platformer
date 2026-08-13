@@ -112,6 +112,7 @@ function scr_player_perfect_dodge_try_trigger() {
     perfect_dodge_timer = variable_instance_exists(id, "PERFECT_DODGE_WINDOW_FRAMES")
         ? PERFECT_DODGE_WINDOW_FRAMES : 45;
     perfect_dodge_window_max = perfect_dodge_timer;
+    perfect_dodge_counter_armed = false;
     perfect_dodge_ghost_tick = 0;
 
     // Soft-stop the dash — flip *through* the enemy to their far side
@@ -125,6 +126,7 @@ function scr_player_perfect_dodge_try_trigger() {
     sprint_z_idle_charged = false;
     sprint_jump_carry = false;
     sprint_air_trail = false;
+    runMomentum = 0; // Don't keep dash skate for after-window / counter air control
 
     // Travel direction: dash direction (into them), falling back to toward the threat
     var _through = (last_direction != 0) ? last_direction : sign(image_xscale);
@@ -189,7 +191,11 @@ function scr_player_perfect_dodge_try_trigger() {
 }
 
 /// @function scr_player_perfect_dodge_end_slowmo
+/// @param {Bool} [_arm_counter] If true and still airborne, X can counter until land.
 function scr_player_perfect_dodge_end_slowmo() {
+    var _arm_counter = false;
+    if (argument_count > 0) _arm_counter = argument[0];
+
     scr_time_scale_set(1);
     if (state == PLAYER_STATE.PERFECT_DODGE_SLOWMO) {
         state = PLAYER_STATE.ALIVE;
@@ -210,7 +216,76 @@ function scr_player_perfect_dodge_end_slowmo() {
     is_sprinting = false;
     sprint_jump_carry = false;
     sprint_air_trail = false;
+    runMomentum = 0;
     sprint_z_idle_charged = key_sprint;
+
+    // Free air after the flip — counter stays available until land (unless jump-cancelled).
+    perfect_dodge_counter_armed = (_arm_counter && !grounded && instance_exists(perfect_dodge_target));
+}
+
+/// @function scr_player_perfect_dodge_jump_cancel
+/// @description Leave PD flip commitment into free air; spends a jump if available.
+function scr_player_perfect_dodge_jump_cancel() {
+    scr_player_perfect_dodge_end_slowmo(false);
+    perfect_dodge_counter_armed = false;
+    perfect_dodge_skip_move_frame = true; // consume this Up press — don't double-jump in movement
+
+    grounded = false;
+    force_landing_crouch = false;
+    coyote_time_timer = 0;
+    jump_buffer_timer = 0;
+
+    if (jump_count < 2) {
+        var _from_ground_bank = (jump_count < 1);
+        vsp = -jumpsp;
+        jump_count++;
+        var _is_double = (!_from_ground_bank && jump_count >= 2);
+        scr_player_jump_sfx(_is_double);
+        if (_is_double) {
+            air_chain_jump_used = true;
+            double_jump_anim_active = true;
+            double_jump_anim_tick = 0;
+            scr_player_jump_stretch_trigger();
+            scr_player_double_jump_particles_burst();
+            sprite_index = spr_mc_doublejump;
+            image_index = 0;
+            image_speed = 1;
+        } else {
+            sprite_index = spr_mc_jump;
+            image_index = 0;
+            image_speed = 0;
+            hair_flicker_counter = 0;
+        }
+    } else {
+        // No jump left — still cancel the flip into normal fall
+        if (vsp < 1.5) vsp = 1.5;
+        sprite_index = spr_mc_jump;
+        image_index = 5;
+        image_speed = 0;
+        hair_flicker_counter = 0;
+    }
+}
+
+/// @function scr_player_perfect_dodge_try_armed_counter
+/// @description Post-flip free air: X starts the counter until you land.
+/// @returns {Bool}
+function scr_player_perfect_dodge_try_armed_counter() {
+    if (!variable_instance_exists(id, "perfect_dodge_counter_armed") || !perfect_dodge_counter_armed) {
+        return false;
+    }
+    if (state != PLAYER_STATE.ALIVE) return false;
+    if (grounded) {
+        perfect_dodge_counter_armed = false;
+        return false;
+    }
+    if (!key_attack) return false;
+    if (!instance_exists(perfect_dodge_target)) {
+        perfect_dodge_counter_armed = false;
+        return false;
+    }
+    perfect_dodge_counter_armed = false;
+    scr_player_begin_dodge_counter();
+    return true;
 }
 
 /// @function scr_player_dodge_counter_compute_landing
@@ -249,6 +324,7 @@ function scr_player_begin_dodge_counter() {
     scr_time_scale_set(1);
     state = PLAYER_STATE.DODGE_COUNTER;
     perfect_dodge_timer = 0;
+    perfect_dodge_counter_armed = false;
     double_jump_anim_active = false;
 
     // Face the threat we slipped through
@@ -287,6 +363,11 @@ function scr_player_begin_dodge_counter() {
 
     hsp = 0;
     vsp = 0;
+    runMomentum = 0;
+    sprint_jump_carry = false;
+    sprint_air_trail = false;
+    sprint_committed = false;
+    is_sprinting = false;
     attack_shift_remaining = 0;
     attack_commit_lock = 0;
 
@@ -707,15 +788,20 @@ function scr_player_dodge_counter_step() {
                     attack_timer = 0;
                     comboCount = 0;
                     comboTimer = 0;
-                    // Resume falling from the air strike — don't plant into idle/land crouch
+                    // Resume falling beside the foe — walk-speed air only (no dash carry)
                     grounded = false;
+                    hsp = 0;
+                    runMomentum = 0;
+                    sprint_jump_carry = false;
+                    sprint_air_trail = false;
+                    sprint_committed = false;
+                    is_sprinting = false;
+                    post_attack_accel_timer = 0;
                     vsp = max(vsp, 2.2);
                     jump_count = max(jump_count, 1);
                     sprite_index = spr_mc_jump;
                     image_index = 5;
                     image_speed = 0;
-                    post_attack_accel_timer = variable_instance_exists(id, "POST_ATTACK_ACCEL_FRAMES")
-                        ? POST_ATTACK_ACCEL_FRAMES : 12;
                     scr_player_dodge_counter_finished();
                     // finished() restores image_speed — keep fall pose locked until movement anim takes over
                     sprite_index = spr_mc_jump;
@@ -803,6 +889,14 @@ function scr_player_dodge_counter_finished() {
     image_blend = c_white;
     image_speed = 1;
     debug_hitbox_active = false;
+    // Strip any leftover dash/PD coast so air after reappear uses normal walksp control
+    runMomentum = 0;
+    sprint_jump_carry = false;
+    sprint_air_trail = false;
+    if (!grounded) {
+        hsp = 0;
+        post_attack_accel_timer = 0;
+    }
     scr_time_scale_set(1);
 }
 
@@ -900,8 +994,19 @@ function scr_player_perfect_dodge_spawn_ghost() {
 }
 
 /// @function scr_player_perfect_dodge_slowmo_step
-/// @description Window: flip hop, ghosts, listen for attack, expire → free.
+/// @description Flip window: X = counter, Jump = cancel to free air. Expire airborne → free + armed counter until land.
 function scr_player_perfect_dodge_slowmo_step() {
+    // Attack / jump resolve before motion so you aren't locked into the flip.
+    if (key_attack) {
+        perfect_dodge_counter_armed = false;
+        scr_player_begin_dodge_counter();
+        return;
+    }
+    if (key_jump) {
+        scr_player_perfect_dodge_jump_cancel();
+        return;
+    }
+
     perfect_dodge_timer--;
 
     // Build Bulb slow-mo lighting toward full focus
@@ -932,13 +1037,18 @@ function scr_player_perfect_dodge_slowmo_step() {
     // Blue motes trail the flip body the whole coast window
     scr_player_perfect_dodge_particles_trail();
 
-    if (key_attack) {
-        scr_player_begin_dodge_counter();
-        return;
-    }
-
+    // Flip window over: free movement. If still airborne, X can counter until land.
     if (perfect_dodge_timer <= 0) {
-        scr_player_perfect_dodge_end_slowmo();
+        if (!grounded) {
+            scr_player_perfect_dodge_end_slowmo(true);
+            // Hand off to normal fall pose (not stuck on flip end frame)
+            sprite_index = spr_mc_jump;
+            image_index = 5;
+            image_speed = 0;
+            hair_flicker_counter = 0;
+        } else {
+            scr_player_perfect_dodge_end_slowmo(false);
+        }
     }
 }
 

@@ -198,8 +198,20 @@ function scr_cutscene_unlock_player() {
     }
 }
 
+/// @function scr_cutscene_player_ready_for_trigger
+/// @description Grounded only — mid-air overlap waits; once landed we freeze + start.
+/// @param {Id.Instance} _pl
+/// @returns {Bool}
+function scr_cutscene_player_ready_for_trigger(_pl) {
+    if (_pl == noone || !instance_exists(_pl)) return false;
+    if (!variable_instance_exists(_pl, "grounded") || !_pl.grounded) return false;
+    // Still rising / jumping — wait for a real land (grounded can flicker on lip frames).
+    if (_pl.vsp < -0.1) return false;
+    return true;
+}
+
 /// @function scr_cutscene_try_fire_trigger
-/// @description If this obj_cutscene_trigger overlaps the player and hasn't played, start it.
+/// @description If this obj_cutscene_trigger overlaps a grounded player and hasn't played, freeze + start.
 /// @returns {Bool}
 function scr_cutscene_try_fire_trigger() {
     if (one_shot) {
@@ -218,6 +230,8 @@ function scr_cutscene_try_fire_trigger() {
         trigger_min_x, trigger_min_y, trigger_max_x, trigger_max_y
     );
     if (_overlap == 0) return false;
+    // Armed while airborne — fire on land, then lock_player forces idle.
+    if (!scr_cutscene_player_ready_for_trigger(_pl)) return false;
 
     if (cutscene_kind == CUTSCENE_KIND.CAMERA_SCOUT) {
         if (scr_cutscene_start_camera_scout(look_x, look_y, id, pan_frames, hold_frames)) {

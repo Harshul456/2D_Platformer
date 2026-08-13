@@ -420,6 +420,7 @@ function scr_enemy_apply_attack_hit() {
         // Air hits use the air-hurt animation (airborne frames now, landing frames on touchdown).
         hurt_is_air = !grounded;
         hurt_air_landed = false;
+        hurt_fall_anim = false;
         hurt_anim_tick = 0;
         attacking = false;
         attack_lockout = 0;

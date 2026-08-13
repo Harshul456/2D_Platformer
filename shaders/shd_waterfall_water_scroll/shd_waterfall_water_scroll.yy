@@ -1,0 +1,12 @@
+{
+  "$GMShader":"",
+  "%Name":"shd_waterfall_water_scroll",
+  "name":"shd_waterfall_water_scroll",
+  "parent":{
+    "name":"Shaders",
+    "path":"folders/Shaders.yy",
+  },
+  "resourceType":"GMShader",
+  "resourceVersion":"2.0",
+  "type":1,
+}

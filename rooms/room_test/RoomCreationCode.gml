@@ -55,8 +55,11 @@ with (obj_camera_zone) {
     }
 }
 
-// --- Cutscene: run-jump scout (one-shot for this room) ---
-// Ensure trigger exists even if the room editor dropped the placed instance.
+// --- Cutscene: run-jump scout (disabled for now — re-enable later) ---
+// Logic lives in scr_cutscene + obj_cutscene_trigger. Example placement:
+//   instance_create_layer(1504, 768, "Instances", obj_cutscene_trigger);
+//   then set cutscene_id / look_x / look_y / trigger bounds on that instance.
+/*
 var _cut_layer = layer_get_id("Instances");
 if (_cut_layer == -1) _cut_layer = layer_get_id("Compatibility_Instances_Depth_0");
 var _has_scout = false;
@@ -73,18 +76,18 @@ with (obj_cutscene_trigger) {
         look_x = 2432;
         look_y = 768;
         one_shot = true;
-        // Tight X around 1504; taller upward so standing/approach from above still hits
         trigger_w = 96;
         trigger_h = 192;
-        pan_frames = 130; // Slower scout pan toward landing
+        pan_frames = 130;
         hold_frames = 45;
         cutscene_kind = CUTSCENE_KIND.CAMERA_SCOUT;
         trigger_min_x = x - trigger_w * 0.5;
         trigger_max_x = x + trigger_w * 0.5;
-        trigger_max_y = y + 64;              // bottom stays near platform
-        trigger_min_y = trigger_max_y - trigger_h; // extends up (~576 → 832)
+        trigger_max_y = y + 64;
+        trigger_min_y = trigger_max_y - trigger_h;
         if (scr_cutscene_was_played(cutscene_id)) triggered = true;
     }
 }
+*/
 
 audio_play_sound(s_cave_placeholder, 1, true);

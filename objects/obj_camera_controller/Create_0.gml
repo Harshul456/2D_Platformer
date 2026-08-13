@@ -27,12 +27,16 @@ if (instance_exists(obj_player)) {
     camera_set_view_pos(cam, _sx, _sy);
 }
 
-// Parallax — mid_tiles rock wall only; horizontal drift only (no Y shift = no top/bottom gaps).
+// Parallax — mid_tiles, far_tiles, and Tiles_Waterfall share the same horizontal drift.
 parallax_ready = false;
 par_mid_x = 0.35;
 par_mid_y = 0;
+par_far_x = 0.35; // Match mid so far wall moves with mid
+par_far_y = 0;
 mid_start_x = 0;
 mid_start_y = 0;
+far_start_x = 0;
+far_start_y = 0;
 parallax_cam_origin_x = camera_get_view_x(cam);
 parallax_cam_origin_y = camera_get_view_y(cam);
 var _mid_layer = layer_get_id("mid_tiles");
@@ -41,3 +45,10 @@ if (_mid_layer != -1) {
     mid_start_y = layer_get_y(_mid_layer);
     parallax_ready = true;
 }
+var _far_layer = layer_get_id("far_tiles");
+if (_far_layer != -1) {
+    far_start_x = layer_get_x(_far_layer);
+    far_start_y = layer_get_y(_far_layer);
+    parallax_ready = true;
+}
+// Waterfall start x/y are captured in scr_waterfall_bake (Room Start).

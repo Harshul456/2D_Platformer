@@ -12,6 +12,8 @@ if (renderer != undefined) {
 scr_cave_dust_draw(id);
 scr_ceiling_drip_draw(id);
 
+// Waterfall draws natively on Tiles_Waterfall (parallax + Y scroll in scr_parallax_update).
+
 // Low mist sits in front of parallax walls, behind player + emissive glow.
 scr_cave_fog_draw(id);
 

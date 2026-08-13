@@ -177,7 +177,6 @@ function scr_player_attack_end_swing(_post_accel_frames) {
 
     var _keep_combo_window = (comboCount == 1 && comboTimer > 0);
     var _was_atk2 = (comboCount >= 2);
-    var _was_air = attack_is_air;
 
     attacking = false;
     attack_is_air = false;
@@ -189,14 +188,15 @@ function scr_player_attack_end_swing(_post_accel_frames) {
     attack_recovery_cut = false;
     debug_hitbox_active = false;
 
-    // After air slash: normal jump fall pose (not double-jump flip end frames).
-    if (_was_air && !grounded) {
+    // Ending in air (air slash or ground swing that walked off a ledge): fall pose.
+    if (!grounded) {
         double_jump_anim_active = false;
         double_jump_anim_tick = 0;
         sprite_index = spr_mc_jump;
         image_speed = 0;
         image_index = 5;
         hair_flicker_counter = 0;
+        force_landing_crouch = false;
     }
 
     // Atk1 poke: almost zero recovery grace. Atk2 uses the same (no recovery_lock).

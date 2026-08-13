@@ -92,6 +92,7 @@ if (!hit_dealt && instance_exists(obj_player)) {
                 stunTimer = ENEMY_STUN_FRAMES;
                 hurt_is_air = !grounded;
                 hurt_air_landed = false;
+                hurt_fall_anim = false;
                 hurt_anim_tick = 0;
                 attacking = false;
                 attack_lockout = 0;

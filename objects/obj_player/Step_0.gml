@@ -72,14 +72,32 @@ if (death_is_dissolve && death_fade_phase == DEATH_SEQ.FADE_IN) {
     scr_player_death_sequence_step();
 }
 
-// Perfect Dodge slow-mo window — attack to Counter, else expire to free.
+// Perfect Dodge slow-mo window — X counter / Jump cancel; expire airborne arms free counter until land.
 if (state == PLAYER_STATE.PERFECT_DODGE_SLOWMO) {
     scr_player_perfect_dodge_slowmo_step();
+    if (state == PLAYER_STATE.PERFECT_DODGE_SLOWMO) {
+        scr_player_invincibility();
+        scr_player_dash_particles_step();
+        scr_player_perfect_dodge_lighting_step();
+        _player_sprint_deform();
+        exit;
+    }
+}
+
+// Jump-cancel already applied air jump this frame — skip movement so Up isn't spent twice.
+if (variable_instance_exists(id, "perfect_dodge_skip_move_frame") && perfect_dodge_skip_move_frame) {
+    perfect_dodge_skip_move_frame = false;
+    jump_buffer_timer = 0;
     scr_player_invincibility();
     scr_player_dash_particles_step();
     scr_player_perfect_dodge_lighting_step();
     _player_sprint_deform();
     exit;
+}
+
+// Post-flip free air: X still starts the counter until you land.
+if (state == PLAYER_STATE.ALIVE && scr_player_perfect_dodge_try_armed_counter()) {
+    // begin_dodge_counter sets DODGE_COUNTER — handled below
 }
 
 // Dodge counter flurry: vanish → streak → reappear (skips normal attack Step).
@@ -123,6 +141,10 @@ if (keyboard_check_pressed(DISPLAY_BORDERLESS_TOGGLE_KEY)) {
 
 // 1. PROCESS NORMAL MOVEMENT
 scr_player_movement();
+// PD post-flip counter window ends on touchdown
+if (grounded && variable_instance_exists(id, "perfect_dodge_counter_armed") && perfect_dodge_counter_armed) {
+    perfect_dodge_counter_armed = false;
+}
 scr_player_ground_debris_step();
 scr_player_dash_particles_step();
 scr_player_saber_trail_step();
@@ -173,6 +195,10 @@ if (attacking && stunTimer <= 0) {
 
     // Land mid-air-slash: end cleanly so ground locomotion can take over.
     if (attack_is_air && grounded && vsp >= 0) {
+        scr_player_attack_end_swing(0);
+    // Lunge/shift off a ledge mid-ground-slash: drop into fall, don't keep sword anim.
+    } else if (!attack_is_air && !grounded) {
+        attack_shift_remaining = 0;
         scr_player_attack_end_swing(0);
     } else {
     // Pin swing art so reel/sprint pose cannot stick after cancel.

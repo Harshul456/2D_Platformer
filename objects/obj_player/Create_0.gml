@@ -41,6 +41,7 @@ grv             = 0.5;          // Gravity strength
 walksp          = 3.5;          // Standard walk speed
 runsp           = 5.0;          // Sprint sustain speed (hold Z + direction)
 jumpsp          = 9.0;          // Jump power
+MAX_FALL_VSP    = 10;           // Terminal fall speed (hurt knockback + normal air)
 jump_count      = 0;            // 0 = fresh from ground; 1 = one air jump left; 2 = no jumps until land (incl. after wall jump / walk-off).
 jumped_this_frame = false;      // Set true in scr_player_movement when a jump fires (footsteps land check reads this).
 // True after spending the second air jump (or walk-off single-jump mode). Cleared on land. Wall jump sets both this and jump_count=2.
@@ -363,7 +364,7 @@ dash_spark_emit = 0;
 dash_spark_emit_dir = 1;
 dash_spark_emit_cols = [c_white];
 // Perfect Dodge / Dodge Counter (dash through active enemy hitbox)
-PERFECT_DODGE_WINDOW_FRAMES = 45;   // Real-time frames of slow-mo reaction window
+PERFECT_DODGE_WINDOW_FRAMES = 45;   // Real-time frames of slow-mo flip window
 PERFECT_DODGE_TIME_SCALE    = 0.38; // Bayonetta-style slow (not a freeze)
 PERFECT_DODGE_HITSTOP       = 0;    // No hard freeze — shing + slow-mo carry the punch
 PERFECT_DODGE_HOP_VSP       = -4.6; // Slightly higher flip arc
@@ -393,6 +394,8 @@ DODGE_COUNTER_FLURRY_FRAME_HOLD = 6;// Game frames per flurry sprite frame (slow
 DODGE_COUNTER_LAND_FRAME_HOLD = 5;  // Hold each landing-crouch frame on return
 perfect_dodge_timer = 0;
 perfect_dodge_window_max = 45;
+perfect_dodge_counter_armed = false; // After flip: can still counter with X until land (free air)
+perfect_dodge_skip_move_frame = false; // Jump-cancel: don't re-trigger jump in movement same frame
 perfect_dodge_target = noone;
 perfect_dodge_through_dir = 1;      // Sign of flip-through travel
 perfect_dodge_used = false;         // One trigger per dash
@@ -577,7 +580,10 @@ hurt_anim_tick  = 0;            // Steps elapsed since current hurt frame block 
 HURT_ANIM_HOLD_FRAMES = 10;     // Steps each hurt-sprite frame holds (3 frames × 10 = ENEMY_STUN_FRAMES)
 hurt_is_air     = false;        // True when the active hurt was taken airborne (uses spr_mc_hurt_air)
 hurt_air_landed = false;        // True once an air-hurt player touches the ground (plays the landing frames)
+hurt_fall_anim  = false;        // Hurt pose finished mid-air / left ledge — use fall until land
 HURT_AIR_LAND_START = 2;        // spr_mc_hurt_air: frames 0..1 are airborne, frames 2..end are the ground impact
+HURT_AIR_HOLD_FRAMES = 5;       // Faster air-flinch frame pace than ground hurt
+HURT_AIR_TO_FALL_FRAMES = 4;    // Brief hold on last air-hurt frame before fall
 jump_cut_multiplier = 0.333;    // Release jump early: cap rise speed to jumpsp * this (short hop)
 
 // --- VISUALS ---

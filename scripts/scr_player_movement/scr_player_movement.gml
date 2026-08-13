@@ -486,8 +486,9 @@ function scr_player_movement() {
             }
             
             if (_grounded_jump) {
-                var _jd = (key_right - key_left);
-                if (_jd == 0) _jd = sign(_pre_hsp);
+                // Carry keeps pre-jump travel dir — never snap full dash speed into opposite input.
+                var _jd = sign(_pre_hsp);
+                if (_jd == 0 && variable_instance_exists(id, "sprint_commit_dir")) _jd = sign(sprint_commit_dir);
                 if (_jd == 0) _jd = last_direction;
                 if (_pre_sprinting || _pre_sprint_committed) {
                     sprint_jump_carry = true;
@@ -552,26 +553,34 @@ function scr_player_movement() {
     // Melee preempt (after grounded/coyote): start swing BEFORE sprint/reel so dash/run → attack wins this frame.
     scr_player_try_attack_start();
 
-    if (attacking && attack_is_air) {
-        var _gmul = (variable_instance_exists(id, "AIR_ATTACK_GRAV_MUL") ? AIR_ATTACK_GRAV_MUL : 0.85);
-        vsp += grv * _gmul;
-    } else {
-        vsp += grv;
-    }
-    // Soften fall slightly during air slash so momentum reads through the swing.
-    // Short-hop: release jump early caps rise speed (jump_cut_multiplier)
-    if (vsp < 0 && !key_jump_held) vsp = max(vsp, jumpsp * (-jump_cut_multiplier));
-    // Wall slide: MMX wall_slide only while falling — don’t cling on rise past a ledge
-    if (!grounded && wall_side != 0 && stunTimer <= 0 && vsp > 0) {
-        if (cling_eff && vsp > WALL_SLIDE_VSP) vsp = WALL_SLIDE_VSP;
+    var _fall_max = (variable_instance_exists(id, "MAX_FALL_VSP") ? MAX_FALL_VSP : 10);
+
+    // Stun owns vertical via knockBackY — don't also tick gravity into vsp this frame.
+    if (stunTimer <= 0) {
+        if (attacking && attack_is_air) {
+            var _gmul = (variable_instance_exists(id, "AIR_ATTACK_GRAV_MUL") ? AIR_ATTACK_GRAV_MUL : 0.85);
+            vsp += grv * _gmul;
+        } else {
+            vsp += grv;
+        }
+        if (vsp > _fall_max) vsp = _fall_max;
+        // Soften fall slightly during air slash so momentum reads through the swing.
+        // Short-hop: release jump early caps rise speed (jump_cut_multiplier)
+        if (vsp < 0 && !key_jump_held) vsp = max(vsp, jumpsp * (-jump_cut_multiplier));
+        // Wall slide: MMX wall_slide only while falling — don’t cling on rise past a ledge
+        if (!grounded && wall_side != 0 && vsp > 0) {
+            if (cling_eff && vsp > WALL_SLIDE_VSP) vsp = WALL_SLIDE_VSP;
+        }
     }
     
     if (stunTimer > 0) {
         // Air-hurt: hold the stun lock while the player is still falling (airborne flinch frames).
         // The countdown only resumes once landed, so the landing frames get their full window and
         // control never returns mid-air. hurt_air_landed is latched in the animation section below.
+        // hurt_fall_anim still counts as air-hurt hold until plant (pose already handed to fall).
         var _air_hurt_hold = (hurt_is_air && !hurt_air_landed && !grounded);
         if (!_air_hurt_hold) stunTimer--;
+        if (stunTimer <= 0) hurt_fall_anim = false;
         is_sprinting = false;
         sprint_afterimage_tick = 0;
         sprint_jump_carry = false;
@@ -587,8 +596,22 @@ function scr_player_movement() {
         sprint_z_idle_charged = false;
         sprint_resume_hold = false;
         sprint_dir_gap = 0;
-        hsp = knockBackX; vsp = knockBackY;
-        knockBackX *= knockback_friction; knockBackY += grv; 
+        hsp = knockBackX;
+        // Don't charge fall speed while planted — that made ledge drops after ground-hits rocket down.
+        if (grounded && knockBackY > 0) knockBackY = 0;
+        vsp = knockBackY;
+        knockBackX *= knockback_friction;
+        if (!grounded) {
+            knockBackY += grv;
+            if (knockBackY > _fall_max) knockBackY = _fall_max;
+        }
+        if (vsp > _fall_max) vsp = _fall_max;
+        // Stun just expired this frame — keep a sane fall speed into free movement
+        if (stunTimer <= 0) {
+            knockBackY = min(knockBackY, _fall_max);
+            if (vsp > _fall_max) vsp = _fall_max;
+            if (grounded && vsp > 0) vsp = 0;
+        }
     } else {
         is_sprinting = false;
         var _recovery_locked = scr_player_attack_is_recovery_locked();
@@ -876,9 +899,12 @@ function scr_player_movement() {
                 hsp = walksp * inputDir;
             }
             }
-            // Sprint jump: §6c can re-ground for one frame while feet overlap — force carry after air/walk resolve
+            // Sprint jump: §6c can re-ground for one frame while feet overlap — reassert carry after air/walk resolve.
+            // Direction stays pre-jump travel (not opposite input) so dash→jump→turn can't invent reverse speed.
             if (jumped_this_frame && _grounded_jump_this_step && !attacking) {
-                var _sj_dir = inputDir;
+                var _sj_dir = sign(runMomentum);
+                if (_sj_dir == 0) _sj_dir = sign(_pre_hsp);
+                if (_sj_dir == 0 && variable_instance_exists(id, "sprint_commit_dir")) _sj_dir = sign(sprint_commit_dir);
                 if (_sj_dir == 0) _sj_dir = last_direction;
                 if (_sj_dir != 0 && (_pre_sprinting || _pre_sprint_committed)) {
                     sprint_committed = false;
@@ -2109,8 +2135,38 @@ function scr_player_movement() {
             sprint_reel_dir_wait = 0;
             image_speed = 0;
             var _hurt_hold = (variable_instance_exists(id, "HURT_ANIM_HOLD_FRAMES") ? HURT_ANIM_HOLD_FRAMES : 8);
+            var _hurt_air_hold = (variable_instance_exists(id, "HURT_AIR_HOLD_FRAMES")
+                ? HURT_AIR_HOLD_FRAMES : max(1, floor(_hurt_hold * 0.5)));
 
-            if (hurt_is_air) {
+            if (hurt_fall_anim) {
+                // Flinch finished mid-air (or ground-hurt walked off a ledge) — fall pose until plant.
+                if (_anim_grounded) {
+                    hurt_fall_anim = false;
+                    hurt_is_air = false;
+                    hurt_air_landed = true;
+                    knockBackX = 0;
+                    knockBackY = 0;
+                    hsp = 0;
+                    stunTimer = 0; // hand off to normal land crouch
+                    sprite_index = spr_mc_jump;
+                    image_index = (variable_instance_exists(id, "ANIM_LAND_CROUCH_START")
+                        ? ANIM_LAND_CROUCH_START : 8);
+                    image_speed = 1;
+                    force_landing_crouch = true;
+                    hair_flicker_counter = 0;
+                } else {
+                    sprite_index = spr_mc_jump;
+                    image_speed = 0;
+                    if (!variable_instance_exists(id, "hair_flicker_counter")) hair_flicker_counter = 0;
+                    hair_flicker_counter++;
+                    var _hf_iv = variable_instance_exists(id, "ANIM_HAIR_FLICKER_INTERVAL")
+                        ? ANIM_HAIR_FLICKER_INTERVAL : 5;
+                    var _hf_th = variable_instance_exists(id, "ANIM_HAIR_FLICKER_THRESHOLD")
+                        ? ANIM_HAIR_FLICKER_THRESHOLD : 2.5;
+                    if (hair_flicker_counter >= _hf_iv) hair_flicker_counter = 0;
+                    image_index = (hair_flicker_counter < _hf_th) ? 5 : 6;
+                }
+            } else if (hurt_is_air) {
                 // Air-hurt: frames 0..1 are the airborne knockback, frames 2..end are the ground impact.
                 if (sprite_index != spr_mc_hurt_air) {
                     sprite_index = spr_mc_hurt_air;
@@ -2124,9 +2180,21 @@ function scr_player_movement() {
                     hsp = 0;
                 }
                 if (!hurt_air_landed) {
-                    // Still falling: advance through the two airborne frames, then hold the last one.
+                    // Still falling: snap through airborne hurt, then hand off to fall quickly.
                     hurt_anim_tick++;
-                    image_index = min(floor(hurt_anim_tick / max(1, _hurt_hold)), HURT_AIR_LAND_START - 1);
+                    var _air_max = max(0, HURT_AIR_LAND_START - 1);
+                    image_index = min(floor(hurt_anim_tick / max(1, _hurt_air_hold)), _air_max);
+                    var _to_fall = (variable_instance_exists(id, "HURT_AIR_TO_FALL_FRAMES")
+                        ? HURT_AIR_TO_FALL_FRAMES : 4);
+                    if (image_index >= _air_max
+                        && hurt_anim_tick >= (_air_max + 1) * max(1, _hurt_air_hold) + _to_fall) {
+                        hurt_fall_anim = true;
+                        hair_flicker_counter = 0;
+                        // Cap any knockback that stacked during a long air-hurt hold
+                        var _fall_cap = (variable_instance_exists(id, "MAX_FALL_VSP") ? MAX_FALL_VSP : 10);
+                        if (knockBackY > _fall_cap) knockBackY = _fall_cap;
+                        if (vsp > _fall_cap) vsp = _fall_cap;
+                    }
                 } else {
                     // Landed: play the remaining ground-impact frames.
                     image_index = min(HURT_AIR_LAND_START + floor(hurt_anim_tick / max(1, _hurt_hold)),
@@ -2134,13 +2202,26 @@ function scr_player_movement() {
                     hurt_anim_tick++;
                 }
             } else {
-                if (sprite_index != spr_mc_hurt) {
-                    sprite_index = spr_mc_hurt;
-                    hurt_anim_tick = 0;
+                // Ground hurt — if knockback/walk carries off a ledge, hand off to fall.
+                if (!_anim_grounded) {
+                    hurt_fall_anim = true;
+                    hair_flicker_counter = 0;
+                    // Ground stun used to charge knockBackY with gravity while planted — reset to a normal fall seed.
+                    var _fall_cap = (variable_instance_exists(id, "MAX_FALL_VSP") ? MAX_FALL_VSP : 10);
+                    knockBackY = clamp(knockBackY, -_fall_cap, 2);
+                    vsp = knockBackY;
+                    sprite_index = spr_mc_jump;
+                    image_speed = 0;
+                    image_index = 5;
                 } else {
-                    hurt_anim_tick++;
+                    if (sprite_index != spr_mc_hurt) {
+                        sprite_index = spr_mc_hurt;
+                        hurt_anim_tick = 0;
+                    } else {
+                        hurt_anim_tick++;
+                    }
+                    image_index = min(floor(hurt_anim_tick / max(1, _hurt_hold)), sprite_get_number(spr_mc_hurt) - 1);
                 }
-                image_index = min(floor(hurt_anim_tick / max(1, _hurt_hold)), sprite_get_number(spr_mc_hurt) - 1);
             }
         } else if (_anim_grounded) {
             var _hold_full_lip_pose = FULL_BLOCK_EDGE_GROUND_FORGIVE && !_shelf_any_near_feet_pose && (full_lip_anim_sticky > 0 || _teeter_anim)

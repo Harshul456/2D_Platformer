@@ -77,6 +77,7 @@ if (variable_instance_exists(other, "gnd_touch_enabled") && !other.gnd_touch_ena
     // Air hits use the air-hurt animation (airborne frames now, landing frames on touchdown).
     hurt_is_air = !grounded;
     hurt_air_landed = false;
+    hurt_fall_anim = false;
     hurt_anim_tick = 0;
     if (variable_instance_exists(other, "gnd_touch_stun_frames") && other.gnd_touch_stun_frames > 0) {
         stunTimer = other.gnd_touch_stun_frames;

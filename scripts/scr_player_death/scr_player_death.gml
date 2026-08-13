@@ -93,6 +93,7 @@ function scr_player_clear_hurt_state() {
     hurt_anim_tick = 0;
     hurt_is_air = false;
     hurt_air_landed = false;
+    hurt_fall_anim = false;
     knockBackX = 0;
     knockBackY = 0;
 }
@@ -366,6 +367,7 @@ function scr_player_begin_death_dissolve() {
     // Death flinch always uses the first airborne frames of spr_mc_hurt_air.
     hurt_is_air = true;
     hurt_air_landed = false;
+    hurt_fall_anim = false;
     hurt_anim_tick = 0;
     sprite_index = spr_mc_hurt_air;
     image_index = 0;

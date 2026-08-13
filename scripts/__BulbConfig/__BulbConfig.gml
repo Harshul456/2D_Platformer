@@ -161,20 +161,33 @@
 #macro BULB_CAVE_DUST_SPAWN_PAD              24
 #macro BULB_CAVE_DUST_CULL_MARGIN            32
 
+// Waterfall — dedicated Tiles_Waterfall layer (tile 24 stream).
+// Y wraps for downward flow. X is world-locked by default so the stream stays where
+// you placed it (set MATCH_MID_PARALLAX true to drift with mid_tiles instead).
+#macro BULB_WATERFALL_ENABLED                true
+#macro BULB_WATERFALL_LAYER                  "Tiles_Waterfall"
+#macro BULB_WATERFALL_TILE_STREAM            24
+#macro BULB_WATERFALL_SCROLL_SPEED           1.35
+#macro BULB_WATERFALL_MATCH_MID_PARALLAX     false
+
 // Ceiling stalactite drips — spawned from Tiles_Ceiling_Drips, splash on lay_collision.
 #macro BULB_CEILING_DRIP_ENABLED             true
 #macro BULB_CEILING_DRIP_LAYER               "Tiles_Ceiling_Drips"
 #macro BULB_CEILING_DRIP_SPAWN_Y_FRAC        0.92
 #macro BULB_CEILING_DRIP_INTERVAL_MIN        110
 #macro BULB_CEILING_DRIP_INTERVAL_MAX        300
-#macro BULB_CEILING_DRIP_MAX_ACTIVE          22
-#macro BULB_CEILING_DRIP_MAX_SPLASH          16
-#macro BULB_CEILING_DRIP_FALL_SPEED          2.35
+#macro BULB_CEILING_DRIP_MAX_ACTIVE          40
+#macro BULB_CEILING_DRIP_MAX_SPLASH          20
+#macro BULB_CEILING_DRIP_FALL_SPEED          2.85
 #macro BULB_CEILING_DRIP_MAX_FALL            720
 #macro BULB_CEILING_DRIP_FLOOR_STEP           2
 #macro BULB_CEILING_DRIP_X_JITTER            3
 #macro BULB_CEILING_DRIP_VIEW_PAD            96
-#macro BULB_CEILING_DRIP_ALPHA               0.82
+#macro BULB_CEILING_DRIP_ALPHA               0.78
+#macro BULB_CEILING_DRIP_TIP_ALPHA           0.95
+#macro BULB_CEILING_DRIP_STREAK_MIN          5
+#macro BULB_CEILING_DRIP_STREAK_MAX          12
+#macro BULB_CEILING_DRIP_STREAK_VY_MUL       3.2
 #macro BULB_CEILING_DRIP_SPLASH_ALPHA        0.7
 #macro BULB_CEILING_DRIP_SPLASH_FRAME_LEN    4
 
