@@ -104,3 +104,29 @@ if (!variable_global_exists("sfx_cave_emitter")) {
     global.sfx_cave_reverb = _cave_reverb; // Handle kept for runtime tuning
 }
 
+// --- Waterfall ambient — cave reverb + short slap echo (looping diegetic stream) ---
+if (!variable_global_exists("sfx_waterfall_emitter")) {
+    global.sfx_waterfall_emitter = audio_emitter_create();
+    // Match cave emitter: no spatial mute; volume is handled in code by distance.
+    audio_emitter_falloff(global.sfx_waterfall_emitter, 100, 1000000, 0);
+    audio_emitter_gain(global.sfx_waterfall_emitter, 1);
+
+    global.sfx_waterfall_bus = audio_bus_create();
+    audio_emitter_bus(global.sfx_waterfall_emitter, global.sfx_waterfall_bus);
+
+    var _wf_reverb = audio_effect_create(AudioEffectType.Reverb1);
+    _wf_reverb.size = 0.88;
+    _wf_reverb.damp = 0.38;
+    _wf_reverb.mix  = 0.42;
+    global.sfx_waterfall_bus.effects[0] = _wf_reverb;
+
+    var _wf_echo = audio_effect_create(AudioEffectType.Delay);
+    _wf_echo.time = 0.2;
+    _wf_echo.feedback = 0.26;
+    _wf_echo.mix = 0.22;
+    global.sfx_waterfall_bus.effects[1] = _wf_echo;
+
+    global.sfx_waterfall_reverb = _wf_reverb;
+    global.sfx_waterfall_echo = _wf_echo;
+}
+

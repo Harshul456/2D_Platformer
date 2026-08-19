@@ -19,3 +19,6 @@ lit_scene_surface = -1;
 
 application_surface_draw_enable(true);
 
+scr_waterfall_sfx_stop(id);
+
+scr_fairy_cleanup(id);

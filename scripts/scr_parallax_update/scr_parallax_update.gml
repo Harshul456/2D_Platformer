@@ -1,6 +1,5 @@
 /// @function scr_parallax_update()
-/// @description Offsets mid_tiles, far_tiles, and Tiles_Waterfall.
-/// Waterfall uses the same horizontal factor as mid; its Y is driven by waterfall scroll.
+/// @description Offsets mid_tiles, far_tiles, and Tiles_Waterfall (synced to mid).
 /// Call at the end of scr_camera_control() after camera_set_view_pos().
 function scr_parallax_update() {
     var _ctrl = obj_camera_controller;
@@ -34,6 +33,6 @@ function scr_parallax_update() {
         }
     }
 
-    // Waterfall: same horizontal drift as mid + wrapped vertical scroll.
+    // Waterfall: world-locked X (by default) + wrapped vertical scroll.
     scr_waterfall_parallax_apply(_ctrl);
 }

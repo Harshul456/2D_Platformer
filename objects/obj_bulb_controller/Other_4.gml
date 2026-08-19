@@ -25,5 +25,9 @@ tilemap_occluders = scr_bulb_build_room_occluders(renderer);
 occluders_built = true;
 
 scr_ceiling_drip_bake_emitters(id, BULB_CEILING_DRIP_LAYER);
+// Pond first so waterfall bake can snap streams onto water (no platform leak split).
+scr_pond_bake(id, BULB_POND_LAYER);
 scr_waterfall_bake(id, BULB_WATERFALL_LAYER);
 scr_cave_atmosphere_bind_fog_layer(id);
+// After the pond bake so the dense pond cluster knows where the water is.
+scr_fairy_spawn(id);

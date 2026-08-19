@@ -71,46 +71,70 @@ function scr_ceiling_drip_point_is_floor(_tm, _px, _py) {
     return tilecol_solid_at_local(_sh, _lx, _ly, _tw, _th, _idx);
 }
 
-/// @description Raycast down for the first drip floor Y. Does NOT use check_tile_collision —
-/// player one-way shelf context (rising / already-below) was making shelf hits intermittent.
+/// @description Raycast down for the first drip floor Y. Prefers pond surface over
+/// collision ground so drips splash on water instead of falling through it.
+/// Does NOT use check_tile_collision — player one-way shelf context (rising /
+/// already-below) was making shelf hits intermittent.
 /// @param {Real} _x
 /// @param {Real} _y_start
 /// @returns {Real|undefined}
 function scr_ceiling_drip_find_floor_y(_x, _y_start) {
-    var _tm = (variable_global_exists("tilemap_collision_id") ? global.tilemap_collision_id : noone);
-    if (_tm == noone || _tm == -1) return undefined;
-
     var _limit = _y_start + BULB_CEILING_DRIP_MAX_FALL;
     var _px = floor(_x);
-    var _step = max(1, BULB_CEILING_DRIP_FLOOR_STEP);
 
-    // 1px-accurate scan through thin shelf caps (ly 0..3); step>1 only for empty air stretches.
-    var _y = floor(_y_start);
-    while (_y < _limit) {
-        if (scr_ceiling_drip_point_is_floor(_tm, _px, _y)) {
-            // Snap to the top of a shelf/full cell when we punched into the solid band.
-            var _td = tilemap_get_at_pixel(_tm, _px, _y);
-            if (_td != 0) {
-                var _idx = tile_get_index(_td);
-                var _th = tilemap_get_tile_height(_tm);
-                var _tcy = tilemap_get_cell_y_at_pixel(_tm, _px, _y);
-                var _cell_top = tilemap_get_y(_tm) + _tcy * _th;
-                if (tilecol_one_way_shelf_tile_index(_idx) && !tilemap_cell_above_is_solid(_tm, _px, _y)) {
-                    return _cell_top;
-                }
+    // Pond surface (tile-23 water) — catch before ground so drips don't fall through.
+    var _pond_y = undefined;
+    if (BULB_POND_ENABLED) {
+        _pond_y = scr_pond_surface_y_at(_px);
+        if (_pond_y != undefined) {
+            if (_pond_y <= _y_start + 1 || _pond_y > _limit) {
+                _pond_y = undefined;
             }
-            return _y;
-        }
-        // Coarse step in open air; refine to 1px when a tile cell is nearby
-        var _td_ahead = tilemap_get_at_pixel(_tm, _px, _y + _step);
-        if (_td_ahead != 0 || tilemap_get_at_pixel(_tm, _px, _y + 1) != 0) {
-            _y += 1;
-        } else {
-            _y += _step;
         }
     }
 
-    return undefined;
+    var _tm = (variable_global_exists("tilemap_collision_id") ? global.tilemap_collision_id : noone);
+    var _floor_y = undefined;
+    if (_tm != noone && _tm != -1) {
+        var _step = max(1, BULB_CEILING_DRIP_FLOOR_STEP);
+
+        // 1px-accurate scan through thin shelf caps (ly 0..3); step>1 only for empty air stretches.
+        var _y = floor(_y_start);
+        // Stop early if we've already passed a pond surface above the ground.
+        var _scan_limit = _limit;
+        if (_pond_y != undefined) _scan_limit = min(_scan_limit, _pond_y);
+
+        while (_y < _scan_limit) {
+            if (scr_ceiling_drip_point_is_floor(_tm, _px, _y)) {
+                // Snap to the top of a shelf/full cell when we punched into the solid band.
+                var _td = tilemap_get_at_pixel(_tm, _px, _y);
+                if (_td != 0) {
+                    var _idx = tile_get_index(_td);
+                    var _th = tilemap_get_tile_height(_tm);
+                    var _tcy = tilemap_get_cell_y_at_pixel(_tm, _px, _y);
+                    var _cell_top = tilemap_get_y(_tm) + _tcy * _th;
+                    if (tilecol_one_way_shelf_tile_index(_idx) && !tilemap_cell_above_is_solid(_tm, _px, _y)) {
+                        _floor_y = _cell_top;
+                        break;
+                    }
+                }
+                _floor_y = _y;
+                break;
+            }
+            // Coarse step in open air; refine to 1px when a tile cell is nearby
+            var _td_ahead = tilemap_get_at_pixel(_tm, _px, _y + _step);
+            if (_td_ahead != 0 || tilemap_get_at_pixel(_tm, _px, _y + 1) != 0) {
+                _y += 1;
+            } else {
+                _y += _step;
+            }
+        }
+    }
+
+    if (_pond_y != undefined && (_floor_y == undefined || _pond_y <= _floor_y)) {
+        return _pond_y;
+    }
+    return _floor_y;
 }
 
 /// @description Init drip lists on obj_bulb_controller.
@@ -285,26 +309,35 @@ function scr_ceiling_drip_step(_controller) {
                     BULB_CEILING_DRIP_STREAK_MIN, BULB_CEILING_DRIP_STREAK_MAX);
             }
 
-            // Sweep the fall segment so fast drips can't skip a thin shelf band.
+            // Sweep the fall segment so fast drips can't skip a thin shelf band / pond surface.
             var _hit_y = undefined;
             if (_d.y >= _d.floor_y) {
                 _hit_y = _d.floor_y;
-            } else if (_tm_fall != noone && _tm_fall != -1) {
-                var _px = floor(_d.x);
-                var _y0 = floor(_prev_y);
-                var _y1 = floor(_d.y);
-                for (var _sy = _y0; _sy <= _y1; _sy++) {
-                    if (scr_ceiling_drip_point_is_floor(_tm_fall, _px, _sy)) {
-                        var _td = tilemap_get_at_pixel(_tm_fall, _px, _sy);
-                        if (_td != 0 && tilecol_one_way_shelf_tile_index(tile_get_index(_td))
-                            && !tilemap_cell_above_is_solid(_tm_fall, _px, _sy)) {
-                            var _th = tilemap_get_tile_height(_tm_fall);
-                            var _tcy = tilemap_get_cell_y_at_pixel(_tm_fall, _px, _sy);
-                            _hit_y = tilemap_get_y(_tm_fall) + _tcy * _th;
-                        } else {
-                            _hit_y = _sy;
+            } else {
+                // Live pond check — catches water even if floor was baked before ponds.
+                if (BULB_POND_ENABLED) {
+                    var _pond_hit = scr_pond_surface_y_at(floor(_d.x));
+                    if (_pond_hit != undefined && _prev_y < _pond_hit && _d.y >= _pond_hit) {
+                        _hit_y = _pond_hit;
+                    }
+                }
+                if (_hit_y == undefined && _tm_fall != noone && _tm_fall != -1) {
+                    var _px = floor(_d.x);
+                    var _y0 = floor(_prev_y);
+                    var _y1 = floor(_d.y);
+                    for (var _sy = _y0; _sy <= _y1; _sy++) {
+                        if (scr_ceiling_drip_point_is_floor(_tm_fall, _px, _sy)) {
+                            var _td = tilemap_get_at_pixel(_tm_fall, _px, _sy);
+                            if (_td != 0 && tilecol_one_way_shelf_tile_index(tile_get_index(_td))
+                                && !tilemap_cell_above_is_solid(_tm_fall, _px, _sy)) {
+                                var _th = tilemap_get_tile_height(_tm_fall);
+                                var _tcy = tilemap_get_cell_y_at_pixel(_tm_fall, _px, _sy);
+                                _hit_y = tilemap_get_y(_tm_fall) + _tcy * _th;
+                            } else {
+                                _hit_y = _sy;
+                            }
+                            break;
                         }
-                        break;
                     }
                 }
             }
