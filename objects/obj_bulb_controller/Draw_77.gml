@@ -1,7 +1,8 @@
 var _lit_scene = -1;
 
 if (renderer != undefined) {
-    var _emissive_overlays = BULB_GLOW_TILE_LAYER_ENABLED || BULB_CRYSTAL_SPARKS_ENABLED || BULB_ENEMY_GLOW_ENABLED;
+    var _emissive_overlays = BULB_GLOW_TILE_LAYER_ENABLED || BULB_CRYSTAL_SPARKS_ENABLED || BULB_ENEMY_GLOW_ENABLED
+        || scr_water_glow_core_active();
 
     if (_emissive_overlays) {
         _lit_scene = scr_bulb_draw_lit_scene(renderer);
@@ -19,6 +20,7 @@ scr_waterfall_draw(id);
 scr_cave_fog_draw(id);
 
 scr_bulb_draw_glow_tile_layer();
+scr_water_glow_draw(id);
 scr_bulb_redraw_over_emissive_glow(_lit_scene);
 scr_bulb_draw_enemy_emissive_glow_all();
 scr_crystal_spark_draw_all();

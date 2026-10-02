@@ -751,6 +751,8 @@ function scr_pond_layer_draw() {
             var _c0 = clamp(floor((_vx0 - _b.left) / _cstep - 1) * _cstep, 0, _cols);
             var _c1 = clamp(ceil((_vx1 - _b.left) / _cstep + 1) * _cstep, 0, _cols);
             var _samples = ceil((_c1 - _c0) / _cstep) + 1;
+            // Published for scr_water_glow_draw, which replays this frame's waterline.
+            _p.col_n = 0;
             if (_samples < 2) continue;
 
             // Arrays are sized for the whole pond once and reused, so panning the camera
@@ -806,6 +808,7 @@ function scr_pond_layer_draw() {
                 }
                 _col_ef[_c] = _ef;
             }
+            _p.col_n = _samples;
 
             draw_primitive_begin(pr_trianglestrip);
             for (var _tx = 0; _tx < _samples; _tx++) {
@@ -909,5 +912,213 @@ function scr_pond_layer_draw() {
             pond_perf_us_acc += (get_timer() - _perf_t0);
             pond_perf_calls_acc += 1;
         }
+    }
+}
+
+// ---------------------------------------------------------------------------------------
+// Water glow — see the BULB_WATER_GLOW_* block in __BulbConfig for why this is two halves.
+// ---------------------------------------------------------------------------------------
+
+/// @description True when the additive core pass will draw anything. Draw_77 needs this to
+/// decide whether to cache the lit scene and redraw actors over the overlay.
+function scr_water_glow_core_active() {
+    return BULB_WATER_GLOW_ENABLED && BULB_WATER_GLOW_CORE_ENABLED;
+}
+
+function scr_water_glow_init(_controller) {
+    with (_controller) {
+        water_glow_lights = [];
+    }
+}
+
+/// @description Release the glow lights so they don't linger in Bulb's light array.
+function scr_water_glow_cleanup(_controller) {
+    with (_controller) {
+        if (!variable_instance_exists(id, "water_glow_lights")) return;
+
+        for (var _i = 0; _i < array_length(water_glow_lights); _i++) {
+            var _g = water_glow_lights[_i];
+            if (_g.light != undefined) {
+                _g.light.Destroy();
+                _g.light = undefined;
+            }
+        }
+
+        water_glow_lights = [];
+    }
+}
+
+/// @description Add one glow light: flat and wide over a pool, tall and narrow on a fall.
+function scr_water_glow_add(_controller, _x, _y, _xscale, _yscale) {
+    if (!variable_global_exists("bulb_renderer") || global.bulb_renderer == undefined) return;
+
+    with (_controller) {
+        if (!variable_instance_exists(id, "water_glow_lights")) water_glow_lights = [];
+        if (array_length(water_glow_lights) >= BULB_WATER_GLOW_MAX_LIGHTS) return;
+
+        var _l = new BulbLight(global.bulb_renderer, BULB_WATER_GLOW_LIGHT_SPRITE, 0, _x, _y);
+        _l.blend = BULB_WATER_GLOW_BLEND;
+        _l.intensity = BULB_WATER_GLOW_LIGHT_INTENSITY;
+        _l.xscale = _xscale;
+        _l.yscale = _yscale;
+        _l.penumbraSize = 0;
+        // Water only ever adds brightness here. Shadow casting would also carve hard edges
+        // out of the pool where the surrounding rock occludes it.
+        _l.castShadows = false;
+        _l.normalMap = true;
+        _l.normalMapZ = BULB_WATER_GLOW_LIGHT_NORMAL_MAP_Z;
+
+        array_push(water_glow_lights, {
+            light: _l,
+            base_intensity: BULB_WATER_GLOW_LIGHT_INTENSITY,
+            base_xscale: _xscale,
+            base_yscale: _yscale,
+            phase: random(360),
+            speed: BULB_WATER_GLOW_SHIMMER_SPEED * random_range(0.7, 1.3)
+        });
+    }
+}
+
+/// @description Chain lights along every pond waterline and down every waterfall stream.
+/// Must run after both bakes, since it reads their geometry.
+function scr_water_glow_spawn(_controller) {
+    if (!BULB_WATER_GLOW_ENABLED || !BULB_WATER_GLOW_LIGHTS_ENABLED) return;
+
+    scr_water_glow_cleanup(_controller);
+
+    with (_controller) {
+        // Falls are placed first on purpose: they need only a few lights each, whereas a
+        // room-wide pool could otherwise eat the whole budget and leave the streams dark.
+        if (BULB_WATERFALL_ENABLED && variable_instance_exists(id, "waterfall_soft_columns")) {
+            var _fstep = max(8, BULB_WATER_GLOW_FALL_SPACING);
+
+            for (var _c = 0; _c < array_length(waterfall_soft_columns); _c++) {
+                var _col = waterfall_soft_columns[_c];
+                for (var _y = _col.y0 + _fstep * 0.5; _y < _col.y1; _y += _fstep) {
+                    scr_water_glow_add(id, _col.cx, _y,
+                        BULB_WATER_GLOW_FALL_LIGHT_XSCALE, BULB_WATER_GLOW_FALL_LIGHT_YSCALE);
+                }
+            }
+        }
+
+        if (BULB_POND_ENABLED && variable_instance_exists(id, "pond_list")) {
+            var _step = max(8, BULB_WATER_GLOW_POND_SPACING);
+
+            for (var _i = 0; _i < array_length(pond_list); _i++) {
+                var _b = scr_pond_draw_bounds(pond_list[_i]);
+                // Half a step in from each end, so a light never lands exactly on the seam
+                // where two pools meet and reads as a bright spot.
+                for (var _x = _b.left + _step * 0.5; _x < _b.right; _x += _step) {
+                    scr_water_glow_add(id, _x, _b.top + 2,
+                        BULB_WATER_GLOW_POND_LIGHT_XSCALE, BULB_WATER_GLOW_POND_LIGHT_YSCALE);
+                }
+            }
+        }
+    }
+}
+
+/// @description Slow shimmer so the water light never sits perfectly still.
+function scr_water_glow_step(_controller) {
+    if (!BULB_WATER_GLOW_ENABLED || !BULB_WATER_GLOW_LIGHTS_ENABLED) return;
+
+    with (_controller) {
+        if (!variable_instance_exists(id, "water_glow_lights")) return;
+
+        for (var _i = 0; _i < array_length(water_glow_lights); _i++) {
+            var _g = water_glow_lights[_i];
+            if (_g.light == undefined) continue;
+
+            _g.phase += _g.speed;
+            if (_g.phase >= 360) _g.phase -= 360;
+
+            var _mul = lerp(BULB_WATER_GLOW_SHIMMER_MIN, BULB_WATER_GLOW_SHIMMER_MAX,
+                (dsin(_g.phase) + 1) * 0.5);
+            _g.light.intensity = _g.base_intensity * _mul;
+            _g.light.xscale = _g.base_xscale * _mul;
+            _g.light.yscale = _g.base_yscale * _mul;
+        }
+    }
+}
+
+/// @description Additive glow over the finished lighting composite: a bright band hugging
+/// each pond waterline and a soft wash down each stream. The pond band replays the
+/// per-column waterline scr_pond_layer_draw already cached this frame, so it needs no
+/// surface or wave maths of its own.
+function scr_water_glow_draw(_controller) {
+    if (!scr_water_glow_core_active()) return;
+
+    with (_controller) {
+        var _cam = view_camera[0];
+        if (instance_exists(obj_camera_controller)) _cam = obj_camera_controller.cam;
+        camera_apply(_cam);
+
+        var _vx0 = camera_get_view_x(_cam);
+        var _vy0 = camera_get_view_y(_cam);
+        var _vx1 = _vx0 + camera_get_view_width(_cam);
+        var _vy1 = _vy0 + camera_get_view_height(_cam);
+
+        var _old_tex = gpu_get_texfilter();
+        var _old_blend = gpu_get_blendmode();
+        var _old_alpha = draw_get_alpha();
+        var _old_col = draw_get_color();
+
+        gpu_set_texfilter(false);
+        gpu_set_blendmode(bm_add);
+
+        var _glow = BULB_WATER_GLOW_BLEND;
+
+        if (BULB_POND_ENABLED && variable_instance_exists(id, "pond_baked") && pond_baked
+            && variable_instance_exists(id, "pond_list")) {
+            var _depth = BULB_WATER_GLOW_POND_CORE_DEPTH;
+            var _core_a = BULB_WATER_GLOW_POND_CORE_ALPHA;
+
+            for (var _i = 0; _i < array_length(pond_list); _i++) {
+                var _p = pond_list[_i];
+                // col_n is 0 unless the pond drew a waterline this frame, which also means
+                // a culled pond is skipped here without repeating the cull test.
+                if (!variable_struct_exists(_p, "col_n") || _p.col_n < 2) continue;
+
+                var _b = _p.bounds;
+                var _cx = _p.col_x;
+                var _cy = _p.col_sy;
+                var _ce = _p.col_ef;
+                var _n = _p.col_n;
+
+                draw_primitive_begin(pr_trianglestrip);
+                for (var _c = 0; _c < _n; _c++) {
+                    var _px = _b.left + _cx[_c];
+                    var _sy = _cy[_c];
+                    draw_vertex_colour(_px, _sy, _glow, _core_a * _ce[_c]);
+                    draw_vertex_colour(_px, _sy + _depth, _glow, 0);
+                }
+                draw_primitive_end();
+            }
+        }
+
+        if (BULB_WATERFALL_ENABLED && variable_instance_exists(id, "waterfall_soft_columns")) {
+            var _fall_a = BULB_WATER_GLOW_FALL_CORE_ALPHA;
+
+            for (var _c2 = 0; _c2 < array_length(waterfall_soft_columns); _c2++) {
+                var _col = waterfall_soft_columns[_c2];
+                var _half = max(2, _col.half);
+                if (_col.cx + _half < _vx0 || _col.cx - _half > _vx1) continue;
+                if (_col.y1 < _vy0 || _col.y0 > _vy1) continue;
+
+                // Bright down the centre line, falling to nothing at the stream edges.
+                draw_primitive_begin(pr_trianglestrip);
+                draw_vertex_colour(_col.cx - _half, _col.y0, _glow, 0);
+                draw_vertex_colour(_col.cx - _half, _col.y1, _glow, 0);
+                draw_vertex_colour(_col.cx, _col.y0, _glow, _fall_a);
+                draw_vertex_colour(_col.cx, _col.y1, _glow, _fall_a);
+                draw_vertex_colour(_col.cx + _half, _col.y0, _glow, 0);
+                draw_vertex_colour(_col.cx + _half, _col.y1, _glow, 0);
+                draw_primitive_end();
+            }
+        }
+
+        gpu_set_texfilter(_old_tex);
+        draw_set_alpha(_old_alpha);
+        draw_set_color(_old_col);
+        gpu_set_blendmode(_old_blend);
     }
 }

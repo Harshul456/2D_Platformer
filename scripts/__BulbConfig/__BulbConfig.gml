@@ -30,10 +30,10 @@
 #macro BULB_NORMAL_MAPS_ENABLED       true
 #macro BULB_NORMAL_MAP_TOGGLE_KEY     vk_f8
 
-// HDR bloom — on by default; press F9 in-game to toggle it off.
+// HDR bloom — off at launch; press F9 in-game to toggle it on.
 // Tuned so bloom only glows genuine highlights (light cores / crystals) instead of
 // washing the whole scene: neutral exposure + high threshold + visible intensity.
-#macro BULB_HDR_BLOOM_DEFAULT_ON        true
+#macro BULB_HDR_BLOOM_DEFAULT_ON        false
 #macro BULB_HDR_BLOOM_INTENSITY         0.28   // Glow strength on the highlights that pass threshold
 #macro BULB_HDR_BLOOM_ITERATIONS        3      // Wider, softer falloff
 #macro BULB_HDR_BLOOM_THRESHOLD_MIN     1.02   // Only bright crystal/light cores bloom (higher = less scene lift)
@@ -205,7 +205,43 @@
 #macro BULB_FAIRY_PULSE_SPEED                0.9
 #macro BULB_FAIRY_PULSE_MIN                  0.68
 #macro BULB_FAIRY_PULSE_MAX                  1.16
+// Fairies never enter the water — they hover, so they stay at least this many pixels above
+// any pond surface they drift over.
+#macro BULB_FAIRY_WATER_CLEARANCE            3
 #macro BULB_FAIRY_CULL_MARGIN                48
+
+// Water glow — the pond surface and the waterfall streams light themselves.
+// Two halves, because neither alone is enough. Bulb lights brighten the light map, so they
+// spill blue onto nearby rock and are the only part that reaches HDR bloom (bloom happens
+// inside GetOutputSurface, before any of the Draw_77 overlays). The additive core is drawn
+// over the finished lighting composite, so the water still reads as emissive in a chamber
+// with no other light in it, where a light-map-only glow would be crushed to black.
+#macro BULB_WATER_GLOW_ENABLED               true
+#macro BULB_WATER_GLOW_BLEND                 make_colour_rgb(70, 150, 230)
+// Lights. Spacing is the gap between lights along a pool's waterline / down a stream, so
+// a wide pool costs (width / spacing) lights — keep the cap in sight.
+#macro BULB_WATER_GLOW_LIGHTS_ENABLED        true
+#macro BULB_WATER_GLOW_LIGHT_SPRITE          sLight128
+#macro BULB_WATER_GLOW_MAX_LIGHTS            26
+#macro BULB_WATER_GLOW_POND_SPACING          52
+#macro BULB_WATER_GLOW_FALL_SPACING          56
+#macro BULB_WATER_GLOW_LIGHT_INTENSITY       0.62
+#macro BULB_WATER_GLOW_LIGHT_NORMAL_MAP_Z    26
+// Pool lights are wide and flat so the glow hugs the waterline; fall lights are tall and
+// narrow so they trace the stream instead of washing the whole wall.
+#macro BULB_WATER_GLOW_POND_LIGHT_XSCALE     0.85
+#macro BULB_WATER_GLOW_POND_LIGHT_YSCALE     0.45
+#macro BULB_WATER_GLOW_FALL_LIGHT_XSCALE     0.45
+#macro BULB_WATER_GLOW_FALL_LIGHT_YSCALE     0.70
+#macro BULB_WATER_GLOW_SHIMMER_SPEED         0.55
+#macro BULB_WATER_GLOW_SHIMMER_MIN           0.82
+#macro BULB_WATER_GLOW_SHIMMER_MAX           1.18
+// Additive core on the water itself. Pond depth is how far the band bleeds down from the
+// waterline before it fades out.
+#macro BULB_WATER_GLOW_CORE_ENABLED          true
+#macro BULB_WATER_GLOW_POND_CORE_ALPHA       0.30
+#macro BULB_WATER_GLOW_POND_CORE_DEPTH       10
+#macro BULB_WATER_GLOW_FALL_CORE_ALPHA       0.22
 
 // Waterfall — tile 24 on Tiles_Waterfall (mid copies moved here at bake).
 // World-locked X so it stays where you placed it. Depth just in front of mid.

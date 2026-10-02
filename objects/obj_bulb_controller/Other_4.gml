@@ -31,3 +31,5 @@ scr_waterfall_bake(id, BULB_WATERFALL_LAYER);
 scr_cave_atmosphere_bind_fog_layer(id);
 // After the pond bake so the dense pond cluster knows where the water is.
 scr_fairy_spawn(id);
+// After both water bakes: the glow lights are placed along their baked geometry.
+scr_water_glow_spawn(id);

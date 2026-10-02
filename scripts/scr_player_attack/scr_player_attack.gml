@@ -18,7 +18,13 @@ function scr_player_try_attack_start() {
     var _combo_followup = (comboTimer > 0 && comboCount == 1 && (grounded || coyote_time_timer > 0));
     if (attackCooldownTimer > 0 && !_combo_followup) return false;
 
-    var _want_air = (!grounded && coyote_time_timer <= 0);
+    // Coyote time forgives a late jump, not a late ground swing: a ground swing started while
+    // already off the ledge is killed the same frame by the ledge cancel, so you hear the
+    // whoosh and never see the attack. Off the ground is an air attack.
+    var _want_air = !grounded;
+    // wall_side stays set only while the slide is active. A wall jump the same frame clears
+    // the cling for this press (jumped_this_frame), so a slash can still come out as you kick off.
+    if (_want_air && wall_side != 0 && !jumped_this_frame) return false;
     if (_want_air && air_attack_used) return false;
 
     scr_player_attack();
@@ -40,7 +46,8 @@ function scr_player_attack() {
         return;
     }
 
-    var _air = (!grounded && coyote_time_timer <= 0);
+    var _air = !grounded;
+    if (_air && wall_side != 0 && !jumped_this_frame) return;
     if (_air && air_attack_used) return;
 
     scr_player_apply_attack_facing();
@@ -63,21 +70,29 @@ function scr_player_attack() {
         attack_shift_remaining = 0;
         attack_commit_lock = 0;
         air_attack_used = true;
-        sprite_index = spr_mc_air_attack;
+        // Down held swaps the forward slash for the downward arc. key_down already folds
+        // keyboard, d-pad and left-stick-down together (scr_player_input).
+        attack_is_down = key_down;
+        sprite_index = attack_is_down ? spr_mc_downward_attack : spr_mc_air_attack;
         image_blend = c_white;
         // Don't resume the double-jump flip after this slash — fall pose instead.
         double_jump_anim_active = false;
         double_jump_anim_tick = 0;
 
         // Keep air momentum (dead-stop was lunge overwrite + ground friction).
-        var _keep = (variable_instance_exists(id, "AIR_ATTACK_MOMENTUM_KEEP") ? AIR_ATTACK_MOMENTUM_KEEP : 1);
+        var _keep = attack_is_down
+            ? (variable_instance_exists(id, "DOWN_ATTACK_MOMENTUM_KEEP") ? DOWN_ATTACK_MOMENTUM_KEEP : 1)
+            : (variable_instance_exists(id, "AIR_ATTACK_MOMENTUM_KEEP") ? AIR_ATTACK_MOMENTUM_KEEP : 1);
         hsp *= _keep;
-        var _min_h = (variable_instance_exists(id, "AIR_ATTACK_MIN_HSP") ? AIR_ATTACK_MIN_HSP : 1.2);
+        var _min_h = attack_is_down
+            ? (variable_instance_exists(id, "DOWN_ATTACK_MIN_HSP") ? DOWN_ATTACK_MIN_HSP : 0)
+            : (variable_instance_exists(id, "AIR_ATTACK_MIN_HSP") ? AIR_ATTACK_MIN_HSP : 1.2);
         if (abs(hsp) < _min_h && last_direction != 0) {
             hsp = last_direction * _min_h;
         }
         runMomentum = hsp;
     } else {
+        attack_is_down = false;
         // Lenient ground during dash/run — floor probes can flicker one frame at speed.
         // Only valid mid-combo step is 1→2 (no third hit from buffer/timer).
         if (comboTimer > 0 && comboCount == 1) comboCount = 2;
@@ -109,7 +124,9 @@ function scr_player_attack() {
 
     image_index = 0;
     image_speed = _air
-        ? (variable_instance_exists(id, "AIR_ATTACK_IMAGE_SPEED") ? AIR_ATTACK_IMAGE_SPEED : 0.85)
+        ? (attack_is_down
+            ? (variable_instance_exists(id, "DOWN_ATTACK_IMAGE_SPEED") ? DOWN_ATTACK_IMAGE_SPEED : 0.85)
+            : (variable_instance_exists(id, "AIR_ATTACK_IMAGE_SPEED") ? AIR_ATTACK_IMAGE_SPEED : 0.85))
         : 1;
 
     // Saber whoosh — random swing clip + pitch (same idea as impact clanks)
@@ -180,6 +197,7 @@ function scr_player_attack_end_swing(_post_accel_frames) {
 
     attacking = false;
     attack_is_air = false;
+    attack_is_down = false;
     attack_no_lunge = false;
     attack_timer = 0;
     attack_lockout = 0;
@@ -262,6 +280,7 @@ function scr_player_attack_dodge_cancel(_dir) {
 
     attacking = false;
     attack_is_air = false;
+    attack_is_down = false;
     attack_no_lunge = false;
     attack_timer = 0;
     attack_lockout = 0;
@@ -319,6 +338,11 @@ function scr_player_attack_dodge_cancel(_dir) {
 function scr_player_is_attack_active() {
     if (!attacking) return false;
     if (attack_is_air) {
+        if (attack_is_down) {
+            var _d0 = (variable_instance_exists(id, "DOWN_ATTACK_HIT_START") ? DOWN_ATTACK_HIT_START : 0);
+            var _d1 = (variable_instance_exists(id, "DOWN_ATTACK_HIT_END") ? DOWN_ATTACK_HIT_END : 2);
+            return (image_index >= _d0 && image_index <= _d1);
+        }
         var _a0 = (variable_instance_exists(id, "AIR_ATTACK_HIT_START") ? AIR_ATTACK_HIT_START : 0);
         var _a1 = (variable_instance_exists(id, "AIR_ATTACK_HIT_END") ? AIR_ATTACK_HIT_END : 1);
         return (image_index >= _a0 && image_index <= _a1);
@@ -349,6 +373,7 @@ function scr_player_apply_nail_pogo() {
     coyote_time_timer = 0;
     attacking = false;
     attack_is_air = false;
+    attack_is_down = false;
     attack_no_lunge = false;
     attack_lockout = 0;
     attack_buffer_timer = 0;

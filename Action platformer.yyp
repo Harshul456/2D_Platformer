@@ -81,6 +81,7 @@
     {"id":{"name":"obj_void_stain","path":"objects/obj_void_stain/obj_void_stain.yy",},},
     {"id":{"name":"obj_wall","path":"objects/obj_wall/obj_wall.yy",},},
     {"id":{"name":"room_test","path":"rooms/room_test/room_test.yy",},},
+    {"id":{"name":"room_test2","path":"rooms/room_test2/room_test2.yy",},},
     {"id":{"name":"__BulbAddOcclusionHard","path":"scripts/__BulbAddOcclusionHard/__BulbAddOcclusionHard.yy",},},
     {"id":{"name":"__BulbAddOcclusionSoft","path":"scripts/__BulbAddOcclusionSoft/__BulbAddOcclusionSoft.yy",},},
     {"id":{"name":"__BulbConfig","path":"scripts/__BulbConfig/__BulbConfig.yy",},},
@@ -205,6 +206,7 @@
     {"id":{"name":"s_cave_placeholder","path":"sounds/s_cave_placeholder/s_cave_placeholder.yy",},},
     {"id":{"name":"s_first_area","path":"sounds/s_first_area/s_first_area.yy",},},
     {"id":{"name":"s_further","path":"sounds/s_further/s_further.yy",},},
+    {"id":{"name":"s_past","path":"sounds/s_past/s_past.yy",},},
     {"id":{"name":"s_tutorial_stage","path":"sounds/s_tutorial_stage/s_tutorial_stage.yy",},},
     {"id":{"name":"snd_air_flip_parry","path":"sounds/snd_air_flip_parry/snd_air_flip_parry.yy",},},
     {"id":{"name":"snd_cave_footstep1","path":"sounds/snd_cave_footstep1/snd_cave_footstep1.yy",},},
@@ -263,6 +265,7 @@
     {"id":{"name":"spr_mc_attack2","path":"sprites/spr_mc_attack2/spr_mc_attack2.yy",},},
     {"id":{"name":"spr_mc_doublejump_n","path":"sprites/spr_mc_doublejump_n/spr_mc_doublejump_n.yy",},},
     {"id":{"name":"spr_mc_doublejump","path":"sprites/spr_mc_doublejump/spr_mc_doublejump.yy",},},
+    {"id":{"name":"spr_mc_downward_attack","path":"sprites/spr_mc_downward_attack/spr_mc_downward_attack.yy",},},
     {"id":{"name":"spr_mc_flurry_attack","path":"sprites/spr_mc_flurry_attack/spr_mc_flurry_attack.yy",},},
     {"id":{"name":"spr_mc_healthbar","path":"sprites/spr_mc_healthbar/spr_mc_healthbar.yy",},},
     {"id":{"name":"spr_mc_hurt_air_n","path":"sprites/spr_mc_hurt_air_n/spr_mc_hurt_air_n.yy",},},
@@ -292,6 +295,7 @@
   "resourceVersion":"2.0",
   "RoomOrderNodes":[
     {"roomId":{"name":"room_test","path":"rooms/room_test/room_test.yy",},},
+    {"roomId":{"name":"room_test2","path":"rooms/room_test2/room_test2.yy",},},
   ],
   "templateType":"game",
   "TextureGroups":[

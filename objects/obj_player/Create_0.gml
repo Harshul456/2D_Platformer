@@ -262,6 +262,7 @@ sprint_resume_hold = false;     // Z held through hold-sprint jump — resume su
 sprint_dir_gap = 0;             // Grace frames when swapping L/R during hold sprint
 SPRINT_DIR_SWITCH_GAP = 6;
 sprint_burst_tick = 0;          // Frames elapsed this commit
+sprint_started_from_stop = false; // This commit began from a standstill or walk
 sprint_commit_dir = 0;          // Direction locked when sprint/dash started (−1 / +1)
 SPRINT_BURST_FRAMES = 12;       // Directional burst before runsp sustain (eased in/out)
 SPRINT_BURST_SPEED = 8.2;       // Peak speed during directional burst
@@ -277,6 +278,7 @@ DASH_LOCK_FRAMES = 14;          // Blocks re-trigger through reel after standsti
 dash_input_buffer = 0;
 dash_lock_timer = 0;
 SPRINT_JUMP_CARRY_MULT = 1.12;  // Jump/leaving ground while sprinting: runsp × this (initial air hsp)
+SPRINT_JUMP_FROM_STOP_FRAMES = 10; // From a stop, dash this long on the ground before a jump carries sprint speed
 SPRINT_AIR_DECAY = 0.003;       // Air lerp toward 0 while sprint_jump_carry (lower = longer glide)
 SPRINT_AIR_DECAY_TURN = 0.10;   // Extra decay when reversing direction in air during carry
 SPRINT_AIR_DECAY_HOLD = 0.001;  // Decay while holding Z + same direction in air (near-zero = coast)
@@ -462,6 +464,28 @@ AIR_ATTACK_HITBOX = [
     [0, 0, 0, 0],        // frame 2 — recovery
     [0, 0, 0, 0]         // frame 3 — recovery
 ];
+
+// Downward air slash (spr_mc_downward_attack) — Down held + attack while airborne.
+// Boxes trace the blue arc that sweeps under the character, so unlike the forward air slash
+// they are symmetric about the feet and the facing flip is a no-op. Active on frames 0–2
+// (arc forming, full sweep, trailing edge); 3–5 are the blade settling back, no hitbox.
+attack_is_down = false;
+DOWN_ATTACK_HIT_START = 0;
+DOWN_ATTACK_HIT_END = 2;
+DOWN_ATTACK_IMAGE_SPEED = 0.85;
+DOWN_ATTACK_HITBOX = [
+    [-28, -4, 28, 22],   // frame 0 — arc forming beneath the feet
+    [-34, -6, 34, 24],   // frame 1 — full sweep, widest reach
+    [-30, -4, 30, 20],   // frame 2 — trailing edge
+    [0, 0, 0, 0],        // frame 3 — recovery
+    [0, 0, 0, 0],        // frame 4 — recovery
+    [0, 0, 0, 0]         // frame 5 — recovery
+];
+// Same momentum keep as the forward air slash. The forward slash also forces a minimum
+// drift (AIR_ATTACK_MIN_HSP) so it never looks like a dead stop; a dive wants to stay
+// vertical instead, so this defaults to 0 — raise it if you want the dive to drift.
+DOWN_ATTACK_MOMENTUM_KEEP = 1;
+DOWN_ATTACK_MIN_HSP = 0;
 AIR_ATTACK_MOMENTUM_KEEP = 1.0;   // Keep full air hsp (no dead-stop lunge overwrite)
 AIR_ATTACK_MIN_HSP = 1.2;         // Tiny push if nearly still so the swing still carries
 AIR_ATTACK_GRAV_MUL = 0.85;       // Slight float during swing (does not freeze fall)

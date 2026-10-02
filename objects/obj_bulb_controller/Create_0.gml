@@ -36,3 +36,4 @@ scr_waterfall_init(id);
 scr_pond_init(id);
 scr_cave_atmosphere_init(id);
 scr_fairy_init(id);
+scr_water_glow_init(id);

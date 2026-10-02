@@ -90,4 +90,4 @@ with (obj_cutscene_trigger) {
 }
 */
 
-audio_play_sound(s_cave_placeholder, 1, true);
+audio_play_sound(s_past, 1, true);

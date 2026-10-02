@@ -171,9 +171,10 @@ function scr_fairy_collision_tilemap() {
     return -1;
 }
 
-/// @description True if the point is clear of rock. Blank tile index 0 counts as solid:
-/// this room authors its floors as invisible collision cells, so testing for visible art
-/// would let fairies sit inside the ground.
+/// @description True if the point is clear of rock. Any tile in the cell blocks, rather
+/// than testing the tile's collision shape per pixel like the drips do — cell granularity
+/// keeps fairies from clipping into slope and edge tiles, which matters more here than
+/// letting them fly right up to the rock.
 function scr_fairy_point_is_open(_tm, _x, _y) {
     if (_x < 12 || _y < 12 || _x > room_width - 12 || _y > room_height - 12) return false;
     if (_tm == -1) return true;
@@ -279,6 +280,9 @@ function scr_fairy_spawn(_controller) {
             var _rx = random(room_width);
             var _ry = random(room_height);
             if (!scr_fairy_point_is_open(_tm, _rx, _ry)) continue;
+            // Ponds aren't collision, so open space includes the water. Skip it: these are
+            // hover-only and would otherwise snap up to the surface on the first frame.
+            if (BULB_POND_ENABLED && scr_pond_contains_point(_rx, _ry)) continue;
 
             array_push(fairy_list, scr_fairy_make(_rx, _ry));
             _placed += 1;
@@ -286,7 +290,8 @@ function scr_fairy_spawn(_controller) {
     }
 }
 
-/// @description Drift fairies around their anchors and drive their light pulse.
+/// @description Drift fairies around their anchors, keep them above the water, and drive
+/// their light pulse.
 function scr_fairy_step(_controller) {
     if (!BULB_FAIRY_ENABLED) return;
 
@@ -298,8 +303,32 @@ function scr_fairy_step(_controller) {
         var _drag = BULB_FAIRY_DRAG;
         var _vmax = BULB_FAIRY_SPEED_MAX;
 
+        // Snapshot the waterlines once per frame as a flat [left, right, top, ...] list.
+        // scr_pond_surface_y_at probes tilemaps for the wall snap, so asking it per fairy
+        // would undo the pond draw optimisations.
+        var _water = [];
+        if (BULB_POND_ENABLED
+            && variable_instance_exists(id, "pond_list")
+            && variable_instance_exists(id, "pond_baked") && pond_baked) {
+            for (var _p = 0; _p < array_length(pond_list); _p++) {
+                var _pb = scr_pond_draw_bounds(pond_list[_p]);
+                array_push(_water, _pb.left, _pb.right, _pb.top);
+            }
+        }
+        var _water_n = array_length(_water);
+        var _clearance = BULB_FAIRY_WATER_CLEARANCE;
+
         for (var _i = 0; _i < array_length(fairy_list); _i++) {
             var _f = fairy_list[_i];
+
+            // Waterline under this fairy, or undefined when it isn't over a pond.
+            var _surface = undefined;
+            for (var _w = 0; _w < _water_n; _w += 3) {
+                if (_f.x < _water[_w] || _f.x > _water[_w + 1]) continue;
+                var _top = _water[_w + 2];
+                if (_surface == undefined || _top < _surface) _surface = _top;
+            }
+            var _limit_y = (_surface == undefined) ? undefined : _surface - _clearance;
 
             _f.retarget -= 1;
             if (_f.retarget <= 0) {
@@ -308,6 +337,9 @@ function scr_fairy_step(_controller) {
                 var _dist = random(BULB_FAIRY_ROAM_RADIUS);
                 var _cx = _f.ax + lengthdir_x(_dist, _dir);
                 var _cy = _f.ay + lengthdir_y(_dist, _dir);
+                // Keep the target out of the water so it isn't forever pressing downward
+                // against the clamp below.
+                if (_limit_y != undefined) _cy = min(_cy, _limit_y);
                 if (scr_fairy_point_is_open(_tm, _cx, _cy)) {
                     _f.tx = _cx;
                     _f.ty = _cy;
@@ -324,6 +356,13 @@ function scr_fairy_step(_controller) {
 
             var _nx = _f.x + _f.vx;
             var _ny = _f.y + _f.vy;
+
+            // Hard floor at the waterline — fairies hover, they never break the surface.
+            if (_limit_y != undefined && _ny > _limit_y) {
+                _ny = _limit_y;
+                if (_f.vy > 0) _f.vy = 0;
+            }
+
             if (scr_fairy_point_is_open(_tm, _nx, _ny)) {
                 _f.x = _nx;
                 _f.y = _ny;
@@ -350,6 +389,7 @@ function scr_fairy_step(_controller) {
                 _f.light.yscale = BULB_FAIRY_LIGHT_SCALE * _mul;
                 _f.light.intensity = BULB_FAIRY_LIGHT_INTENSITY * _mul;
             }
+
         }
     }
 }

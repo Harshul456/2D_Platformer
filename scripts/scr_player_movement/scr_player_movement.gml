@@ -376,6 +376,12 @@ function scr_player_movement() {
     var _pre_sprint_committed = sprint_committed;
     var _pre_sprint_hold_latched = sprint_hold_latched;
     var _pre_sprint_dash_standstill = sprint_dash_standstill;
+    // Run pressed with the jump, from a stop: the dash is only a frame or two old, but jump
+    // carry would still launch at sprint speed. Require a real ground dash first.
+    var _from_stop_frames = (variable_instance_exists(id, "SPRINT_JUMP_FROM_STOP_FRAMES") ? SPRINT_JUMP_FROM_STOP_FRAMES : 10);
+    var _fresh_stop_dash = sprint_started_from_stop
+        && (_pre_sprinting || _pre_sprint_committed)
+        && sprint_burst_tick < _from_stop_frames;
     jumped_this_frame = false;
     var _grounded_jump_this_step = false;
 
@@ -490,7 +496,17 @@ function scr_player_movement() {
                 var _jd = sign(_pre_hsp);
                 if (_jd == 0 && variable_instance_exists(id, "sprint_commit_dir")) _jd = sign(sprint_commit_dir);
                 if (_jd == 0) _jd = last_direction;
-                if (_pre_sprinting || _pre_sprint_committed) {
+                if (_fresh_stop_dash) {
+                    sprint_jump_carry = false;
+                    sprint_air_trail = false;
+                    sprint_started_from_stop = false;
+                    sprint_resume_hold = false;
+                    var _walk_dir = (key_right - key_left);
+                    if (_walk_dir == 0) _walk_dir = last_direction;
+                    hsp = walksp * _walk_dir;
+                    runMomentum = 0;
+                    dash_input_buffer = 0;
+                } else if (_pre_sprinting || _pre_sprint_committed) {
                     sprint_jump_carry = true;
                     sprint_air_trail = true;
                     var _carry_sp = _pre_sprint_dash_standstill
@@ -506,7 +522,7 @@ function scr_player_movement() {
                     sprint_jump_carry = false;
                 }
                 is_sprinting = false;
-                if (key_sprint && _pre_sprint_hold_latched && (_pre_sprinting || _pre_sprint_committed)) {
+                if (!_fresh_stop_dash && key_sprint && _pre_sprint_hold_latched && (_pre_sprinting || _pre_sprint_committed)) {
                     sprint_resume_hold = true;
                 }
                 sprint_committed = false;
@@ -698,7 +714,8 @@ function scr_player_movement() {
             // Hold Z while idle — direction later starts sprint (not standstill dash)
             if (!_recovery_locked && key_sprint && inputDir == 0 && grounded && !jumped_this_frame && vsp >= 0
                 && (sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
-                && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_air_attack && !sprint_reel_active)
+                && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_air_attack
+                && sprite_index != spr_mc_downward_attack && !sprint_reel_active)
                 && !sprint_committed) {
                 sprint_z_idle_charged = true;
             }
@@ -707,7 +724,8 @@ function scr_player_movement() {
             if (!_recovery_locked && !_sprint_wall_blocked && key_sprint && sprint_hold_latched && grounded && !jumped_this_frame && vsp >= 0
                 && inputDir != 0 && !sprint_committed
                 && ((sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
-                    && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_air_attack && !sprint_reel_active)
+                    && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_air_attack
+                    && sprite_index != spr_mc_downward_attack && !sprint_reel_active)
                     || (sprint_resume_hold && key_sprint))) {
                 sprint_committed = true;
                 sprint_dash_standstill = false;
@@ -901,7 +919,7 @@ function scr_player_movement() {
             }
             // Sprint jump: §6c can re-ground for one frame while feet overlap — reassert carry after air/walk resolve.
             // Direction stays pre-jump travel (not opposite input) so dash→jump→turn can't invent reverse speed.
-            if (jumped_this_frame && _grounded_jump_this_step && !attacking) {
+            if (jumped_this_frame && _grounded_jump_this_step && !attacking && !_fresh_stop_dash) {
                 var _sj_dir = sign(runMomentum);
                 if (_sj_dir == 0) _sj_dir = sign(_pre_hsp);
                 if (_sj_dir == 0 && variable_instance_exists(id, "sprint_commit_dir")) _sj_dir = sign(sprint_commit_dir);
@@ -924,7 +942,7 @@ function scr_player_movement() {
                 }
             }
             if (jumped_this_frame) {
-                if (key_sprint && _pre_sprint_hold_latched && (_pre_sprinting || _pre_sprint_committed)) {
+                if (!_fresh_stop_dash && key_sprint && _pre_sprint_hold_latched && (_pre_sprinting || _pre_sprint_committed)) {
                     sprint_resume_hold = true;
                 }
                 sprint_committed = false;
@@ -2118,7 +2136,12 @@ function scr_player_movement() {
     var _teeter_anim = FULL_BLOCK_EDGE_GROUND_FORGIVE && !_shelf_any_near_feet_pose && _teeter_toe_floor && _span_teet <= CAP_GROUND_CELL_SPAN_MAX
         && wall_side == 0 && abs(vsp) <= 2 && !_torso_overlap_pose && !_feet_embed_pose;
     // Keep crouch art through a 1-frame ground flicker only while still on jump land frames.
+    // A deliberate jump is not a flicker: without the rising guard this holds _anim_grounded
+    // true while the player is already on the way up, so the ground pose branch keeps playing
+    // the land crouch instead of the jump rise (very visible out of a wall-cling landing,
+    // which force-latches the crouch).
     var _land_crouch_anim_hold = force_landing_crouch
+        && !jumped_this_frame && vsp >= 0
         && (sprite_index == spr_mc_jump || sprite_index == spr_mc_doublejump)
         && image_index >= ANIM_LAND_CROUCH_START && image_index <= ANIM_LAND_CROUCH_END;
     var _anim_grounded = grounded || _teeter_anim || _land_crouch_anim_hold;
@@ -2227,7 +2250,8 @@ function scr_player_movement() {
             var _hold_full_lip_pose = FULL_BLOCK_EDGE_GROUND_FORGIVE && !_shelf_any_near_feet_pose && (full_lip_anim_sticky > 0 || _teeter_anim)
                 && !_feet_embed_pose
                 && !is_sprinting && sprite_index != spr_mc_sprint && sprite_index != spr_mc_reelback
-                && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_air_attack && sprite_index != spr_mc_walljump
+                && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_air_attack
+                && sprite_index != spr_mc_downward_attack && sprite_index != spr_mc_walljump
                 && sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump; // allow landing crouch on full-block lip edges
             if (_hold_full_lip_pose) {
                 // No dedicated teeter art yet — keep stable *ground* visuals on full-block lip (after jump land anim finishes).
@@ -2290,7 +2314,8 @@ function scr_player_movement() {
                 sprite_index = spr_mc_jump;
                 image_index = ANIM_LAND_CROUCH_START;
                 force_landing_crouch = true;
-            } else if (sprite_index == spr_mc_attack2 || sprite_index == spr_asta_attack1 || sprite_index == spr_mc_air_attack) {
+            } else if (sprite_index == spr_mc_attack2 || sprite_index == spr_asta_attack1
+                || sprite_index == spr_mc_air_attack || sprite_index == spr_mc_downward_attack) {
                 // Attack just ended — transition to jog/idle
                 sprite_index = (abs(hsp) > MOVEMENT_THRESHOLD) ? spr_mc_jog : spr_mc_idle;
                 image_index = 0;
@@ -2462,14 +2487,16 @@ function scr_player_movement() {
     } else {
         // Keep attack swing art; never let reel/sprint pose win mid-slash.
         var _want_atk = attack_is_air
-            ? spr_mc_air_attack
+            ? (attack_is_down ? spr_mc_downward_attack : spr_mc_air_attack)
             : ((comboCount >= 2) ? spr_mc_attack2 : spr_asta_attack1);
         if (sprite_index != _want_atk) {
             sprite_index = _want_atk;
             image_index = 0;
         }
         image_speed = attack_is_air
-            ? (variable_instance_exists(id, "AIR_ATTACK_IMAGE_SPEED") ? AIR_ATTACK_IMAGE_SPEED : 0.85)
+            ? (attack_is_down
+                ? (variable_instance_exists(id, "DOWN_ATTACK_IMAGE_SPEED") ? DOWN_ATTACK_IMAGE_SPEED : 0.85)
+                : (variable_instance_exists(id, "AIR_ATTACK_IMAGE_SPEED") ? AIR_ATTACK_IMAGE_SPEED : 0.85))
             : 1;
     }
 
@@ -2481,6 +2508,11 @@ function scr_player_movement() {
         if (_land_crouch_now) {
             hsp = 0;
             runMomentum = 0;
+        } else if (force_landing_crouch && (jumped_this_frame || (!grounded && vsp < 0))) {
+            // Jumped out of a land crouch. The sprite-mismatch release below can never catch
+            // this, because a rising player is still on spr_mc_jump — so the latch would ride
+            // out the whole jump and also block the next landing from skipping its crouch.
+            force_landing_crouch = false;
         } else if (force_landing_crouch
             && sprite_index != spr_mc_jump
             && sprite_index != spr_mc_doublejump
@@ -2512,7 +2544,9 @@ function scr_player_movement() {
             image_xscale = (_move_dir > 0) ? image_base_scale : -image_base_scale;
             last_direction = _move_dir;
         }
-    } else if (wall_side != 0 && !_anim_grounded && cling_eff && vsp > 0) {
+    } else if (wall_side != 0 && !_anim_grounded && cling_eff && vsp > 0 && !attacking) {
+        // Slide facing waits until the swing ends. Applying it mid air-attack flips the
+        // slash toward the wall, then the cling pose takes over when the swing finishes.
         image_xscale = -wall_side * image_base_scale;
         last_direction = -wall_side;
     } else if (_input_dir != 0 && stunTimer <= 0 && !attacking) {
@@ -2692,7 +2726,8 @@ function scr_player_sprint_try_begin(_early) {
 
     var _reel_blocked = sprint_reel_active || sprint_reel_pending || (sprite_index == spr_mc_reelback);
     var _sprint_sprite_ok = (sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
-        && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_air_attack && !sprint_reel_active);
+        && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_air_attack
+        && sprite_index != spr_mc_downward_attack && !sprint_reel_active);
     var _dash_lock = (variable_instance_exists(id, "dash_lock_timer") ? dash_lock_timer : 0);
     var _dash_sprite_ok = _sprint_sprite_ok && !_reel_blocked && _dash_lock <= 0;
     var _sprint_start_ok = _sprint_sprite_ok || (sprint_resume_hold && key_sprint);
@@ -2716,11 +2751,16 @@ function scr_player_sprint_try_begin(_early) {
 
     post_attack_accel_timer = 0;
 
+    // Jump and run on the same frame, while stopped or only walking. Begin Step commits
+    // the dash before the jump, so the jump would carry dash speed off a standstill.
+    if (key_jump && !is_sprinting && abs(hsp) <= walksp + 0.01) return false;
+
     // Standstill tap-Z: fixed burst in facing direction — never extends to run
     if (inputDir == 0 && _dash_sprite_ok) {
         var _sd = last_direction;
         if (_sd == 0) _sd = sign(image_xscale);
         if (_sd == 0) _sd = 1;
+        sprint_started_from_stop = (abs(hsp) <= walksp + 0.01);
         sprint_committed = true;
         sprint_hold_latched = false;
         sprint_dash_standstill = true;
@@ -2751,6 +2791,7 @@ function scr_player_sprint_try_begin(_early) {
     // Directional sprint: tap = burst only, hold Z = burst + runsp sustain
     var _sprint_from_idle_charge = (key_sprint && sprint_z_idle_charged && inputDir != 0);
     if (inputDir != 0 && (_dash_wants || _sprint_from_idle_charge) && _sprint_start_ok && _dash_lock <= 0) {
+        sprint_started_from_stop = (abs(hsp) <= walksp + 0.01);
         sprint_committed = true;
         sprint_hold_latched = _sprint_from_idle_charge;
         sprint_dash_standstill = false;

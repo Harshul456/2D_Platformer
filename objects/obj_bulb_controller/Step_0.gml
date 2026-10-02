@@ -20,5 +20,6 @@ scr_ceiling_drip_step(id);
 scr_waterfall_step(id);
 scr_pond_step(id);
 scr_fairy_step(id);
+scr_water_glow_step(id);
 scr_cave_fog_step(id);
 scr_hit_distort_step();

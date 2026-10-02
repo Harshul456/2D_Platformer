@@ -15,6 +15,38 @@ function scr_player_attack_compute_hitbox() {
 
     if (!attacking) return _hb;
 
+    // Downward dive — per-frame boxes tracing the arc under the feet. Symmetric, so no
+    // facing flip, and always flagged downward so the trail draws along the arc instead of
+    // along a vertical blade edge.
+    if (attack_is_air && variable_instance_exists(id, "attack_is_down") && attack_is_down) {
+        var _d0 = (variable_instance_exists(id, "DOWN_ATTACK_HIT_START") ? DOWN_ATTACK_HIT_START : 0);
+        var _d1 = (variable_instance_exists(id, "DOWN_ATTACK_HIT_END") ? DOWN_ATTACK_HIT_END : 2);
+        var _didx = floor(image_index);
+        if (_didx < _d0 || _didx > _d1) return _hb;
+        if (!variable_instance_exists(id, "DOWN_ATTACK_HITBOX") || !is_array(DOWN_ATTACK_HITBOX)) return _hb;
+        if (_didx >= array_length(DOWN_ATTACK_HITBOX)) return _hb;
+
+        var _dbox = DOWN_ATTACK_HITBOX[_didx];
+        if (!is_array(_dbox) || array_length(_dbox) < 4) return _hb;
+        if (_dbox[0] == 0 && _dbox[1] == 0 && _dbox[2] == 0 && _dbox[3] == 0) return _hb;
+
+        var _dface = (last_direction != 0) ? last_direction : sign(image_xscale);
+        if (_dface == 0) _dface = 1;
+
+        _hb.active = true;
+        _hb.downward = true;
+        _hb.facing = _dface;
+        _hb.x1 = x + _dbox[0];
+        _hb.y1 = y + _dbox[1];
+        _hb.x2 = x + _dbox[2];
+        _hb.y2 = y + _dbox[3];
+        // Cutting edge is the bottom of the arc, not a side.
+        _hb.edge_x = x;
+        _hb.edge_y1 = _hb.y2;
+        _hb.edge_y2 = _hb.y2;
+        return _hb;
+    }
+
     // Dedicated air slash — per-frame boxes that track the blade (active from frame 0).
     if (attack_is_air) {
         var _a0 = (variable_instance_exists(id, "AIR_ATTACK_HIT_START") ? AIR_ATTACK_HIT_START : 0);

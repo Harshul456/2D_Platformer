@@ -159,6 +159,7 @@ if (state == PLAYER_STATE.ALIVE) {
 if (stunTimer > 0 && attacking) {
     attacking = false;
     attack_is_air = false;
+    attack_is_down = false;
     attack_no_lunge = false;
     attack_lockout = 0;
     attack_commit_lock = 0;
@@ -193,6 +194,16 @@ if (!attacking) {
 if (attacking && stunTimer <= 0) {
     attack_timer++;
 
+    // Same-frame re-ground after an airborne start is a floor-probe flicker, not a landing.
+    // Fold it into a ground swing; cancelling here is a whoosh with nothing on screen.
+    if (attack_is_air && attack_timer <= 1 && grounded && vsp >= 0) {
+        attack_is_air = false;
+        attack_is_down = false;
+        comboCount = 1;
+        comboTimer = comboCooldown;
+        attack_no_lunge = false;
+    }
+
     // Land mid-air-slash: end cleanly so ground locomotion can take over.
     if (attack_is_air && grounded && vsp >= 0) {
         scr_player_attack_end_swing(0);
@@ -203,14 +214,16 @@ if (attacking && stunTimer <= 0) {
     } else {
     // Pin swing art so reel/sprint pose cannot stick after cancel.
     var _swing_sprite = attack_is_air
-        ? spr_mc_air_attack
+        ? (attack_is_down ? spr_mc_downward_attack : spr_mc_air_attack)
         : ((comboCount >= 2) ? spr_mc_attack2 : spr_asta_attack1);
     if (sprite_index != _swing_sprite) {
         sprite_index = _swing_sprite;
         image_index = 0;
     }
     image_speed = attack_is_air
-        ? (variable_instance_exists(id, "AIR_ATTACK_IMAGE_SPEED") ? AIR_ATTACK_IMAGE_SPEED : 0.85)
+        ? (attack_is_down
+            ? (variable_instance_exists(id, "DOWN_ATTACK_IMAGE_SPEED") ? DOWN_ATTACK_IMAGE_SPEED : 0.85)
+            : (variable_instance_exists(id, "AIR_ATTACK_IMAGE_SPEED") ? AIR_ATTACK_IMAGE_SPEED : 0.85))
         : 1;
 
     // Ground swings use heavy lunge friction. Air keeps carry momentum (no dead stop).

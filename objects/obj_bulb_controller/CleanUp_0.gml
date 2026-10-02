@@ -22,3 +22,4 @@ application_surface_draw_enable(true);
 scr_waterfall_sfx_stop(id);
 
 scr_fairy_cleanup(id);
+scr_water_glow_cleanup(id);

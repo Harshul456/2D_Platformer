@@ -86,7 +86,8 @@ function scr_bulb_draw_enemy_parent_lit_sprite(_lit_surface, _cam) {
 /// @description Redraw actors over additive emissive layers (lit restore when normal maps are on).
 /// @param {Id.Surface} [_lit_surface]
 function scr_bulb_redraw_over_emissive_glow(_lit_surface = -1) {
-    var _need = BULB_GLOW_TILE_LAYER_ENABLED || BULB_CRYSTAL_SPARKS_ENABLED || BULB_ENEMY_GLOW_ENABLED;
+    var _need = BULB_GLOW_TILE_LAYER_ENABLED || BULB_CRYSTAL_SPARKS_ENABLED || BULB_ENEMY_GLOW_ENABLED
+        || scr_water_glow_core_active();
     if (!_need) return;
 
     var _cam = view_camera[0];
