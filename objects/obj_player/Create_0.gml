@@ -278,7 +278,7 @@ DASH_LOCK_FRAMES = 14;          // Blocks re-trigger through reel after standsti
 dash_input_buffer = 0;
 dash_lock_timer = 0;
 SPRINT_JUMP_CARRY_MULT = 1.12;  // Jump/leaving ground while sprinting: runsp × this (initial air hsp)
-SPRINT_JUMP_FROM_STOP_FRAMES = 10; // From a stop, dash this long on the ground before a jump carries sprint speed
+SPRINT_JUMP_FROM_STOP_FRAMES = 4; // From a stop, a few dash frames on the ground before a jump carries sprint speed
 SPRINT_AIR_DECAY = 0.003;       // Air lerp toward 0 while sprint_jump_carry (lower = longer glide)
 SPRINT_AIR_DECAY_TURN = 0.10;   // Extra decay when reversing direction in air during carry
 SPRINT_AIR_DECAY_HOLD = 0.001;  // Decay while holding Z + same direction in air (near-zero = coast)

@@ -294,8 +294,8 @@
   "resourceType":"GMProject",
   "resourceVersion":"2.0",
   "RoomOrderNodes":[
-    {"roomId":{"name":"room_test2","path":"rooms/room_test2/room_test2.yy",},},
     {"roomId":{"name":"room_test","path":"rooms/room_test/room_test.yy",},},
+    {"roomId":{"name":"room_test2","path":"rooms/room_test2/room_test2.yy",},},
   ],
   "templateType":"game",
   "TextureGroups":[

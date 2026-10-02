@@ -132,6 +132,10 @@ function scr_player_attack() {
     // Saber whoosh — random swing clip + pitch (same idea as impact clanks)
     scr_player_attack_swing_sfx(!_air && comboCount >= 2);
 
+    // A run that is already going, with run still held, should come back on landing.
+    var _air_keep_run = _air && key_sprint
+        && (is_sprinting || sprint_committed || sprint_resume_hold || sprint_jump_carry || sprint_hold_latched);
+
     // Hard cancel sprint/dash/reel — must not be gated on image_index (float / remap races).
     is_sprinting = false;
     sprint_afterimage_tick = 0;
@@ -148,6 +152,10 @@ function scr_player_attack() {
     sprint_z_idle_charged = false;
     sprint_resume_hold = false;
     sprint_dir_gap = 0;
+    if (_air_keep_run) {
+        sprint_resume_hold = true;
+        sprint_hold_latched = true;
+    }
     // Leftover Z buffer must not instantly dodge-cancel this swing (MIN_INDEX can be 0).
     dash_input_buffer = 0;
 }

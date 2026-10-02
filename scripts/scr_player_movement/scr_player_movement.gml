@@ -378,7 +378,7 @@ function scr_player_movement() {
     var _pre_sprint_dash_standstill = sprint_dash_standstill;
     // Run pressed with the jump, from a stop: the dash is only a frame or two old, but jump
     // carry would still launch at sprint speed. Require a real ground dash first.
-    var _from_stop_frames = (variable_instance_exists(id, "SPRINT_JUMP_FROM_STOP_FRAMES") ? SPRINT_JUMP_FROM_STOP_FRAMES : 10);
+    var _from_stop_frames = (variable_instance_exists(id, "SPRINT_JUMP_FROM_STOP_FRAMES") ? SPRINT_JUMP_FROM_STOP_FRAMES : 4);
     var _fresh_stop_dash = sprint_started_from_stop
         && (_pre_sprinting || _pre_sprint_committed)
         && sprint_burst_tick < _from_stop_frames;
@@ -509,14 +509,18 @@ function scr_player_movement() {
                 } else if (_pre_sprinting || _pre_sprint_committed) {
                     sprint_jump_carry = true;
                     sprint_air_trail = true;
-                    var _carry_sp = _pre_sprint_dash_standstill
-                        ? (variable_instance_exists(id, "DASH_SPEED") ? DASH_SPEED : 8.5)
-                        : runsp * (variable_instance_exists(id, "SPRINT_JUMP_CARRY_MULT") ? SPRINT_JUMP_CARRY_MULT : 1);
-                    runMomentum = _carry_sp * _jd;
+                    // Burst peak is much faster than a run and barely decays in the air.
+                    // A dash-jump carries the same speed as a sprint jump.
+                    runMomentum = scr_player_sprint_jump_carry_speed() * _jd;
                     hsp = runMomentum;
                 } else if (abs(_pre_hsp) > walksp + 0.01) {
                     sprint_jump_carry = false;
-                    runMomentum = _pre_hsp;
+                    var _kept_h = _pre_hsp;
+                    if (sprint_started_from_stop) {
+                        var _cap_h = scr_player_sprint_jump_carry_speed();
+                        _kept_h = clamp(_pre_hsp, -_cap_h, _cap_h);
+                    }
+                    runMomentum = _kept_h;
                     hsp = runMomentum;
                 } else {
                     sprint_jump_carry = false;
@@ -548,13 +552,15 @@ function scr_player_movement() {
                 if (_pre_sprinting || _pre_sprint_committed) {
                     sprint_jump_carry = true;
                     sprint_air_trail = true;
-                    var _carry_sp_off = _pre_sprint_dash_standstill
-                        ? (variable_instance_exists(id, "DASH_SPEED") ? DASH_SPEED : 8.5)
-                        : runsp * (variable_instance_exists(id, "SPRINT_JUMP_CARRY_MULT") ? SPRINT_JUMP_CARRY_MULT : 1);
-                    runMomentum = _carry_sp_off * _jd_off;
+                    runMomentum = scr_player_sprint_jump_carry_speed() * _jd_off;
                 } else {
                     sprint_jump_carry = false;
-                    runMomentum = _pre_hsp;
+                    var _kept_off = _pre_hsp;
+                    if (sprint_started_from_stop) {
+                        var _cap_off = scr_player_sprint_jump_carry_speed();
+                        _kept_off = clamp(_pre_hsp, -_cap_off, _cap_off);
+                    }
+                    runMomentum = _kept_off;
                 }
                 hsp = runMomentum;
             }
@@ -647,11 +653,14 @@ function scr_player_movement() {
             sprint_reel_wall = false;
             sprint_reel_dir_wait = 0;
             sprint_committed = false;
-            sprint_hold_latched = false;
             sprint_dash_standstill = false;
             sprint_burst_tick = 0;
-            sprint_commit_dir = 0;
             is_sprinting = false;
+            // Air swing while run is held should still resume on landing.
+            if (!(attack_is_air && key_sprint && sprint_resume_hold)) {
+                sprint_hold_latched = false;
+                sprint_commit_dir = 0;
+            }
         }
         // Always decay dash buffer — while sprint_committed it used to stick and steal the next attack into dodge-cancel.
         if (dash_input_buffer > 0) dash_input_buffer--;
@@ -935,10 +944,7 @@ function scr_player_movement() {
                     sprint_dash_standstill = false;
                     sprint_jump_carry = true;
                     sprint_air_trail = true;
-                    var _carry_sp_j = _pre_sprint_dash_standstill
-                        ? (variable_instance_exists(id, "DASH_SPEED") ? DASH_SPEED : 8.5)
-                        : runsp * (variable_instance_exists(id, "SPRINT_JUMP_CARRY_MULT") ? SPRINT_JUMP_CARRY_MULT : 1);
-                    runMomentum = _carry_sp_j * _sj_dir;
+                    runMomentum = scr_player_sprint_jump_carry_speed() * _sj_dir;
                     hsp = runMomentum;
                 }
             }
@@ -2298,8 +2304,9 @@ function scr_player_movement() {
                 force_landing_crouch = true;
             } else if (sprite_index == spr_mc_attack2 || sprite_index == spr_asta_attack1
                 || sprite_index == spr_mc_air_attack || sprite_index == spr_mc_downward_attack) {
-                // Attack just ended — transition to jog/idle
-                sprite_index = (abs(hsp) > MOVEMENT_THRESHOLD) ? spr_mc_jog : spr_mc_idle;
+                // Attack just ended — sprint if the run resumed, otherwise jog/idle
+                sprite_index = (is_sprinting || sprint_committed) ? spr_mc_sprint
+                    : ((abs(hsp) > MOVEMENT_THRESHOLD) ? spr_mc_jog : spr_mc_idle);
                 image_index = 0;
             } else if (is_sprinting || sprint_committed) {
                 sprint_reel_active = false;
@@ -2652,6 +2659,13 @@ function scr_player_movement() {
     }
 
     shelf_bb_bottom_prev = bbox_bottom;
+}
+
+/// @function scr_player_sprint_jump_carry_speed
+/// @description Horizontal speed a sprint or dash jump is allowed to take into the air.
+function scr_player_sprint_jump_carry_speed() {
+    var _mult = (variable_instance_exists(id, "SPRINT_JUMP_CARRY_MULT") ? SPRINT_JUMP_CARRY_MULT : 1);
+    return runsp * _mult;
 }
 
 /// @function scr_player_dash_speed_mult
