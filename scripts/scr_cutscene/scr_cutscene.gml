@@ -302,8 +302,8 @@ function scr_cutscene_start_camera_scout(_look_x, _look_y) {
             cutscene_id = _trigger.cutscene_id;
         }
 
-        cutscene_pan_from_x = camera_get_view_x(cam);
-        cutscene_pan_from_y = camera_get_view_y(cam);
+        cutscene_pan_from_x = variable_instance_exists(id, "cam_base_x") ? cam_base_x : camera_get_view_x(cam);
+        cutscene_pan_from_y = variable_instance_exists(id, "cam_base_y") ? cam_base_y : camera_get_view_y(cam);
         var _to = scr_cutscene_cam_pos_for_point(_look_x, _look_y);
         cutscene_pan_to_x = _to.x;
         cutscene_pan_to_y = _to.y;
@@ -364,17 +364,23 @@ function scr_cutscene_step() {
                 var _u = scr_cutscene_ease(cutscene_timer / _dur);
                 var _x = lerp(cutscene_pan_from_x, cutscene_pan_to_x, _u);
                 var _y = lerp(cutscene_pan_from_y, cutscene_pan_to_y, _u);
-                camera_set_view_pos(cam, floor(_x), floor(_y));
+                cam_base_x = floor(_x);
+                cam_base_y = floor(_y);
+                camera_set_view_pos(cam, cam_base_x, cam_base_y);
                 scr_parallax_update();
                 if (cutscene_timer >= _dur) {
-                    camera_set_view_pos(cam, cutscene_pan_to_x, cutscene_pan_to_y);
+                    cam_base_x = cutscene_pan_to_x;
+                    cam_base_y = cutscene_pan_to_y;
+                    camera_set_view_pos(cam, cam_base_x, cam_base_y);
                     cutscene_phase = CUTSCENE_PHASE.HOLD;
                     cutscene_timer = 0;
                 }
             } break;
 
             case CUTSCENE_PHASE.HOLD: {
-                camera_set_view_pos(cam, cutscene_pan_to_x, cutscene_pan_to_y);
+                cam_base_x = cutscene_pan_to_x;
+                cam_base_y = cutscene_pan_to_y;
+                camera_set_view_pos(cam, cam_base_x, cam_base_y);
                 scr_parallax_update();
                 if (cutscene_timer >= max(1, cutscene_hold_frames)) {
                     cutscene_phase = CUTSCENE_PHASE.FADE_OUT;

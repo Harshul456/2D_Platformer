@@ -80,6 +80,8 @@ function scr_camera_snap_to_player() {
         var _max_y = max(global.camera_min_y, global.camera_max_y - cam_h);
         var _sx = clamp(floor(obj_player.x - cam_w * 0.5), global.camera_min_x, _max_x);
         var _sy = clamp(floor(obj_player.y - _half_h - cam_h * 0.5), global.camera_min_y, _max_y);
+        cam_base_x = _sx;
+        cam_base_y = _sy;
         camera_set_view_pos(cam, _sx, _sy);
     }
     // Death freezes scr_camera_control — still realign mid_tiles so fade-in isn't empty/wrong.

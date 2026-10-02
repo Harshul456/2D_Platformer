@@ -580,9 +580,10 @@ function scr_player_movement() {
             vsp += grv;
         }
         if (vsp > _fall_max) vsp = _fall_max;
-        // Soften fall slightly during air slash so momentum reads through the swing.
-        // Short-hop: release jump early caps rise speed (jump_cut_multiplier)
-        if (vsp < 0 && !key_jump_held) vsp = max(vsp, jumpsp * (-jump_cut_multiplier));
+        // Short-hop cuts a jump when the button is released. A pogo is not a jump hold,
+        // so that cap was flattening the bounce into a short float.
+        if (vsp < 0 && !key_jump_held && !pogo_rising) vsp = max(vsp, jumpsp * (-jump_cut_multiplier));
+        if (pogo_rising && (grounded || vsp >= 0)) pogo_rising = false;
         // Wall slide: MMX wall_slide only while falling — don’t cling on rise past a ledge
         if (!grounded && wall_side != 0 && vsp > 0) {
             if (cling_eff && vsp > WALL_SLIDE_VSP) vsp = WALL_SLIDE_VSP;
@@ -1893,25 +1894,6 @@ function scr_player_movement() {
             }
         }
         }
-    }
-
-    // --- 6b. RESOLVE OVERLAP WITH PIT/HAZARD (prevent clipping inside tile/pit) ---
-    var _hazard = instance_place(x, y, obj_hazard_parent);
-    if (_hazard != noone && !is_dying) {
-        // Push out along the axis with smallest overlap (pop out nearest edge)
-        var _dx_left   = _hazard.bbox_left   - bbox_right;   // negative = move left
-        var _dx_right  = _hazard.bbox_right  - bbox_left;    // positive = move right
-        var _dy_up     = _hazard.bbox_top    - bbox_bottom; // negative = move up
-        var _dy_down   = _hazard.bbox_bottom - bbox_top;    // positive = move down
-        var _best_dx = 0;
-        var _best_dy = 0;
-        var _min = 99999;
-        if (abs(_dx_left) < _min && _dx_left != 0) { _min = abs(_dx_left); _best_dx = _dx_left; _best_dy = 0; }
-        if (abs(_dx_right) < _min && _dx_right != 0) { _min = abs(_dx_right); _best_dx = _dx_right; _best_dy = 0; }
-        if (abs(_dy_up) < _min && _dy_up != 0) { _min = abs(_dy_up); _best_dx = 0; _best_dy = _dy_up; }
-        if (abs(_dy_down) < _min && _dy_down != 0) { _min = abs(_dy_down); _best_dx = 0; _best_dy = _dy_down; }
-        x += _best_dx;
-        y += _best_dy;
     }
 
     // --- 6c. RE-CHECK GROUNDED AFTER VERTICAL MOVEMENT ---

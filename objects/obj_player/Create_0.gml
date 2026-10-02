@@ -14,7 +14,7 @@ DEATH_FADE_IN_FRAMES = 28;      // Ease back in at spawn (control unlocks when t
 DEATH_SPAWN_X = 96;
 DEATH_SPAWN_Y = 960;
 can_move        = true;         // Control toggle for input
-obj_player_health_max = 100;    // Restored on Alarm_0 respawn
+obj_player_health_max = 100;    // Restored on respawn
 attacking       = false;        // State for combat lockout
 grounded        = false;        // Track floor contact
 is_sprinting    = false;        // Hold Z on ground while moving
@@ -486,6 +486,11 @@ DOWN_ATTACK_HITBOX = [
 // vertical instead, so this defaults to 0 — raise it if you want the dive to drift.
 DOWN_ATTACK_MOMENTUM_KEEP = 1;
 DOWN_ATTACK_MIN_HSP = 0;
+// Hollow Knight nail bounce. Higher than a jump so the pop reads, and the slash keeps playing.
+// The cone is degrees off straight down: the arc under the feet pogos, a side overlap does not.
+POGO_VSP = 9;
+POGO_CONE_DEG = 58;
+pogo_rising = false;
 AIR_ATTACK_MOMENTUM_KEEP = 1.0;   // Keep full air hsp (no dead-stop lunge overwrite)
 AIR_ATTACK_MIN_HSP = 1.2;         // Tiny push if nearly still so the swing still carries
 AIR_ATTACK_GRAV_MUL = 0.85;       // Slight float during swing (does not freeze fall)

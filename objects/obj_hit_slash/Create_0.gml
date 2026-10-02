@@ -1,6 +1,7 @@
 /// Razor hit-slash — neon outer + white core, shockwave ring, starburst sparks.
 image_speed = 0;
-visible = false; // Drawn in Bulb Post-Draw so fog/glow cannot bury it
+// Bulb rooms draw this in Post-Draw so fog cannot bury it. Without that controller, draw normally.
+visible = !instance_exists(obj_bulb_controller);
 
 life_max = 7;
 life_timer = life_max;

@@ -7,8 +7,7 @@ if (place_meeting(x, y, other)) {
     var _in_tile = (global.tilemap_collision_id != noone) && (
         check_tile_collision(bbox_left, bbox_top) || check_tile_collision(bbox_right, bbox_top) ||
         check_tile_collision(bbox_left, bbox_bottom) || check_tile_collision(bbox_right, bbox_bottom));
-    var _in_hazard = place_meeting(x, y, obj_hazard_parent);
-    if (_in_tile || _in_hazard) x = _old_x;
+    if (_in_tile) x = _old_x;
 }
 
 // Backup slash check if Step order missed overlap this frame (scr_enemy_apply_attack_hit dedupes).

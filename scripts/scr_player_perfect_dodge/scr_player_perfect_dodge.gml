@@ -417,8 +417,8 @@ function scr_player_dodge_counter_move_toward(_tx, _ty, _rate) {
     repeat (_n) {
         if (_sx == 0) break;
         var _px = x + _sx;
-        var _blocked = place_meeting(_px, y, obj_solid) || place_meeting(_px, y, obj_wall);
-        if (!_blocked && _tm != noone && _tm != -1) {
+        var _blocked = false;
+        if (_tm != noone && _tm != -1) {
             _blocked = tilemap_point_solid(_tm, _px, y)
                 || tilemap_point_solid(_tm, _px, bbox_top + 4)
                 || tilemap_point_solid(_tm, _px, bbox_bottom - 4);
@@ -432,8 +432,8 @@ function scr_player_dodge_counter_move_toward(_tx, _ty, _rate) {
     repeat (_n) {
         if (_sy == 0) break;
         var _py = y + _sy;
-        var _blocked_y = place_meeting(x, _py, obj_solid) || place_meeting(x, _py, obj_wall);
-        if (!_blocked_y && _tm != noone && _tm != -1) {
+        var _blocked_y = false;
+        if (_tm != noone && _tm != -1) {
             if (_sy > 0) {
                 _blocked_y = tilemap_point_solid(_tm, x, bbox_bottom + 1);
             } else {
@@ -942,8 +942,8 @@ function scr_player_perfect_dodge_apply_flip_motion() {
     repeat (_n) {
         if (_sx == 0) break;
         var _nx = x + _sx;
-        var _blocked = place_meeting(_nx, y, obj_solid) || place_meeting(_nx, y, obj_wall);
-        if (!_blocked && _tm != noone && _tm != -1) {
+        var _blocked = false;
+        if (_tm != noone && _tm != -1) {
             _blocked = tilemap_point_solid(_tm, _nx, y)
                 || tilemap_point_solid(_tm, _nx, bbox_top + 4)
                 || tilemap_point_solid(_tm, _nx, bbox_bottom - 4);
@@ -962,8 +962,8 @@ function scr_player_perfect_dodge_apply_flip_motion() {
     repeat (_n) {
         if (_sy == 0) break;
         var _ny = y + _sy;
-        var _blocked_y = place_meeting(x, _ny, obj_solid) || place_meeting(x, _ny, obj_wall);
-        if (!_blocked_y && _tm != noone && _tm != -1) {
+        var _blocked_y = false;
+        if (_tm != noone && _tm != -1) {
             if (_sy > 0) {
                 _blocked_y = tilemap_point_solid(_tm, x, bbox_bottom + 1)
                     || tilemap_point_solid(_tm, bbox_left + 2, bbox_bottom + 1)

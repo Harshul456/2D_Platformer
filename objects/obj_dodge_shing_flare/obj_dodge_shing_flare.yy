@@ -11,8 +11,8 @@
   "name":"obj_dodge_shing_flare",
   "overriddenProperties":[],
   "parent":{
-    "name":"Objects",
-    "path":"folders/Objects.yy",
+    "name":"effects",
+    "path":"folders/Objects/effects.yy",
   },
   "parentObjectId":null,
   "persistent":false,

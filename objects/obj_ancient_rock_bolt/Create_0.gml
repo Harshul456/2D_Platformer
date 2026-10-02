@@ -1,5 +1,6 @@
-/// Aimed crystal bolt — animated body, trail, sparks. Drawn in Bulb post-draw.
-visible = false;
+/// Aimed crystal bolt — animated body, trail, sparks.
+// Bulb rooms draw this in Post-Draw so fog cannot bury it. Without that controller, Draw runs.
+visible = !instance_exists(obj_bulb_controller);
 
 owner = noone;
 damage = ROCK_BOLT_DAMAGE;

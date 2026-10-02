@@ -362,30 +362,36 @@ function scr_player_is_downward_air_strike() {
     return !grounded && vsp > 0.25;
 }
 
+/// @function scr_player_pogo_angle_ok
+/// @description True when the enemy sits in the downward arc, not beside the body.
+/// @param {Id.Instance} _enemy
+function scr_player_pogo_angle_ok(_enemy) {
+    if (!instance_exists(_enemy)) return false;
+
+    var _contact_x = clamp(x, _enemy.bbox_left, _enemy.bbox_right);
+    var _contact_y = clamp(bbox_bottom, _enemy.bbox_top, _enemy.bbox_bottom);
+    var _dx = _contact_x - x;
+    var _dy = _contact_y - bbox_bottom;
+
+    // Feet on top of them: straight down, even though the delta is zero.
+    if (abs(_dx) <= 8 && _dy <= 2) return true;
+    // Contact above the feet is the side of the body, not the underside arc.
+    if (_dy < 0) return false;
+
+    var _cone = (variable_instance_exists(id, "POGO_CONE_DEG") ? POGO_CONE_DEG : 58);
+    var _from_down = abs(angle_difference(point_direction(0, 0, _dx, _dy), 270));
+    return _from_down <= _cone;
+}
+
 /// @function scr_player_apply_nail_pogo
-/// @description Hollow Knight nail-bounce: upward recoil + movement reset.
+/// @description Pop upward off a downward hit. The slash keeps playing; the next one is allowed once it ends.
 function scr_player_apply_nail_pogo() {
-    vsp = -stomp_force;
-    hsp *= 0.35;
+    var _pop = (variable_instance_exists(id, "POGO_VSP") ? POGO_VSP : jumpsp);
+    vsp = -_pop;
     grounded = false;
-    jump_count = 0;
-    air_chain_jump_used = false;
     coyote_time_timer = 0;
-    attacking = false;
-    attack_is_air = false;
-    attack_is_down = false;
-    attack_no_lunge = false;
-    attack_lockout = 0;
-    attack_buffer_timer = 0;
-    attack_chain_buffer_timer = 0;
-    attack_chain_latched = false;
-    attack_shift_remaining = 0;
-    attack_has_hit = true;
-    combo_buffer = false;
-    comboTimer = 0;
-    comboCount = 0;
-    attack_commit_lock = 0;
-    attack_recovery_lock = 0;
-    attack_recovery_cut = false;
-    debug_hitbox_active = false;
+    pogo_rising = true;
+    // This swing is already out. Clear the once-per-air lock so the next downslash can chain after it finishes.
+    air_attack_used = false;
+    attackCooldownTimer = 0;
 }

@@ -27,6 +27,11 @@ if (instance_exists(obj_player)) {
     camera_set_view_pos(cam, _sx, _sy);
 }
 
+// Follow position. Screen shake is added only when the view is drawn, then clamped,
+// so a hit cannot leave the camera sitting outside the room.
+cam_base_x = camera_get_view_x(cam);
+cam_base_y = camera_get_view_y(cam);
+
 // Parallax — mid_tiles, far_tiles, and Tiles_Waterfall share the same horizontal drift.
 parallax_ready = false;
 par_mid_x = 0.35;

@@ -328,7 +328,7 @@ if (attacking && stunTimer <= 0) {
                     }
                 }
                 if (_fx_target == noone) _fx_target = _inst;
-                if (_inst.object_index == obj_crystal_core) _pogo_enemy = _inst;
+                if (attack_is_down && scr_player_pogo_angle_ok(_inst)) _pogo_enemy = _inst;
             }
             ds_list_destroy(_hit_list);
 
@@ -336,7 +336,10 @@ if (attacking && stunTimer <= 0) {
                 scr_player_impact_lines_on_hit(x1, y1, x2, y2, _fx_target);
             }
 
-            if (_hit_result.intercepted) {
+            if (_pogo_enemy != noone) {
+                scr_hitstop_trigger(ATTACK_LIGHT_HITSTOP);
+                scr_player_apply_nail_pogo();
+            } else if (_hit_result.intercepted) {
                 if (_hit_result.super_armor) {
                     scr_hitstop_trigger(4);
                     hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK * 1.4;
@@ -357,10 +360,7 @@ if (attacking && stunTimer <= 0) {
                 if (dodge_counter_strike) _hitstop_frames = max(_hitstop_frames, 8);
                 scr_hitstop_trigger(_hitstop_frames);
 
-                if (_pogo_enemy != noone && attack_is_air && scr_player_is_downward_air_strike()
-                    && bbox_bottom <= _pogo_enemy.bbox_top + 28) {
-                    scr_player_apply_nail_pogo();
-                } else if (attack_is_air) {
+                if (attack_is_air) {
                     hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK * 0.35;
                 } else {
                     hsp -= last_direction * ATTACK_ON_HIT_PUSHBACK;

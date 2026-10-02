@@ -11,6 +11,7 @@
     {"name":"inst_bulb_ctrl","path":"rooms/room_test/room_test.yy",},
     {"name":"inst_3E5D230F","path":"rooms/room_test/room_test.yy",},
     {"name":"inst_313FC9BC","path":"rooms/room_test/room_test.yy",},
+    {"name":"inst_574E21DF","path":"rooms/room_test/room_test.yy",},
   ],
   "isDnd":false,
   "layers":[
@@ -30,6 +31,7 @@
         {"$GMRInstance":"v4","%Name":"inst_bulb_ctrl","colour":4294967295,"frozen":false,"hasCreationCode":false,"ignore":false,"imageIndex":0,"imageSpeed":1.0,"inheritCode":false,"inheritedItemId":null,"inheritItemSettings":false,"isDnd":false,"name":"inst_bulb_ctrl","objectId":{"name":"obj_bulb_controller","path":"objects/obj_bulb_controller/obj_bulb_controller.yy",},"properties":[],"resourceType":"GMRInstance","resourceVersion":"2.0","rotation":0.0,"scaleX":1.0,"scaleY":1.0,"x":64.0,"y":416.0,},
         {"$GMRInstance":"v4","%Name":"inst_3E5D230F","colour":4294967295,"frozen":false,"hasCreationCode":false,"ignore":false,"imageIndex":0,"imageSpeed":1.0,"inheritCode":false,"inheritedItemId":null,"inheritItemSettings":false,"isDnd":false,"name":"inst_3E5D230F","objectId":{"name":"obj_player","path":"objects/obj_player/obj_player.yy",},"properties":[],"resourceType":"GMRInstance","resourceVersion":"2.0","rotation":0.0,"scaleX":1.0,"scaleY":1.0,"x":160.0,"y":960.0,},
         {"$GMRInstance":"v4","%Name":"inst_313FC9BC","colour":4294967295,"frozen":false,"hasCreationCode":false,"ignore":false,"imageIndex":0,"imageSpeed":1.0,"inheritCode":false,"inheritedItemId":null,"inheritItemSettings":false,"isDnd":false,"name":"inst_313FC9BC","objectId":{"name":"obj_crystal_core","path":"objects/obj_crystal_core/obj_crystal_core.yy",},"properties":[],"resourceType":"GMRInstance","resourceVersion":"2.0","rotation":0.0,"scaleX":1.0,"scaleY":1.0,"x":2400.0,"y":1152.0,},
+        {"$GMRInstance":"v4","%Name":"inst_574E21DF","colour":4294967295,"frozen":false,"hasCreationCode":false,"ignore":false,"imageIndex":0,"imageSpeed":1.0,"inheritCode":false,"inheritedItemId":null,"inheritItemSettings":false,"isDnd":false,"name":"inst_574E21DF","objectId":{"name":"obj_ancient_rock","path":"objects/obj_ancient_rock/obj_ancient_rock.yy",},"properties":[],"resourceType":"GMRInstance","resourceVersion":"2.0","rotation":0.0,"scaleX":1.0,"scaleY":1.0,"x":2272.0,"y":1088.0,},
       ],"layers":[],"name":"Instances","properties":[],"resourceType":"GMRInstanceLayer","resourceVersion":"2.0","userdefinedDepth":false,"visible":true,},
     {"$GMRTileLayer":"","%Name":"lay_collision","depth":200,"effectEnabled":true,"effectType":"none","gridX":32,"gridY":32,"hierarchyFrozen":false,"inheritLayerDepth":false,"inheritLayerSettings":false,"inheritSubLayers":true,"inheritVisibility":true,"layers":[],"name":"lay_collision","properties":[],"resourceType":"GMRTileLayer","resourceVersion":"2.0","tiles":{"SerialiseHeight":40,"SerialiseWidth":120,"TileCompressedData":[
           -2,0,5,-2147483648,0,0,-2147483648,-2147483648,-3,0,-110,-2147483648,-2,0,-5,-2147483648,-4,0,-109,-2147483648,

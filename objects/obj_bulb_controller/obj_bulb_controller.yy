@@ -13,8 +13,8 @@
   "name":"obj_bulb_controller",
   "overriddenProperties":[],
   "parent":{
-    "name":"Objects",
-    "path":"folders/Objects.yy",
+    "name":"lighting",
+    "path":"folders/Objects/lighting.yy",
   },
   "parentObjectId":null,
   "persistent":false,

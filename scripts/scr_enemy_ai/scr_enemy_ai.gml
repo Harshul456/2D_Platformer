@@ -172,7 +172,6 @@ function scr_enemy_player_in_melee_band() {
 
 /// @function scr_enemy_touching_solid_wall
 function scr_enemy_touching_solid_wall() {
-    if (place_meeting(x, y, obj_solid)) return true;
     var _cy = (bbox_top + bbox_bottom) * 0.5;
     return check_tile_collision(bbox_left - 1, _cy) || check_tile_collision(bbox_right + 1, _cy);
 }
@@ -912,14 +911,13 @@ function scr_enemy_los_to_player() {
 }
 
 /// @function scr_enemy_attack_wall_probe
-/// @returns {Bool} True if forward ray hits solid tile or obj_solid.
+/// @returns {Bool} True if the forward ray hits a solid tile.
 function scr_enemy_attack_wall_probe() {
     if (hsp == 0) return false;
     var _dir = sign(hsp);
     var _x1 = (_dir > 0) ? bbox_right : bbox_left;
     var _y1 = (bbox_top + bbox_bottom) * 0.5;
     var _x2 = _x1 + _dir * 14;
-    if (collision_line(_x1, _y1, _x2, _y1, obj_solid, true, true) != noone) return true;
     if (check_tile_collision(_x2, _y1) || check_tile_collision(_x2, bbox_bottom - 4)) return true;
     return false;
 }

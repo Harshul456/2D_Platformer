@@ -1,10 +1,10 @@
 /// @file scr_enemy_raycast.gml
-/// @description Unified segment raycast — obj_solid instances + tilemap solids.
+/// @description Unified segment raycast against the collision tilemap.
 
 #macro ENEMY_RAYCAST_TILE_STEP 12
 
 /// @function scr_enemy_raycast_tiles_along
-/// @description Tile-only samples along a segment (obj_solid excluded).
+/// @description Tile samples along a segment.
 function scr_enemy_raycast_tiles_along(_x1, _y1, _x2, _y2) {
     if (global.tilemap_collision_id == noone) return false;
 
@@ -33,11 +33,8 @@ function scr_enemy_raycast_tiles_along(_x1, _y1, _x2, _y2) {
 /// @param {Real} _y1
 /// @param {Real} _x2
 /// @param {Real} _y2
-/// @returns {Bool} True if segment is blocked by obj_solid or a solid tile.
+/// @returns {Bool} True if the segment hits a solid tile.
 function scr_enemy_raycast(_x1, _y1, _x2, _y2) {
-    if (collision_line(_x1, _y1, _x2, _y2, obj_solid, true, true) != noone) {
-        return true;
-    }
     return scr_enemy_raycast_tiles_along(_x1, _y1, _x2, _y2);
 }
 

@@ -6,7 +6,7 @@ if (life <= 0) {
 
 angle += spin;
 
-// Bounce off solid floor/walls using the tile collision map (no obj_wall instances).
+// Bounce off solid floor/walls using the tile collision map.
 var _tm = (variable_global_exists("tilemap_collision_id") ? global.tilemap_collision_id : noone);
 if (_tm != noone && _tm != -1) {
     // Floor: reflect vertical velocity when moving down into a solid tile.

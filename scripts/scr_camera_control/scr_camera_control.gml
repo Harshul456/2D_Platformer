@@ -108,8 +108,12 @@ function scr_camera_control() {
         exit;
     }
 
-    var _cam_x = camera_get_view_x(cam);
-    var _cam_y = camera_get_view_y(cam);
+    if (!variable_instance_exists(id, "cam_base_x")) {
+        cam_base_x = camera_get_view_x(cam);
+        cam_base_y = camera_get_view_y(cam);
+    }
+    var _cam_x = cam_base_x;
+    var _cam_y = cam_base_y;
 
     var _player_moved = (abs(_p.x - camera_prev_player_x) > 0.001 || abs(_p.y - camera_prev_player_y) > 0.001);
     // Hitstop freezes the player — don't drift the view toward look-ahead / min-scroll alone.
@@ -240,6 +244,16 @@ function scr_camera_control() {
         if (cam_shake_timer <= 0) cam_shake_mag = 0;
     }
 
-    camera_set_view_pos(cam, _new_x + _shake_x, _new_y + _shake_y);
+    var _lim_x = max(_min_x, _max_x - cam_w);
+    var _lim_y = max(_min_y, _max_y - cam_h);
+    _new_x = clamp(_new_x, _min_x, _lim_x);
+    _new_y = clamp(_new_y, _min_y, _lim_y);
+    cam_base_x = _new_x;
+    cam_base_y = _new_y;
+    // Shake is display-only. Folding it into the follow position let a hit walk the
+    // view past the room edge, and it stayed there until the player moved again.
+    camera_set_view_pos(cam,
+        clamp(_new_x + _shake_x, _min_x, _lim_x),
+        clamp(_new_y + _shake_y, _min_y, _lim_y));
     scr_parallax_update();
 }

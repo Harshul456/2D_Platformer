@@ -18,17 +18,6 @@ function scr_enemy_raycast_debug_probe(_x1, _y1, _x2, _y2, _tiles_only) {
     var _step = ENEMY_RAYCAST_TILE_STEP;
     var _steps = max(1, ceil(_dist / _step));
 
-    if (!_tiles_only) {
-        for (var _i = 1; _i <= _steps; _i++) {
-            var _t = _i / _steps;
-            var _sx = lerp(_x1, _x2, _t);
-            var _sy = lerp(_y1, _y2, _t);
-            if (collision_point(_sx, _sy, obj_solid, true, true) != noone) {
-                return { blocked: true, hit_x: _sx, hit_y: _sy };
-            }
-        }
-    }
-
     for (var _j = 1; _j <= _steps; _j++) {
         var _tj = _j / _steps;
         var _tx = lerp(_x1, _x2, _tj);

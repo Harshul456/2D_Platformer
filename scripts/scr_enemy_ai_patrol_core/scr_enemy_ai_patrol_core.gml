@@ -50,13 +50,6 @@ function scr_enemy_patrol_wall_ahead(_dir) {
     var _y_h = _head_y + _head_off;
     var _y_t = _feet_y - _toe_inset;
 
-    if (collision_line(
-        (_h_step > 0) ? bbox_right : bbox_left, _center_y,
-        (_h_step > 0) ? bbox_right + _h_step * 14 : bbox_left + _h_step * 14, _center_y,
-        obj_solid, true, true) != noone) {
-        return true;
-    }
-
     var _tm = global.tilemap_collision_id;
     if (_tm == noone) return false;
 
