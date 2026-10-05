@@ -70,6 +70,23 @@ function scr_enemy_horizontal_lead_x(_h_step) {
     return (_h_step > 0) ? floor(x + _half_w) : floor(x - _half_w);
 }
 
+/// @function scr_enemy_column_is_spike_drop
+/// @description The landing under this x is a spike pit. A normal floor, even a lower one, is not.
+function scr_enemy_column_is_spike_drop(_px, _feet_y) {
+    var _tm = global.tilemap_collision_id;
+    if (_tm == noone || _tm == -1) return false;
+    var _limit = min(room_height - 1, _feet_y + 480);
+    for (var _y = _feet_y + 1; _y <= _limit; _y++) {
+        var _td = tilemap_sample(_tm, _px, _y);
+        if (_td == 0) continue;
+        var _idx = tile_get_index(_td);
+        if (_idx == 0) continue;
+        if (tilecol_is_spike_tile(_idx)) return true;
+        if (check_tile_collision(_px, _y)) return false;
+    }
+    return false;
+}
+
 /// @function scr_enemy_foot_probes
 /// @description Narrow foot probes at spike tips — spr_crystal_core bbox is ~42px wide (shoulder wings) but feet are ~6px at center.
 function scr_enemy_foot_probes() {
@@ -82,6 +99,32 @@ function scr_enemy_foot_probes() {
         center: _cx,
         right: _cx + _hw
     };
+}
+
+/// @function scr_enemy_hold_on_bridge
+/// @description A one-way bridge under the feet is a floor. Do not fall through it to chase.
+function scr_enemy_hold_on_bridge() {
+    var _tm = global.tilemap_collision_id;
+    if (_tm == noone || _tm == -1) return false;
+    var _fp = scr_enemy_foot_probes();
+    var _py = _fp.feet_y + 1;
+    var _xs = [_fp.left, _fp.center, _fp.right];
+    var _th = tilemap_get_tile_height(_tm);
+    var _top = noone;
+    for (var _i = 0; _i < 3; _i++) {
+        var _px = _xs[_i];
+        var _td = tilemap_sample(_tm, _px, _py);
+        if (_td == 0) continue;
+        if (!tilecol_one_way_shelf_tile_index(tile_get_index(_td))) continue;
+        if (tilemap_cell_above_is_solid(_tm, _px, _py)) continue;
+        var _cell_top = tilemap_get_y(_tm) + tilemap_sample_cell_y(_tm, _px, _py) * _th;
+        if (_top == noone || _cell_top < _top) _top = _cell_top;
+    }
+    if (_top == noone) return false;
+    if (bbox_bottom > _top) y -= (bbox_bottom - _top);
+    vsp = 0;
+    enemy_grounded = true;
+    return true;
 }
 
 /// @function scr_enemy_toes_have_standable_support
@@ -175,6 +218,7 @@ function scr_enemy_resolve_grounded() {
 /// @function scr_enemy_vertical_fall_step
 /// @description One downward collision step while airborne (after lip detach / knockback).
 function scr_enemy_vertical_fall_step(_tm, _fall_inset) {
+    if (scr_enemy_hold_on_bridge()) return false;
     var _fp = scr_enemy_foot_probes();
     var p_left = _fp.left;
     var p_right = _fp.right;
@@ -285,6 +329,26 @@ function scr_enemy_tile_movement() {
             head_y = floor(bbox_top);
             center_y = floor((bbox_top + bbox_bottom) * 0.5);
 
+            var _fp_drop = scr_enemy_foot_probes();
+            var _drop_x = (_h_step > 0) ? (_fp_drop.right + 1) : (_fp_drop.left - 1);
+            if (scr_enemy_column_is_spike_drop(_drop_x, _fp_drop.feet_y)) {
+                hsp = 0;
+                knockbackX = 0;
+                break;
+            }
+            // Chase, attack, and knockback all stop at the lip. A pit is not a slide path.
+            var _fy = _fp_drop.feet_y;
+            var _standing = check_tile_collision(_fp_drop.center, _fy + 1)
+                || check_tile_collision(_fp_drop.left, _fy + 1)
+                || check_tile_collision(_fp_drop.right, _fy + 1);
+            var _ahead = check_tile_collision(_drop_x, _fy + 1) || check_tile_collision(_drop_x, _fy + 4);
+            if (_standing && !_ahead) {
+                hsp = 0;
+                knockbackX = 0;
+                if (variable_instance_exists(id, "knockback_pending_x")) knockback_pending_x = 0;
+                break;
+            }
+
             var _target_side = (_h_step > 0) ? floor(bbox_right) : floor(bbox_left);
             var _wx = _target_side + _h_step;
             var _y_h = head_y + _wall_head_off;
@@ -352,6 +416,8 @@ function scr_enemy_tile_movement() {
             if (enemy_grounded && !scr_enemy_toes_have_standable_support()) {
                 enemy_grounded = false;
             }
+
+            if (_v_step > 0 && scr_enemy_hold_on_bridge()) break;
 
             var _col_clear;
             if (!enemy_grounded && _v_step > 0) {

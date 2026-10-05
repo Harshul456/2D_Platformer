@@ -1,7 +1,7 @@
 /// Razor hit-slash — neon outer + white core, shockwave ring, starburst sparks.
 image_speed = 0;
-// Bulb rooms draw this in Post-Draw so fog cannot bury it. Without that controller, draw normally.
-visible = !instance_exists(obj_bulb_controller);
+// Drawn with the other gameplay FX, after the room, so cave fog cannot bury it.
+visible = false;
 
 life_max = 7;
 life_timer = life_max;
@@ -11,6 +11,9 @@ slash_angle = 0;
 slash_length = 56;
 color_outer = c_aqua;
 color_inner = c_white;
+
+// Spike pogo: sparks travel only along slash_angle, under the blade.
+outward_only = false;
 
 // Detail layers (lazily built on first Draw once slash_length is finalized)
 fx_built = false;

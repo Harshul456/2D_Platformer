@@ -218,21 +218,17 @@
 // with no other light in it, where a light-map-only glow would be crushed to black.
 #macro BULB_WATER_GLOW_ENABLED               true
 #macro BULB_WATER_GLOW_BLEND                 make_colour_rgb(70, 150, 230)
-// Lights. Spacing is the gap between lights along a pool's waterline / down a stream, so
-// a wide pool costs (width / spacing) lights — keep the cap in sight.
+// Lights, placed along a pool's waterline only. Spacing is the gap between them, so a wide
+// pool costs (width / spacing) lights — keep the cap in sight. Falls carry no lights.
 #macro BULB_WATER_GLOW_LIGHTS_ENABLED        true
 #macro BULB_WATER_GLOW_LIGHT_SPRITE          sLight128
 #macro BULB_WATER_GLOW_MAX_LIGHTS            26
 #macro BULB_WATER_GLOW_POND_SPACING          52
-#macro BULB_WATER_GLOW_FALL_SPACING          56
 #macro BULB_WATER_GLOW_LIGHT_INTENSITY       0.62
 #macro BULB_WATER_GLOW_LIGHT_NORMAL_MAP_Z    26
-// Pool lights are wide and flat so the glow hugs the waterline; fall lights are tall and
-// narrow so they trace the stream instead of washing the whole wall.
+// Pool lights are wide and flat so the glow hugs the waterline.
 #macro BULB_WATER_GLOW_POND_LIGHT_XSCALE     0.85
 #macro BULB_WATER_GLOW_POND_LIGHT_YSCALE     0.45
-#macro BULB_WATER_GLOW_FALL_LIGHT_XSCALE     0.45
-#macro BULB_WATER_GLOW_FALL_LIGHT_YSCALE     0.70
 #macro BULB_WATER_GLOW_SHIMMER_SPEED         0.55
 #macro BULB_WATER_GLOW_SHIMMER_MIN           0.82
 #macro BULB_WATER_GLOW_SHIMMER_MAX           1.18
@@ -241,7 +237,6 @@
 #macro BULB_WATER_GLOW_CORE_ENABLED          true
 #macro BULB_WATER_GLOW_POND_CORE_ALPHA       0.30
 #macro BULB_WATER_GLOW_POND_CORE_DEPTH       10
-#macro BULB_WATER_GLOW_FALL_CORE_ALPHA       0.22
 
 // Waterfall — tile 24 on Tiles_Waterfall (mid copies moved here at bake).
 // World-locked X so it stays where you placed it. Depth just in front of mid.
@@ -252,8 +247,19 @@
 #macro BULB_WATERFALL_MATCH_MID_PARALLAX     false
 // Soft translucent main column (no tile zig-zag). Drawn behind the player.
 #macro BULB_WATERFALL_SOFT_STREAM            true
-#macro BULB_WATERFALL_SOFT_ALPHA             0.78
+// Two body passes land on top of each other (base, then a narrower mid), so the stream
+// reads at roughly 1.5x this value. Keep it low enough to see mid_tiles through the water.
+#macro BULB_WATERFALL_SOFT_ALPHA             0.34
 #macro BULB_WATERFALL_SOFT_EDGE              3
+// Bright stream edges: a straight line broken into SEG-tall segments, each of which may
+// step AMP pixels out or in. CHANCE is the odds of a step in either direction, so most
+// segments stay in line. SPEED is a multiple of the droplet scroll: 1 keeps the pattern
+// travelling down level with them.
+#macro BULB_WATERFALL_RIM_AMP                1
+#macro BULB_WATERFALL_RIM_SEG                14
+#macro BULB_WATERFALL_RIM_SHIFT_CHANCE       0.22
+#macro BULB_WATERFALL_RIM_SPEED              1.0
+#macro BULB_WATERFALL_RIM_WIDTH              1.5
 #macro BULB_WATERFALL_SPARKLE_ENABLED        true
 #macro BULB_WATERFALL_SPARKLE_DENSITY        0.055
 #macro BULB_WATERFALL_SPARKLE_ALPHA          0.75
@@ -291,25 +297,28 @@
 #macro BULB_WATERFALL_GROUND_SPARKLE_N       18
 #macro BULB_WATERFALL_LEAK_POUR_R            7
 
-// Light blue waterfall palette (stream / splash / sparkles / leaks).
-#macro BULB_WATERFALL_COL_BASE_R             72
-#macro BULB_WATERFALL_COL_BASE_G             150
-#macro BULB_WATERFALL_COL_BASE_B             220
-#macro BULB_WATERFALL_COL_MID_R              110
-#macro BULB_WATERFALL_COL_MID_G             190
-#macro BULB_WATERFALL_COL_MID_B             245
-#macro BULB_WATERFALL_COL_BRIGHT_R           165
-#macro BULB_WATERFALL_COL_BRIGHT_G           225
+// See-through saturated blue, closer to a lit fall than a flat sky panel.
+#macro BULB_WATERFALL_COL_BASE_R             64
+#macro BULB_WATERFALL_COL_BASE_G             148
+#macro BULB_WATERFALL_COL_BASE_B             214
+#macro BULB_WATERFALL_COL_MID_R              96
+#macro BULB_WATERFALL_COL_MID_G             178
+#macro BULB_WATERFALL_COL_MID_B             232
+#macro BULB_WATERFALL_COL_BRIGHT_R           186
+#macro BULB_WATERFALL_COL_BRIGHT_G           236
 #macro BULB_WATERFALL_COL_BRIGHT_B           255
 #macro BULB_WATERFALL_COL_FOAM_R             210
 #macro BULB_WATERFALL_COL_FOAM_G             240
 #macro BULB_WATERFALL_COL_FOAM_B             255
 
-// Waterfall ambient loop — cave reverb + light slap echo; louder near the stream.
+// Waterfall ambient loop — cave reverb + light slap echo.
+// Audible along the falling stream; louder again at the splash.
 #macro BULB_WATERFALL_SFX_ENABLED            true
 #macro BULB_WATERFALL_SFX_HEAR_RADIUS        720
+#macro BULB_WATERFALL_SFX_BOTTOM_RADIUS      280
 #macro BULB_WATERFALL_SFX_VIEW_PAD           160
 #macro BULB_WATERFALL_SFX_VOL_MIN            0.18
+#macro BULB_WATERFALL_SFX_STREAM_VOL         0.48
 #macro BULB_WATERFALL_SFX_VOL_MAX            0.85
 #macro BULB_WATERFALL_SFX_FADE_MS            250
 #macro BULB_WATERFALL_SFX_PITCH              1.0
@@ -325,8 +334,10 @@
 #macro BULB_POND_ENABLED                     true
 #macro BULB_POND_LAYER                       "Tiles_Pond"
 #macro BULB_POND_TILE                        23
-#macro BULB_POND_BODY_ALPHA                  0.58
-#macro BULB_POND_DEEP_ALPHA                  0.72
+// Body alpha near the surface, deep alpha at the floor. Both stay low enough to read the
+// rock on mid_tiles through the water, matching the fall.
+#macro BULB_POND_BODY_ALPHA                  0.38
+#macro BULB_POND_DEEP_ALPHA                  0.52
 #macro BULB_POND_SURFACE_ALPHA               0.95
 #macro BULB_POND_SURFACE_AMP                 2
 #macro BULB_POND_SURFACE_SCROLL              0.55

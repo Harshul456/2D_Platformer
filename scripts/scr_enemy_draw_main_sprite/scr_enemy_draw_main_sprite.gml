@@ -150,6 +150,8 @@ function scr_enemy_draw_emissive_glow() {
 /// @description Draw all obj_crystal_core emissive overlays in Post Draw (after lit body redraw).
 function scr_bulb_draw_enemy_emissive_glow_all() {
     if (!BULB_ENEMY_GLOW_ENABLED) return;
+    // Additive crystal glow is part of the cave light, not a gameplay hit effect.
+    if (!instance_exists(obj_bulb_controller)) return;
 
     var _cam = view_camera[0];
     if (instance_exists(obj_camera_controller)) {

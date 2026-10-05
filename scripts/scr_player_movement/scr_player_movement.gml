@@ -18,6 +18,9 @@ function scr_player_movement() {
         }
         return;
     }
+    // Set when a fall crosses a spike tip that is not under the body. The end-of-step
+    // touch can miss that lip if the same frame carries the feet past it.
+    var _spike_edge_x = noone;
     shelf_threshold_snap_this_step = false;
     global.player_ledge_bb_prev = shelf_bb_bottom_prev;
     global.player_move_vsp = vsp;
@@ -26,7 +29,7 @@ function scr_player_movement() {
 
     if (DEBUG_LEDGE_AIR_STALL && !debug_ledge_hunt_announced) {
         debug_ledge_hunt_announced = true;
-        show_debug_message("LEDGE_DBG: hunt on — show_debug_message only appears when you Run from the IDE (not from a built .exe). Yellow HUD still works in builds.");
+        show_debug_message("LEDGE_DBG: hunt on â€” show_debug_message only appears when you Run from the IDE (not from a built .exe). Yellow HUD still works in builds.");
     }
     
     // Collision sampling is derived from the current collision mask (bbox_*).
@@ -35,6 +38,9 @@ function scr_player_movement() {
     var feet_y    = floor(bbox_bottom);
     var head_y    = floor(bbox_top);
     var center_y  = floor((bbox_top + bbox_bottom) * 0.5);
+    var _exit_y = y;
+    var _exit_grounded = grounded;
+    var _exit_jump_count = jump_count;
     var p_left    = floor(bbox_left) + 1;
     var p_right   = floor(bbox_right) - 1;
     var p_center  = floor((bbox_left + bbox_right) * 0.5);
@@ -43,10 +49,10 @@ function scr_player_movement() {
     if (stunTimer <= 0) {
         scr_player_input_poll();
 
-        // Jump buffer (decay after §2c — can pause while sliding into wall with a live jump buffer, or hugging wall with air jump banked)
+        // Jump buffer (decay after Â§2c â€” can pause while sliding into wall with a live jump buffer, or hugging wall with air jump banked)
         if (key_jump) jump_buffer_timer = jump_buffer_max;
         
-        // Attack buffer: idle refill; during atk1 also latch 1→2 + keep a buffer so end_swing can chain same frame.
+        // Attack buffer: idle refill; during atk1 also latch 1â†’2 + keep a buffer so end_swing can chain same frame.
         if (key_attack) {
             var _recovery_locked = scr_player_attack_is_recovery_locked();
             if (!_recovery_locked && !attacking && attack_recovery_grace <= 0) attack_buffer_timer = attack_buffer_max;
@@ -88,25 +94,25 @@ function scr_player_movement() {
     var _shelf_touch_tile1 = (_ix_l0 == 1 || _ix_c0 == 1 || _ix_r0 == 1);
     var _xl_floor = _feet_on_cap_cell ? p_left : p_g_left;
     var _xr_floor = _feet_on_cap_cell ? p_right : p_g_right;
-    var touch_floor_center = check_tile_collision(p_center, _floor_probe_y);
-    var touch_floor_gl = check_tile_collision(_xl_floor, _floor_probe_y);
-    var touch_floor_gr = check_tile_collision(_xr_floor, _floor_probe_y);
+    var touch_floor_center = check_floor_tile(p_center, _floor_probe_y);
+    var touch_floor_gl = check_floor_tile(_xl_floor, _floor_probe_y);
+    var touch_floor_gr = check_floor_tile(_xr_floor, _floor_probe_y);
     var touch_floor_any = touch_floor_center || touch_floor_gl || touch_floor_gr;
     // Bbox corners + feet row: at the last pixel of a full tile, inset feet+1 probes can all miss one frame while the
-    // collision hull still overlaps the top surface — use these only for lip fence / bless / debounce (not core votes).
+    // collision hull still overlaps the top surface â€” use these only for lip fence / bless / debounce (not core votes).
     var _bl_s2 = floor(bbox_left);
     var _br_s2 = floor(bbox_right);
     var _floor_probe_broad = touch_floor_any
-        || check_tile_collision(_bl_s2, _floor_probe_y)
-        || check_tile_collision(_br_s2, _floor_probe_y);
-    var _feet_row_support = check_tile_collision(p_center, feet_y) || check_tile_collision(p_left, feet_y) || check_tile_collision(p_right, feet_y)
-        || check_tile_collision(_bl_s2, feet_y) || check_tile_collision(_br_s2, feet_y);
+        || check_floor_tile(_bl_s2, _floor_probe_y)
+        || check_floor_tile(_br_s2, _floor_probe_y);
+    var _feet_row_support = check_floor_tile(p_center, feet_y) || check_floor_tile(p_left, feet_y) || check_floor_tile(p_right, feet_y)
+        || check_floor_tile(_bl_s2, feet_y) || check_floor_tile(_br_s2, feet_y);
     var _raw_support_n = (touch_floor_center ? 1 : 0) +
-        (check_tile_collision(p_left,  _floor_probe_y) ? 1 : 0) +
-        (check_tile_collision(p_right, _floor_probe_y) ? 1 : 0);
-    // True feet under bbox L/R — center alone can hit a vertical wall beside the ledge while "floating".
-    var _toe_floor_raw = check_tile_collision(p_left, _floor_probe_y) || check_tile_collision(p_right, _floor_probe_y);
-    // Inset-only floor hits (no toe / no double support) = hanging off ledge — not supported ground on full blocks.
+        (check_floor_tile(p_left,  _floor_probe_y) ? 1 : 0) +
+        (check_floor_tile(p_right, _floor_probe_y) ? 1 : 0);
+    // True feet under bbox L/R â€” center alone can hit a vertical wall beside the ledge while "floating".
+    var _toe_floor_raw = check_floor_tile(p_left, _floor_probe_y) || check_floor_tile(p_right, _floor_probe_y);
+    // Inset-only floor hits (no toe / no double support) = hanging off ledge â€” not supported ground on full blocks.
     var touch_floor_for_ground = touch_floor_any && (_feet_on_cap_cell || _raw_support_n >= 2 || (_raw_support_n >= 1 && _toe_floor_raw));
     var touch_floor_majority = (_raw_support_n >= GROUND_LAND_VOTES_MIN_AIR);
     var _stand_l = check_floor_standable(_xl_floor, feet_y, GROUND_CHECK_DIST, GROUND_STANDABLE_EMBED_PX);
@@ -122,41 +128,41 @@ function scr_player_movement() {
     var touch_stand_for_ground = (touch_stand_majority && (_feet_on_cap_cell || touch_floor_for_ground))
         || (!_shelf_strict_34_36 && _feet_on_cap_cell && touch_floor_any && (_stand_l || _stand_c || _stand_r) && abs(vsp) <= _vsp_toler);
     // Shelf caps: (a) center misses but 2+ floor probes hit in nearby columns, or (b) bbox is wider than the
-    // lip so only 1 probe at feet+1 hits — still treat as anchored when both feet are in the same/adjacent
+    // lip so only 1 probe at feet+1 hits â€” still treat as anchored when both feet are in the same/adjacent
     // tile column and stand-majority says we're on solid (prevents idle vs hair flipping mid-ledge).
     var _touch_floor_anchor = touch_floor_center;
     if (!_touch_floor_anchor && !_shelf_strict_34_36 && _feet_on_cap_cell && _tm_lc != noone) {
         if (_raw_support_n >= GROUND_LAND_VOTES_MIN_AIR) {
-            var _cxl_a = tilemap_get_cell_x_at_pixel(_tm_lc, p_left, _floor_probe_y);
-            var _cxc_a = tilemap_get_cell_x_at_pixel(_tm_lc, p_center, _floor_probe_y);
-            var _cxr_a = tilemap_get_cell_x_at_pixel(_tm_lc, p_right, _floor_probe_y);
+            var _cxl_a = tilemap_sample_cell_x(_tm_lc, p_left, _floor_probe_y);
+            var _cxc_a = tilemap_sample_cell_x(_tm_lc, p_center, _floor_probe_y);
+            var _cxr_a = tilemap_sample_cell_x(_tm_lc, p_right, _floor_probe_y);
             if (max(_cxl_a, max(_cxc_a, _cxr_a)) - min(_cxl_a, min(_cxc_a, _cxr_a)) <= CAP_GROUND_CELL_SPAN_MAX) {
                 _touch_floor_anchor = true;
             }
         }
         if (!_touch_floor_anchor && touch_stand_for_ground && touch_floor_for_ground) {
-            var _sx_la = tilemap_get_cell_x_at_pixel(_tm_lc, p_left, feet_y);
-            var _sx_ra = tilemap_get_cell_x_at_pixel(_tm_lc, p_right, feet_y);
+            var _sx_la = tilemap_sample_cell_x(_tm_lc, p_left, feet_y);
+            var _sx_ra = tilemap_sample_cell_x(_tm_lc, p_right, feet_y);
             if (abs(_sx_la - _sx_ra) <= CAP_GROUND_CELL_SPAN_MAX) _touch_floor_anchor = true;
         }
     }
     // Full blocks: allow anchor when center misses void but inset stand votes + feet span say "on one platform" (lip stand).
     if (!_touch_floor_anchor && !_feet_on_cap_cell && FULL_BLOCK_EDGE_GROUND_FORGIVE && _tm_lc != noone
         && touch_stand_for_ground && touch_floor_for_ground) {
-        var _s2_span = abs(tilemap_get_cell_x_at_pixel(_tm_lc, p_left, feet_y) - tilemap_get_cell_x_at_pixel(_tm_lc, p_right, feet_y));
+        var _s2_span = abs(tilemap_sample_cell_x(_tm_lc, p_left, feet_y) - tilemap_sample_cell_x(_tm_lc, p_right, feet_y));
         if (_s2_span <= CAP_GROUND_CELL_SPAN_MAX) _touch_floor_anchor = true;
     }
     var _coyote_floor_refresh = !((jump_count >= 2) && (!grounded));
     var _thin_cap_ground = _feet_on_cap_cell && (_stand_l || _stand_c || _stand_r) && touch_floor_any && _touch_floor_anchor
         && vsp >= -4;
     
-    var _span_feet_s2gv = (_tm_lc != noone) ? abs(tilemap_get_cell_x_at_pixel(_tm_lc, p_left, feet_y) - tilemap_get_cell_x_at_pixel(_tm_lc, p_right, feet_y)) : 999;
+    var _span_feet_s2gv = (_tm_lc != noone) ? abs(tilemap_sample_cell_x(_tm_lc, p_left, feet_y) - tilemap_sample_cell_x(_tm_lc, p_right, feet_y)) : 999;
     var _shelf_ground_vote_ok = (_raw_support_n >= GROUND_LAND_VOTES_MIN_AIR)
         || (FULL_BLOCK_EDGE_GROUND_FORGIVE && !_feet_on_cap_cell && touch_floor_for_ground && _raw_support_n >= 1
             && _span_feet_s2gv <= CAP_GROUND_CELL_SPAN_MAX && touch_stand_majority)
-        || (!_shelf_strict_34_36 && _feet_on_cap_cell && touch_floor_any && abs(tilemap_get_cell_x_at_pixel(_tm_lc, p_left, feet_y) - tilemap_get_cell_x_at_pixel(_tm_lc, p_right, feet_y)) <= CAP_GROUND_CELL_SPAN_MAX);
-    // Full-block lip: §2 floor/stand votes can flicker off one frame while toes/sticky still say "on tile". Hold coyote
-    // while _s2_lip_fence; if we already cleared grounded, restore same frame (otherwise gravity + motion desync §6c).
+        || (!_shelf_strict_34_36 && _feet_on_cap_cell && touch_floor_any && abs(tilemap_sample_cell_x(_tm_lc, p_left, feet_y) - tilemap_sample_cell_x(_tm_lc, p_right, feet_y)) <= CAP_GROUND_CELL_SPAN_MAX);
+    // Full-block lip: Â§2 floor/stand votes can flicker off one frame while toes/sticky still say "on tile". Hold coyote
+    // while _s2_lip_fence; if we already cleared grounded, restore same frame (otherwise gravity + motion desync Â§6c).
     var _lip_ctx_wide = FULL_BLOCK_EDGE_GROUND_FORGIVE && !_feet_on_cap_cell && abs(vsp) <= 2.5
         && (_span_feet_s2gv <= CAP_GROUND_CELL_SPAN_MAX || full_lip_anim_sticky > 0);
     if (_lip_ctx_wide) {
@@ -198,8 +204,9 @@ function scr_player_movement() {
         lip_ground_bless--;
     }
     if (grounded && _lip_ctx_wide) lip_ground_bless = GROUND_LIP_GROUND_BLESS_MAX;
+    scr_room_exit_lock_ground();
 
-    // Wall cling: Shift must be held in air for WALL_SHIFT_HOLD_FRAMES_REQUIRED consecutive Steps (see Create).
+    // Wall cling: Shift grabs on the frame it is held. The hand margin, not a wait, keeps the hand under the lip.
     var _wshr = (variable_instance_exists(id, "WALL_SHIFT_HOLD_FRAMES_REQUIRED") ? WALL_SHIFT_HOLD_FRAMES_REQUIRED : 14);
     if (_wshr < 1) _wshr = 1;
     var _sk_air = (stunTimer <= 0) && key_wall_cling;
@@ -215,7 +222,7 @@ function scr_player_movement() {
         cling_eff = _sk_air && (wall_shift_hold_timer >= _wshr);
     }
 
-    // --- 2b. WALL CONTACT (mask-edge column + 3 heights — rejects “feet-only” / above-ledge false walls) ---
+    // --- 2b. WALL CONTACT (mask-edge column + 3 heights â€” rejects â€œfeet-onlyâ€ / above-ledge false walls) ---
     wall_side = 0;
     if (!grounded && global.tilemap_collision_id != noone) {
         var __ft_w = feet_y;
@@ -270,7 +277,7 @@ function scr_player_movement() {
             } else if (sign(hsp) != 0) wall_side = sign(hsp);
             else wall_side = -sign(last_direction);
         }
-        // MMX-style scrape: while clinging (Shift), require solid past bbox into the wall (wider scan if no L/R — small post-resolve gap).
+        // MMX-style scrape: while clinging (Shift), require solid past bbox into the wall (wider scan if no L/R â€” small post-resolve gap).
         if (wall_side != 0) {
             var _need_scrape = (!variable_instance_exists(id, "WALL_REQUIRE_SCRAPE_MOTION") || WALL_REQUIRE_SCRAPE_MOTION);
             if (_need_scrape && cling_eff) {
@@ -291,36 +298,25 @@ function scr_player_movement() {
                 if (!_scrape_hit) wall_side = 0;
             }
         }
-        // Top / bottom tile of wall: require wall continuation one tile height beyond our hit span on the face column.
+        // Hand and feet on the wall face. A full tile past either end was dropping real grabs.
         if (wall_side != 0 && global.tilemap_collision_id != noone) {
-            var _tm_tt = global.tilemap_collision_id;
-            var _th_tt = tilemap_get_tile_height(_tm_tt);
-            var _wx_tt = (wall_side < 0) ? __wxl_w : __wxr_w;
-            var _y_top_tt = 999999;
-            var _y_bot_tt = -999999;
-            if (wall_side < 0) {
-                if (__l3) { _y_top_tt = min(_y_top_tt, __yhi_w); _y_bot_tt = max(_y_bot_tt, __yhi_w); }
-                if (__l2) { _y_top_tt = min(_y_top_tt, __ymid_w); _y_bot_tt = max(_y_bot_tt, __ymid_w); }
-                if (__l1) { _y_top_tt = min(_y_top_tt, __ylo_w); _y_bot_tt = max(_y_bot_tt, __ylo_w); }
-            } else {
-                if (__r3) { _y_top_tt = min(_y_top_tt, __yhi_w); _y_bot_tt = max(_y_bot_tt, __yhi_w); }
-                if (__r2) { _y_top_tt = min(_y_top_tt, __ymid_w); _y_bot_tt = max(_y_bot_tt, __ymid_w); }
-                if (__r1) { _y_top_tt = min(_y_top_tt, __ylo_w); _y_bot_tt = max(_y_bot_tt, __ylo_w); }
+            var _face_x = (wall_side < 0) ? (floor(bbox_left) - 1) : (floor(bbox_right) + 1);
+            var _hand_margin = (variable_instance_exists(id, "WALL_CLING_HAND_MARGIN_PX") ? WALL_CLING_HAND_MARGIN_PX : 0);
+            var _hand_clear = check_tile_collision(_face_x, head_y - _hand_margin);
+            var _feet_clear = true;
+            if (!variable_instance_exists(id, "WALL_CLING_BLOCK_BOTTOM_TILE") || WALL_CLING_BLOCK_BOTTOM_TILE) {
+                _feet_clear = check_tile_collision(_face_x, feet_y);
             }
-            var _blk_top = (!variable_instance_exists(id, "WALL_CLING_BLOCK_TOP_TILE") || WALL_CLING_BLOCK_TOP_TILE)
-                && (_y_top_tt < 999999 && !check_tile_collision(_wx_tt, _y_top_tt - _th_tt));
-            var _blk_bot = (!variable_instance_exists(id, "WALL_CLING_BLOCK_BOTTOM_TILE") || WALL_CLING_BLOCK_BOTTOM_TILE)
-                && (_y_bot_tt > -999999 && !check_tile_collision(_wx_tt, _y_bot_tt + _th_tt));
-            if (_blk_top || _blk_bot) wall_side = 0;
+            if (!_feet_clear || !_hand_clear) wall_side = 0;
         }
-        // Rising with a banked air jump: do not cling (avoids snagging past walls). Shift = explicit cling — keep wall_side.
+        // Rising with a banked air jump: do not cling (avoids snagging past walls). Shift = explicit cling â€” keep wall_side.
         if (wall_side != 0 && jump_count < 2 && !air_chain_jump_used && vsp <= WALL_JUMP_MIN_FALL_VSP) {
             if (!cling_eff) wall_side = 0;
         }
         if (wall_side != 0 && !cling_eff) wall_side = 0;
     }
 
-    // Wall cling / slide debris — hand + foot on the wall face (same particles as ground footsteps).
+    // Wall cling / slide debris â€” hand + foot on the wall face (same particles as ground footsteps).
     if (cling_eff && wall_side != 0 && stunTimer <= 0) {
         if (!wall_cling_debris_active) {
             wall_cling_debris_active = true;
@@ -338,7 +334,7 @@ function scr_player_movement() {
         wall_cling_debris_active = false;
     }
 
-    // --- 2c. WALL-JUMP DEFER SCAN (§3 runs before horizontal; wall_side can be 0 until we scrape the wall) ---
+    // --- 2c. WALL-JUMP DEFER SCAN (Â§3 runs before horizontal; wall_side can be 0 until we scrape the wall) ---
     var _wall_jump_defer = false;
     if (!grounded && global.tilemap_collision_id != noone && wall_side == 0 && jump_buffer_timer > 0 && stunTimer <= 0) {
         var _head_de = !check_tile_collision(p_center, head_y - WALL_JUMP_CEIL_CLEAR, true, feet_y);
@@ -400,13 +396,13 @@ function scr_player_movement() {
             grounded = false;
             lip_ground_bless = 0;
             lip_s2_edge_air_streak = 0;
-            // Left the platform without jumping — keep one air jump banked.
+            // Left the platform without jumping â€” keep one air jump banked.
             if (jump_count < 1) jump_count = 1;
             if (vsp < _drop_v) vsp = _drop_v;
             sprint_reel_active = false;
             sprint_reel_pending = false;
             sprint_reel_wall = false;
-            // Do not spend jump_count — this is a fall, not a jump.
+            // Do not spend jump_count â€” this is a fall, not a jump.
         }
     }
 
@@ -437,7 +433,7 @@ function scr_player_movement() {
             last_direction = -wall_side;
             jump_buffer_timer = 0;
             jumped_this_frame = true;
-            scr_player_jump_sfx(true); // Wall kick — double-jump weight
+            scr_player_jump_sfx(true); // Wall kick â€” double-jump weight
             scr_player_ground_debris_on_wall_jump();
             wall_cling_debris_active = false;
             jump_count = 2;
@@ -448,8 +444,8 @@ function scr_player_movement() {
             lip_s2_edge_air_streak = 0;
             wall_jump_lock = WALL_JUMP_LOCK_FRAMES;
             wall_jump_extend_timer = WALL_JUMP_EXTEND_FRAMES;
-            wall_jump_kick_hold_timer = WALL_JUMP_KICK_HOLD_FRAMES;
-            double_jump_anim_active = true;
+            wall_jump_kick_hold_timer = 0;
+            double_jump_anim_active = false;
             double_jump_anim_tick = 0;
             scr_player_jump_stretch_trigger();
             is_sprinting = false;
@@ -464,7 +460,7 @@ function scr_player_movement() {
             sprint_hold_latched = false;
             sprint_dash_standstill = false;
         } else if (!_wall_jump_defer && (coyote_time_timer > 0 || jump_count < 2)) {
-            // Don't burn jump buffer on air jump same frame we intend wall tech (§5b-post can wall jump after H-resolve).
+            // Don't burn jump buffer on air jump same frame we intend wall tech (Â§5b-post can wall jump after H-resolve).
             var _block_air_for_wall = (cling_eff && !grounded && wall_side != 0 && key_jump);
             if (!_block_air_for_wall) {
             var _jump_from_grounded = grounded;
@@ -492,7 +488,7 @@ function scr_player_movement() {
             }
             
             if (_grounded_jump) {
-                // Carry keeps pre-jump travel dir — never snap full dash speed into opposite input.
+                // Carry keeps pre-jump travel dir â€” never snap full dash speed into opposite input.
                 var _jd = sign(_pre_hsp);
                 if (_jd == 0 && variable_instance_exists(id, "sprint_commit_dir")) _jd = sign(sprint_commit_dir);
                 if (_jd == 0) _jd = last_direction;
@@ -567,17 +563,17 @@ function scr_player_movement() {
         }
     }
 
-    // §5b wall-jump must use this (pre-gravity-after-§3), not post-§4 vsp — one grv tick can flip a tiny rise
+    // Â§5b wall-jump must use this (pre-gravity-after-Â§3), not post-Â§4 vsp â€” one grv tick can flip a tiny rise
     // into "falling" and steal a buffered double jump after defer / late wall contact (often asymmetric L vs R).
     var _vsp_wall_jump_fall_ref = vsp;
 
     // --- 4. GRAVITY & SPRINT LOGIC ---
-    // Melee preempt (after grounded/coyote): start swing BEFORE sprint/reel so dash/run → attack wins this frame.
+    // Melee preempt (after grounded/coyote): start swing BEFORE sprint/reel so dash/run â†’ attack wins this frame.
     scr_player_try_attack_start();
 
     var _fall_max = (variable_instance_exists(id, "MAX_FALL_VSP") ? MAX_FALL_VSP : 10);
 
-    // Stun owns vertical via knockBackY — don't also tick gravity into vsp this frame.
+    // Stun owns vertical via knockBackY â€” don't also tick gravity into vsp this frame.
     if (stunTimer <= 0) {
         if (attacking && attack_is_air) {
             var _gmul = (variable_instance_exists(id, "AIR_ATTACK_GRAV_MUL") ? AIR_ATTACK_GRAV_MUL : 0.85);
@@ -590,9 +586,12 @@ function scr_player_movement() {
         // so that cap was flattening the bounce into a short float.
         if (vsp < 0 && !key_jump_held && !pogo_rising) vsp = max(vsp, jumpsp * (-jump_cut_multiplier));
         if (pogo_rising && (grounded || vsp >= 0)) pogo_rising = false;
-        // Wall slide: MMX wall_slide only while falling — don’t cling on rise past a ledge
-        if (!grounded && wall_side != 0 && vsp > 0) {
-            if (cling_eff && vsp > WALL_SLIDE_VSP) vsp = WALL_SLIDE_VSP;
+        // Slide only after the apex. Killing the rise on contact flattened the kick
+        // and the cling never got to start on the way down.
+        if (!grounded && wall_side != 0 && cling_eff && vsp > 0) {
+            if (vsp > WALL_SLIDE_VSP) vsp = WALL_SLIDE_VSP;
+            double_jump_anim_active = false;
+            double_jump_anim_tick = 0;
         }
     }
     
@@ -620,7 +619,7 @@ function scr_player_movement() {
         sprint_resume_hold = false;
         sprint_dir_gap = 0;
         hsp = knockBackX;
-        // Don't charge fall speed while planted — that made ledge drops after ground-hits rocket down.
+        // Don't charge fall speed while planted â€” that made ledge drops after ground-hits rocket down.
         if (grounded && knockBackY > 0) knockBackY = 0;
         vsp = knockBackY;
         knockBackX *= knockback_friction;
@@ -629,7 +628,12 @@ function scr_player_movement() {
             if (knockBackY > _fall_max) knockBackY = _fall_max;
         }
         if (vsp > _fall_max) vsp = _fall_max;
-        // Stun just expired this frame — keep a sane fall speed into free movement
+        // Fall pose after a hit: a zeroed knockBackY must not leave them hanging.
+        if (hurt_fall_anim && !grounded && vsp <= 0) {
+            vsp = grv;
+            knockBackY = grv;
+        }
+        // Stun just expired this frame â€” keep a sane fall speed into free movement
         if (stunTimer <= 0) {
             knockBackY = min(knockBackY, _fall_max);
             if (vsp > _fall_max) vsp = _fall_max;
@@ -637,11 +641,14 @@ function scr_player_movement() {
         }
     } else {
         is_sprinting = false;
+        // The down-slash locks air control, so the rise has to read direction itself.
+        // Holding nothing after the pop stays vertical; a direction held during the rise drifts.
+        if (pogo_rising) scr_player_pogo_apply_horizontal();
         var _recovery_locked = scr_player_attack_is_recovery_locked();
         var _dash_buffer_max = (variable_instance_exists(id, "DASH_INPUT_BUFFER_FRAMES") ? DASH_INPUT_BUFFER_FRAMES : 0);
         if (dash_lock_timer > 0) dash_lock_timer--;
-        // Buffer Z even during atk1 so poke→dash can be queued; attack start clears buffer,
-        // and DODGE_CANCEL_MIN_ATTACK_FRAMES blocks instant steal of dash→attack cancels.
+        // Buffer Z even during atk1 so pokeâ†’dash can be queued; attack start clears buffer,
+        // and DODGE_CANCEL_MIN_ATTACK_FRAMES blocks instant steal of dashâ†’attack cancels.
         if (key_sprint_press) {
             dash_input_buffer = _dash_buffer_max;
         }
@@ -662,14 +669,14 @@ function scr_player_movement() {
                 sprint_commit_dir = 0;
             }
         }
-        // Always decay dash buffer — while sprint_committed it used to stick and steal the next attack into dodge-cancel.
+        // Always decay dash buffer â€” while sprint_committed it used to stick and steal the next attack into dodge-cancel.
         if (dash_input_buffer > 0) dash_input_buffer--;
         if (!sprint_committed) {
             scr_player_sprint_try_begin(false);
         }
         if (!attacking) {
             var inputDir = (key_right - key_left);
-            // Only while jump crouch frames are actually playing — bare force_landing_crouch after
+            // Only while jump crouch frames are actually playing â€” bare force_landing_crouch after
             // idle transition used to zero hsp forever (stuck on shelf/wall corner).
             var _land_crouch_prev = (
                     (sprite_index == spr_mc_jump || sprite_index == spr_mc_doublejump)
@@ -693,7 +700,7 @@ function scr_player_movement() {
             }
 
             // Grounded + holding into a wall: never start/keep a sprint. Easy fix for corner
-            // dash/fall jitter — there's nowhere to run, so don't play the dash.
+            // dash/fall jitter â€” there's nowhere to run, so don't play the dash.
             var _sprint_wall_blocked = false;
             if (grounded && inputDir != 0 && global.tilemap_collision_id != noone) {
                 var _wx_sb = (inputDir > 0) ? (floor(bbox_right) + 1) : (floor(bbox_left) - 1);
@@ -711,7 +718,7 @@ function scr_player_movement() {
                 sprint_jump_carry = false;
                 hsp = 0;
                 runMomentum = 0;
-                // Dead-stop into wall only — reel while jammed; cancel if they push off later
+                // Dead-stop into wall only â€” reel while jammed; cancel if they push off later
                 if (_wall_was_dash && grounded && !jumped_this_frame) {
                     sprint_reel_pending = true;
                     sprint_reel_active = true;
@@ -721,7 +728,7 @@ function scr_player_movement() {
                 }
             }
 
-            // Hold Z while idle — direction later starts sprint (not standstill dash)
+            // Hold Z while idle â€” direction later starts sprint (not standstill dash)
             if (!_recovery_locked && key_sprint && inputDir == 0 && grounded && !jumped_this_frame && vsp >= 0
                 && (sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump
                 && sprite_index != spr_mc_attack2 && sprite_index != spr_asta_attack1 && sprite_index != spr_mc_air_attack
@@ -756,7 +763,7 @@ function scr_player_movement() {
                         if (grounded && !jumped_this_frame && sprint_burst_tick >= _dash_frames) {
                             dash_input_buffer = 0;
                             dash_lock_timer = _dash_lock_max;
-                            // Reel right away — don't wait for Z release (standstill dash often ends while Z is still held)
+                            // Reel right away â€” don't wait for Z release (standstill dash often ends while Z is still held)
                             sprint_reel_pending = true;
                             sprint_reel_active = true;
                             sprint_reel_dir_wait = 0;
@@ -770,7 +777,7 @@ function scr_player_movement() {
                         sprint_burst_tick++;
                         if (!_land_crouch_prev) {
                             is_sprinting = true;
-                            // Progress 0 on first active frame → ease toward peak, then soft stop.
+                            // Progress 0 on first active frame â†’ ease toward peak, then soft stop.
                             var _du = (sprint_burst_tick - 0.5) / max(1, _dash_frames);
                             var _dmult = scr_player_dash_speed_mult(_du);
                             hsp = _dash_speed * _dmult * sprint_commit_dir;
@@ -879,7 +886,7 @@ function scr_player_movement() {
                     _walk_scale = 1 - post_attack_accel_timer / POST_ATTACK_ACCEL_FRAMES;
                     if (_walk_scale < 0.35) _walk_scale = 0.35;
                 }
-                // Instant walk response — anim buffer only affects idle vs jog sprite.
+                // Instant walk response â€” anim buffer only affects idle vs jog sprite.
                 hsp = walksp * inputDir * _walk_scale;
                 runMomentum = 0;
                 }
@@ -927,8 +934,8 @@ function scr_player_movement() {
                 hsp = walksp * inputDir;
             }
             }
-            // Sprint jump: §6c can re-ground for one frame while feet overlap — reassert carry after air/walk resolve.
-            // Direction stays pre-jump travel (not opposite input) so dash→jump→turn can't invent reverse speed.
+            // Sprint jump: Â§6c can re-ground for one frame while feet overlap â€” reassert carry after air/walk resolve.
+            // Direction stays pre-jump travel (not opposite input) so dashâ†’jumpâ†’turn can't invent reverse speed.
             if (jumped_this_frame && _grounded_jump_this_step && !attacking && !_fresh_stop_dash) {
                 var _sj_dir = sign(runMomentum);
                 if (_sj_dir == 0) _sj_dir = sign(_pre_hsp);
@@ -987,7 +994,7 @@ function scr_player_movement() {
                 } else if (!key_sprint && !(key_left || key_right)) {
                     sprint_reel_dir_wait = 0;
                 } else if (!key_sprint && (key_left || key_right)) {
-                    // Z up, direction still down — wait out staggered release before treating as walk
+                    // Z up, direction still down â€” wait out staggered release before treating as walk
                     if (sprint_reel_dir_wait > 0) {
                         sprint_reel_dir_wait--;
                     } else {
@@ -1011,7 +1018,7 @@ function scr_player_movement() {
     tilecol_sync_actor_context(vsp, shelf_bb_bottom_prev, bridge_drop_timer > 0);
 
     // Landing onto shelf 1/5/34/36: detect window so wall shove / magnet / ledge-mount stay off.
-    // Do NOT kill air hsp or force crouch here — that made shelf landings feel laggy.
+    // Do NOT kill air hsp or force crouch here â€” that made shelf landings feel laggy.
     var _shelf_landing_window = false;
     if (!grounded && vsp >= 0 && global.tilemap_collision_id != noone) {
         var _tm_sw = global.tilemap_collision_id;
@@ -1029,7 +1036,7 @@ function scr_player_movement() {
                 }
             }
         }
-        // Only kill leftover air hsp when holding into a wall or into the shelf→void gap.
+        // Only kill leftover air hsp when holding into a wall or into the shelfâ†’void gap.
         if (_shelf_landing_window && hsp != 0) {
             var _idir_sw = clamp(key_right - key_left, -1, 1);
             if (_idir_sw == 0) _idir_sw = sign(hsp);
@@ -1092,7 +1099,7 @@ function scr_player_movement() {
                 if (_clear) {
                     x += _h_step;
                 } else {
-                    // --- Ledge/corner correction: step up 1–LEDGE_STEP_MAX px if blocked by small lip ---
+                    // --- Ledge/corner correction: step up 1â€“LEDGE_STEP_MAX px if blocked by small lip ---
                     var _stepped = false;
                     if (grounded && vsp >= 0 && !attacking && _ledge_center_ok) {
                         for (var _step_up = 1; _step_up <= LEDGE_STEP_MAX; _step_up++) {
@@ -1119,7 +1126,7 @@ function scr_player_movement() {
                     if (!_stepped) {
                         hsp = 0;
                         runMomentum = 0;
-                        // Can't sprint into a wall — kill dash/sprint the moment horizontal motion is
+                        // Can't sprint into a wall â€” kill dash/sprint the moment horizontal motion is
                         // blocked. Stops the run/dash pose from fighting fall when you're jammed into
                         // a corner and holding Z + into-wall (animation jitter).
                         if (is_sprinting || sprint_committed || sprint_air_trail || sprint_jump_carry) {
@@ -1131,7 +1138,7 @@ function scr_player_movement() {
                             sprint_air_trail = false;
                             sprint_jump_carry = false;
                             sprint_afterimage_tick = 0;
-                            // Dead-stop into wall only — skip reel if already holding away to leave
+                            // Dead-stop into wall only â€” skip reel if already holding away to leave
                             var _into_wall = sign(_h_step);
                             var _input_wall = (key_right - key_left);
                             var _dead_stop = (_input_wall == 0 || _input_wall == _into_wall);
@@ -1240,25 +1247,14 @@ function scr_player_movement() {
             }
         }
         if (wall_side != 0 && global.tilemap_collision_id != noone) {
-            var _tm_ttb = global.tilemap_collision_id;
-            var _th_ttb = tilemap_get_tile_height(_tm_ttb);
-            var _wx_ttb = (wall_side < 0) ? __wxl_rb : __wxr_rb;
-            var _y_top_ttb = 999999;
-            var _y_bot_ttb = -999999;
-            if (wall_side < 0) {
-                if (__l3b) { _y_top_ttb = min(_y_top_ttb, __yhi_rb); _y_bot_ttb = max(_y_bot_ttb, __yhi_rb); }
-                if (__l2b) { _y_top_ttb = min(_y_top_ttb, __ymid_rb); _y_bot_ttb = max(_y_bot_ttb, __ymid_rb); }
-                if (__l1b) { _y_top_ttb = min(_y_top_ttb, __ylo_rb); _y_bot_ttb = max(_y_bot_ttb, __ylo_rb); }
-            } else {
-                if (__r3b) { _y_top_ttb = min(_y_top_ttb, __yhi_rb); _y_bot_ttb = max(_y_bot_ttb, __yhi_rb); }
-                if (__r2b) { _y_top_ttb = min(_y_top_ttb, __ymid_rb); _y_bot_ttb = max(_y_bot_ttb, __ymid_rb); }
-                if (__r1b) { _y_top_ttb = min(_y_top_ttb, __ylo_rb); _y_bot_ttb = max(_y_bot_ttb, __ylo_rb); }
+            var _face_xb = (wall_side < 0) ? (floor(bbox_left) - 1) : (floor(bbox_right) + 1);
+            var _hand_margin_b = (variable_instance_exists(id, "WALL_CLING_HAND_MARGIN_PX") ? WALL_CLING_HAND_MARGIN_PX : 0);
+            var _hand_clear_b = check_tile_collision(_face_xb, head_y - _hand_margin_b);
+            var _feet_clear_b = true;
+            if (!variable_instance_exists(id, "WALL_CLING_BLOCK_BOTTOM_TILE") || WALL_CLING_BLOCK_BOTTOM_TILE) {
+                _feet_clear_b = check_tile_collision(_face_xb, feet_y);
             }
-            var _blk_top_b = (!variable_instance_exists(id, "WALL_CLING_BLOCK_TOP_TILE") || WALL_CLING_BLOCK_TOP_TILE)
-                && (_y_top_ttb < 999999 && !check_tile_collision(_wx_ttb, _y_top_ttb - _th_ttb));
-            var _blk_bot_b = (!variable_instance_exists(id, "WALL_CLING_BLOCK_BOTTOM_TILE") || WALL_CLING_BLOCK_BOTTOM_TILE)
-                && (_y_bot_ttb > -999999 && !check_tile_collision(_wx_ttb, _y_bot_ttb + _th_ttb));
-            if (_blk_top_b || _blk_bot_b) wall_side = 0;
+            if (!_feet_clear_b || !_hand_clear_b) wall_side = 0;
         }
         if (wall_side != 0 && jump_count < 2 && !air_chain_jump_used && vsp <= WALL_JUMP_MIN_FALL_VSP) {
             if (!cling_eff) wall_side = 0;
@@ -1266,7 +1262,7 @@ function scr_player_movement() {
         if (wall_side != 0 && !cling_eff) wall_side = 0;
     }
 
-    // --- 5b-post. WALL JUMP (second chance: §3 runs before horizontal; wall_side can become valid after scrape) ---
+    // --- 5b-post. WALL JUMP (second chance: Â§3 runs before horizontal; wall_side can become valid after scrape) ---
     if (!jumped_this_frame && stunTimer <= 0 && jump_buffer_timer > 0 && !attacking) {
         feet_y = floor(bbox_bottom);
         head_y = floor(bbox_top);
@@ -1293,14 +1289,14 @@ function scr_player_movement() {
             if (_shaft_cd_p < 1) _shaft_cd_p = 1;
             if (_wk_prev_p != 0 && wall_side == -_wk_prev_p) wall_kick_cooldown = _shaft_cd_p;
             else wall_kick_cooldown = WALL_KICK_COOLDOWN_FRAMES;
-            // Match §3 early wall jump after one gravity tick: vsp was already += grv in §4 this frame.
+            // Match Â§3 early wall jump after one gravity tick: vsp was already += grv in Â§4 this frame.
             vsp = -WALL_JUMP_VSP + grv;
             hsp = -wall_side * WALL_JUMP_HSP;
             runMomentum = hsp;
             last_direction = -wall_side;
             jump_buffer_timer = 0;
             jumped_this_frame = true;
-            scr_player_jump_sfx(true); // Wall kick — double-jump weight
+            scr_player_jump_sfx(true); // Wall kick â€” double-jump weight
             scr_player_ground_debris_on_wall_jump();
             wall_cling_debris_active = false;
             jump_count = 2;
@@ -1311,8 +1307,8 @@ function scr_player_movement() {
             lip_s2_edge_air_streak = 0;
             wall_jump_lock = WALL_JUMP_LOCK_FRAMES;
             wall_jump_extend_timer = WALL_JUMP_EXTEND_FRAMES;
-            wall_jump_kick_hold_timer = WALL_JUMP_KICK_HOLD_FRAMES;
-            double_jump_anim_active = true;
+            wall_jump_kick_hold_timer = 0;
+            double_jump_anim_active = false;
             double_jump_anim_tick = 0;
             scr_player_jump_stretch_trigger();
             is_sprinting = false;
@@ -1329,15 +1325,15 @@ function scr_player_movement() {
         }
     }
 
-    // --- 5c. DE-PENETRATE (torso or feet inside full block — recover bad clips; run grounded or not) ---
+    // --- 5c. DE-PENETRATE (torso or feet inside full block â€” recover bad clips; run grounded or not) ---
     // Skip on shelf 1/5/34/36 (landing window or already planted): wall-side toe at shelf height reads as
-    // "feet embedded" in the adjacent full wall and shoves you into the gap → lose ground → land anim twice.
+    // "feet embedded" in the adjacent full wall and shoves you into the gap â†’ lose ground â†’ land anim twice.
     var _shelf_feet_dp = false;
     if (global.tilemap_collision_id != noone) {
         _shelf_feet_dp = tilemap_shelf_cap_near_feet(global.tilemap_collision_id,
             floor(bbox_left) + 1, floor((bbox_left + bbox_right) * 0.5), floor(bbox_right) - 1, floor(bbox_bottom));
     }
-    if (!_shelf_landing_window && !_shelf_feet_dp && global.tilemap_collision_id != noone) {
+    if (!_shelf_landing_window && !_shelf_feet_dp && global.tilemap_collision_id != noone && !scr_room_exit_is_crossing()) {
         var _tm_dp = global.tilemap_collision_id;
         var _ly_e = FULL_BLOCK_FEET_INTERIOR_LY_MIN;
         repeat (16) {
@@ -1365,16 +1361,16 @@ function scr_player_movement() {
     }
 
     // --- 5d. AIRBORNE SIDE-EMBED RECOVERY (edge-clip into a wall face) ---
-    // The airborne ledge-mount priority (§5) can step the body into a full-block wall column when the
+    // The airborne ledge-mount priority (Â§5) can step the body into a full-block wall column when the
     // feet momentarily align with an internal tile boundary (feet near a wall tile's top edge, head/
     // center still above the cap). The result is a shallow SIDE clip: only the leading bbox edge is
-    // inside the wall, so §5c (which tests torso-center + feet) never fires and the player hangs inside
+    // inside the wall, so Â§5c (which tests torso-center + feet) never fires and the player hangs inside
     // the wall face in the fall pose. This net checks the raw left/right edge columns across the body
     // and pushes out of any full block until the edge is clear. It cannot affect a normal flush wall
     // rest (that leaves the edge pixel in air) or one-way platforms (full-block only). Airborne only.
-    // SKIP when landing onto shelf 1/5/34/36 — that shove is the visible "jitter away from the wall"
-    // on jump→tap-toward-wall→land (still !grounded here; §6 lands after).
-    if (!grounded && !_shelf_landing_window && global.tilemap_collision_id != noone) {
+    // SKIP when landing onto shelf 1/5/34/36 â€” that shove is the visible "jitter away from the wall"
+    // on jumpâ†’tap-toward-wallâ†’land (still !grounded here; Â§6 lands after).
+    if (!grounded && !_shelf_landing_window && global.tilemap_collision_id != noone && !scr_room_exit_is_crossing()) {
         var _tm_se = global.tilemap_collision_id;
         repeat (16) {
             var _hi_se  = floor(bbox_top) + WALL_CHECK_OFFSET;
@@ -1392,7 +1388,7 @@ function scr_player_movement() {
             var _push_se = 0;
             if (_embed_r && !_embed_l) _push_se = -1;      // right edge in wall -> shove left
             else if (_embed_l && !_embed_r) _push_se = 1;  // left edge in wall  -> shove right
-            else break;                                     // both sides solid (pinched) — leave to §6
+            else break;                                     // both sides solid (pinched) â€” leave to Â§6
             x += _push_se;
             hsp = 0;
             runMomentum = 0;
@@ -1409,7 +1405,7 @@ function scr_player_movement() {
     p_center  = floor((bbox_left + bbox_right) * 0.5);
 
     // One-way ledges: threshold when falling (vsp>0); side-entry = _is_tapping (immediate) OR passive vsp+air gates.
-    // No horizontal magnet while landing into a shelf/wall corner — magnet probes into the wall column and
+    // No horizontal magnet while landing into a shelf/wall corner â€” magnet probes into the wall column and
     // plants a half-supported pose that the next frame "corrects" (double land crouch).
     var _tm_s6 = global.tilemap_collision_id;
     var _mag_thr = (stunTimer <= 0 && !_shelf_landing_window) ? clamp(key_right - key_left, -1, 1) : 0;
@@ -1477,19 +1473,18 @@ function scr_player_movement() {
                             _pl_fall = p_left;
                             _pr_fall = p_right;
                         }
-                        var _hil = check_tile_collision(_pl_fall, _foot_probe_y, false, noone, true);
-                        var _hir = check_tile_collision(_pr_fall, _foot_probe_y, false, noone, true);
-                        var _hic = check_tile_collision(p_center, _foot_probe_y, false, noone, true);
-                        _col_clear = !_hil && !_hic && !_hir;
-                        if (!_col_clear && !_hil && !_hir) {
-                            _col_clear = true;
+                        _col_clear = tilemap_air_fall_step_clear(_tmv, _pl_fall, p_center, _pr_fall, _foot_probe_y);
+                        if (_col_clear && _spike_edge_x == noone) {
+                            var _gx = tilemap_spike_top_at(_tmv, _pl_fall, _foot_probe_y);
+                            if (_gx == noone) _gx = tilemap_spike_top_at(_tmv, _pr_fall, _foot_probe_y);
+                            if (_gx != noone) _spike_edge_x = _gx;
                         }
                     }
                 }
             } else {
                 var _rise_tile = (_v_step < 0);
                 if (_v_step > 0) {
-                    // While grounded — or feet on a one-way shelf cap with grounded false (34/36 lip) — do not ignore
+                    // While grounded â€” or feet on a one-way shelf cap with grounded false (34/36 lip) â€” do not ignore
                     // shelf tiles downward; gravity still adds vsp each frame.
                     var _tmvd = global.tilemap_collision_id;
                     var _shelf_support_else = (_tmvd != noone) && tilemap_shelf_cap_near_feet(_tmvd, p_left, p_center, p_right, feet_y);
@@ -1524,7 +1519,7 @@ function scr_player_movement() {
                         shelf_threshold_snap_this_step = true;
                         global.player_ledge_bb_prev = bbox_bottom;
                     } else {
-                        // Keep y float — do not floor/ceil here (thin ledge rest + sub-pixel snap).
+                        // Keep y float â€” do not floor/ceil here (thin ledge rest + sub-pixel snap).
                     }
                 } else {
                     // Ceiling / upward stop: zero vsp only (avoid ceil(y) stripping float contact).
@@ -1535,8 +1530,8 @@ function scr_player_movement() {
         }
         if (grounded && vsp > 0.001 && stunTimer <= 0) vsp = 0;
     } else if (!grounded && global.tilemap_collision_id != noone && stunTimer <= 0 && abs(vsp) <= 0.001) {
-        // When vsp is exactly 0, the stepped §6 loop above is skipped (apex, friction, collision wipe). In air
-        // we still need one downward resolution pass or gravity seed — otherwise ledge separation can sit motionless
+        // When vsp is exactly 0, the stepped Â§6 loop above is skipped (apex, friction, collision wipe). In air
+        // we still need one downward resolution pass or gravity seed â€” otherwise ledge separation can sit motionless
         // until vsp becomes non-zero (intermittent hover + sudden fall).
         feet_y = floor(bbox_bottom);
         head_y = floor(bbox_top);
@@ -1569,12 +1564,11 @@ function scr_player_movement() {
                     _pl_fz = p_left;
                     _pr_fz = p_right;
                 }
-                var _hilz = check_tile_collision(_pl_fz, _foot_probe_z, false, noone, true);
-                var _hirz = check_tile_collision(_pr_fz, _foot_probe_z, false, noone, true);
-                var _hicz = check_tile_collision(p_center, _foot_probe_z, false, noone, true);
-                _col_clear_z = !_hilz && !_hicz && !_hirz;
-                if (!_col_clear_z && !_hilz && !_hirz) {
-                    _col_clear_z = true;
+                _col_clear_z = tilemap_air_fall_step_clear(_tmvz, _pl_fz, p_center, _pr_fz, _foot_probe_z);
+                if (_col_clear_z && _spike_edge_x == noone) {
+                    var _gxz = tilemap_spike_top_at(_tmvz, _pl_fz, _foot_probe_z);
+                    if (_gxz == noone) _gxz = tilemap_spike_top_at(_tmvz, _pr_fz, _foot_probe_z);
+                    if (_gxz != noone) _spike_edge_x = _gxz;
                 }
             }
         }
@@ -1588,15 +1582,15 @@ function scr_player_movement() {
             p_right = floor(bbox_right) - 1;
             p_center = floor((bbox_left + bbox_right) * 0.5);
         } else {
-            // Blocked lip, open air at exact-zero vsp, or 1px hover with no feet-row hull sample — still need fall
-            // progress; §6d peel is vsp-gated and this branch only runs when the stepped loop was skipped.
+            // Blocked lip, open air at exact-zero vsp, or 1px hover with no feet-row hull sample â€” still need fall
+            // progress; Â§6d peel is vsp-gated and this branch only runs when the stepped loop was skipped.
             vsp = grv;
         }
     }
 
     // --- 6x. AIR LIP UNSTICK (after vertical, before peel) ---
-    // When !grounded and |vsp|≈0, §6d peel does not run. Nudge down + seed grv only when floor helpers disagree
-    // with §2 (!_tffg_u) and the inset row at feet+1 is not fully solid (original behavior — avoids teeter jitter).
+    // When !grounded and |vsp|â‰ˆ0, Â§6d peel does not run. Nudge down + seed grv only when floor helpers disagree
+    // with Â§2 (!_tffg_u) and the inset row at feet+1 is not fully solid (original behavior â€” avoids teeter jitter).
     if (!grounded && global.tilemap_collision_id != noone && abs(vsp) <= 0.001 && stunTimer <= 0) {
         feet_y = floor(bbox_bottom);
         var _tm_u = global.tilemap_collision_id;
@@ -1643,8 +1637,8 @@ function scr_player_movement() {
         }
     }
 
-    // --- 6x2. AIR: DOWN BLOCKED -> SEED GRAVITY (opens §6d peel same frame when vertical cleared all vsp) ---
-    // Apex-safe: only when a 1px air-down step is blocked (same rules as §6 falling). Not when open air is below.
+    // --- 6x2. AIR: DOWN BLOCKED -> SEED GRAVITY (opens Â§6d peel same frame when vertical cleared all vsp) ---
+    // Apex-safe: only when a 1px air-down step is blocked (same rules as Â§6 falling). Not when open air is below.
     if (!grounded && global.tilemap_collision_id != noone && abs(vsp) <= 0.001 && stunTimer <= 0) {
         feet_y = floor(bbox_bottom);
         var _pl_db = floor(bbox_left) + 1;
@@ -1689,13 +1683,13 @@ function scr_player_movement() {
 
     // --- 6x3. AIR HANG BREAKER (after 6x/6x2) ---
     // If physics says !grounded but vsp is still 0 after the vertical stack, always seed one gravity step.
-    // §2 can clear grounded while touch_floor_for_ground && touch_stand_for_ground stay true (anchor / shelf vote
-    // mismatch on full-block lips) — the old inner guard skipped those frames and the stall could persist.
+    // Â§2 can clear grounded while touch_floor_for_ground && touch_stand_for_ground stay true (anchor / shelf vote
+    // mismatch on full-block lips) â€” the old inner guard skipped those frames and the stall could persist.
     if (!grounded && global.tilemap_collision_id != noone && stunTimer <= 0 && abs(vsp) <= 0.001) {
         vsp = grv;
     }
 
-    // --- 6b. FEET POP (full block: rest on top surface, not inside body — fixes corner sink + landing pose jitter) ---
+    // --- 6b. FEET POP (full block: rest on top surface, not inside body â€” fixes corner sink + landing pose jitter) ---
     // Skip on shelf caps: wall-column toes at shelf height are "embedded" in the wall body; popping y-- lifts
     // off the platform and triggers a second land (crouch restarts).
     if (global.tilemap_collision_id != noone) {
@@ -1708,7 +1702,8 @@ function scr_player_movement() {
         var _bl_pop = floor(bbox_left);
         var _br_pop = floor(bbox_right);
         var _shelf_feet_pop = tilemap_shelf_cap_near_feet(_tm_pop, _pl_pop, _pc_pop, _pr_pop, feet_y);
-        if (!_shelf_feet_pop && tilemap_any_feet_row_full_block_embedded(_tm_pop, _pl_pop, _pc_pop, _pr_pop, _bl_pop, _br_pop, feet_y, _ly_pop)) {
+        if (!_shelf_feet_pop && tilemap_any_feet_row_full_block_embedded(_tm_pop, _pl_pop, _pc_pop, _pr_pop, _bl_pop, _br_pop, feet_y, _ly_pop)
+            && !tilemap_spike_toe_embed_only(_tm_pop, _pl_pop, _pc_pop, _pr_pop, _bl_pop, _br_pop, feet_y, _ly_pop)) {
             full_lip_anim_sticky = 0;
             repeat (12) {
                 y -= 1;
@@ -1719,7 +1714,7 @@ function scr_player_movement() {
     }
 
     // --- 6d. PEEL OUT OF TILEMAP (airborne wide bbox vs ledge lip) ---
-    // Skip when vsp==0: at a lip stall peel's x±1 nudges fight strict vertical resolution and read as edge jitter.
+    // Skip when vsp==0: at a lip stall peel's xÂ±1 nudges fight strict vertical resolution and read as edge jitter.
     if (global.tilemap_collision_id != noone && !grounded && vsp != 0) {
         var _ft_pd = floor(bbox_bottom);
         var _pl_pd = floor(bbox_left) + 1;
@@ -1728,12 +1723,12 @@ function scr_player_movement() {
         var _fpys_pd = _ft_pd + GROUND_CHECK_DIST;
         var _tm_pd = global.tilemap_collision_id;
         var _cap_pd = (_tm_pd != noone) && tilemap_cell_thin_floor_near_feet(_tm_pd, _pc_pd, _ft_pd);
-        var _rc_pd = check_tile_collision(_pc_pd, _fpys_pd);
-        var _rl_pd = check_tile_collision(_pl_pd, _fpys_pd);
-        var _rr_pd = check_tile_collision(_pr_pd, _fpys_pd);
+        var _rc_pd = check_floor_tile(_pc_pd, _fpys_pd);
+        var _rl_pd = check_floor_tile(_pl_pd, _fpys_pd);
+        var _rr_pd = check_floor_tile(_pr_pd, _fpys_pd);
         var _sp_pd = 999;
         if (_tm_pd != noone) {
-            _sp_pd = abs(tilemap_get_cell_x_at_pixel(_tm_pd, _pl_pd, _ft_pd) - tilemap_get_cell_x_at_pixel(_tm_pd, _pr_pd, _ft_pd));
+            _sp_pd = abs(tilemap_sample_cell_x(_tm_pd, _pl_pd, _ft_pd) - tilemap_sample_cell_x(_tm_pd, _pr_pd, _ft_pd));
         }
         var _skip_peel_full_teeter = FULL_BLOCK_EDGE_GROUND_FORGIVE && !_cap_pd && !_rc_pd && (_rl_pd || _rr_pd) && _sp_pd <= CAP_GROUND_CELL_SPAN_MAX;
         var _torso_pd = check_tile_collision(_pc_pd, floor((bbox_top + bbox_bottom) * 0.5));
@@ -1803,7 +1798,7 @@ function scr_player_movement() {
         }
     }
 
-    // Air: vertical can move y down but §6d peel / lip separation can push y back up the same frame — gravity still
+    // Air: vertical can move y down but Â§6d peel / lip separation can push y back up the same frame â€” gravity still
     // stacks vsp so HUD shows huge vsp with almost no net drop, then one frame clears and you "snap" fall. Cap when
     // net motion stayed tiny while vsp grew unrealistically.
     if (!grounded && stunTimer <= 0 && vsp > grv * 5) {
@@ -1813,7 +1808,7 @@ function scr_player_movement() {
 
     // --- 6a. GROUND SNAP (grounded only) ---
     // When !grounded but vsp was zeroed by collision (lip / coyote), snapping y+ here fought vertical resolution
-    // and peel — visible edge jitter. Flush-to-floor for true ground contact only; 6c + next frame §2 handle land.
+    // and peel â€” visible edge jitter. Flush-to-floor for true ground contact only; 6c + next frame Â§2 handle land.
     if (global.tilemap_collision_id != noone && vsp == 0 && grounded) {
         feet_y = floor(bbox_bottom);
         var _pl0 = floor(bbox_left) + 1;
@@ -1823,12 +1818,12 @@ function scr_player_movement() {
         if (!_skip_6a_ledges) {
         var _fpy6a = feet_y + GROUND_CHECK_DIST;
         var _cap6a = (_tm_lc != noone) && tilemap_cell_thin_floor_near_feet(_tm_lc, _pc0, feet_y);
-        var _rawc6a = check_tile_collision(_pc0, _fpy6a);
-        var _rawl6a = check_tile_collision(_pl0, _fpy6a);
-        var _rawr6a = check_tile_collision(_pr0, _fpy6a);
+        var _rawc6a = check_floor_tile(_pc0, _fpy6a);
+        var _rawl6a = check_floor_tile(_pl0, _fpy6a);
+        var _rawr6a = check_floor_tile(_pr0, _fpy6a);
         var _span6a = 999;
         if (global.tilemap_collision_id != noone) {
-            _span6a = abs(tilemap_get_cell_x_at_pixel(global.tilemap_collision_id, _pl0, feet_y) - tilemap_get_cell_x_at_pixel(global.tilemap_collision_id, _pr0, feet_y));
+            _span6a = abs(tilemap_sample_cell_x(global.tilemap_collision_id, _pl0, feet_y) - tilemap_sample_cell_x(global.tilemap_collision_id, _pr0, feet_y));
         }
         var _teeter6a_skip = FULL_BLOCK_EDGE_GROUND_FORGIVE && !_cap6a && !_rawc6a && (_rawl6a || _rawr6a) && _span6a <= CAP_GROUND_CELL_SPAN_MAX;
         var _torso_6a = check_tile_collision(_pc0, floor((bbox_top + bbox_bottom) * 0.5));
@@ -1929,11 +1924,11 @@ function scr_player_movement() {
         _stand_r_now = check_floor_standable(_p_right_now, _feet_y_now, GROUND_CHECK_DIST, GROUND_STANDABLE_EMBED_PX);
     }
     var _floor_votes_now = (_stand_l_now ? 1 : 0) + (_stand_c_now ? 1 : 0) + (_stand_r_now ? 1 : 0);
-    var _raw_floor_now = (check_tile_collision(_p_center_now, _fpy_now) ? 1 : 0) +
-        (check_tile_collision(_p_left_now, _fpy_now) ? 1 : 0) +
-        (check_tile_collision(_p_right_now, _fpy_now) ? 1 : 0);
-    var _raw_floor_any_now = check_tile_collision(_p_center_now, _fpy_now) ||
-        check_tile_collision(_p_left_now, _fpy_now) || check_tile_collision(_p_right_now, _fpy_now);
+    var _raw_floor_now = (check_floor_tile(_p_center_now, _fpy_now) ? 1 : 0) +
+        (check_floor_tile(_p_left_now, _fpy_now) ? 1 : 0) +
+        (check_floor_tile(_p_right_now, _fpy_now) ? 1 : 0);
+    var _raw_floor_any_now = check_floor_tile(_p_center_now, _fpy_now) ||
+        check_floor_tile(_p_left_now, _fpy_now) || check_floor_tile(_p_right_now, _fpy_now);
     var _votes_needed = GROUND_LAND_VOTES_MIN_AIR;
     var _ix_ln = (_tm6c != noone) ? tilemap_shelf_index_at_pixel(_tm6c, _p_left_now, _fpy_now) : -1;
     var _ix_cn = (_tm6c != noone) ? tilemap_shelf_index_at_pixel(_tm6c, _p_center_now, _fpy_now) : -1;
@@ -1947,22 +1942,22 @@ function scr_player_movement() {
         && _raw_floor_any_now && (_stand_l_now || _stand_c_now || _stand_r_now) && abs(vsp) <= _vsp_lim_6c;
     var _votes_ok_6c = (_floor_votes_now >= _votes_needed)
         || (!_shelf_strict_34_36_now && _cap_cell_now && _raw_floor_any_now && (_stand_l_now || _stand_c_now || _stand_r_now) && abs(vsp) <= _vsp_lim_6c);
-    var _center_floor_now = check_tile_collision(_p_center_now, _fpy_now);
+    var _center_floor_now = check_floor_tile(_p_center_now, _fpy_now);
     var _center_floor_anchor_now = _center_floor_now;
     var _shelf_raw_ok_now = _raw_floor_now >= GROUND_LAND_VOTES_MIN_AIR
         || (!_shelf_strict_34_36_now && _cap_cell_now && _raw_floor_any_now && _tm6c != noone
-            && abs(tilemap_get_cell_x_at_pixel(_tm6c, _p_left_now, _feet_y_now) - tilemap_get_cell_x_at_pixel(_tm6c, _p_right_now, _feet_y_now)) <= CAP_GROUND_CELL_SPAN_MAX);
+            && abs(tilemap_sample_cell_x(_tm6c, _p_left_now, _feet_y_now) - tilemap_sample_cell_x(_tm6c, _p_right_now, _feet_y_now)) <= CAP_GROUND_CELL_SPAN_MAX);
     if (!_center_floor_anchor_now && !_shelf_strict_34_36_now && _cap_cell_now && _tm6c != noone && _shelf_raw_ok_now) {
-        var _cxl6 = tilemap_get_cell_x_at_pixel(_tm6c, _p_left_now, _fpy_now);
-        var _cxc6 = tilemap_get_cell_x_at_pixel(_tm6c, _p_center_now, _fpy_now);
-        var _cxr6 = tilemap_get_cell_x_at_pixel(_tm6c, _p_right_now, _fpy_now);
+        var _cxl6 = tilemap_sample_cell_x(_tm6c, _p_left_now, _fpy_now);
+        var _cxc6 = tilemap_sample_cell_x(_tm6c, _p_center_now, _fpy_now);
+        var _cxr6 = tilemap_sample_cell_x(_tm6c, _p_right_now, _fpy_now);
         if (max(_cxl6, max(_cxc6, _cxr6)) - min(_cxl6, min(_cxc6, _cxr6)) <= CAP_GROUND_CELL_SPAN_MAX) {
             _center_floor_anchor_now = true;
         }
     }
     if (!_center_floor_anchor_now && !_shelf_strict_34_36_now && _cap_cell_now && _tm6c != noone && _votes_ok_6c && _raw_floor_any_now && (_stand_l_now || _stand_c_now || _stand_r_now)) {
-        var _sx_ln = tilemap_get_cell_x_at_pixel(_tm6c, _p_left_now, _feet_y_now);
-        var _sx_rn = tilemap_get_cell_x_at_pixel(_tm6c, _p_right_now, _feet_y_now);
+        var _sx_ln = tilemap_sample_cell_x(_tm6c, _p_left_now, _feet_y_now);
+        var _sx_rn = tilemap_sample_cell_x(_tm6c, _p_right_now, _feet_y_now);
         if (abs(_sx_ln - _sx_rn) <= CAP_GROUND_CELL_SPAN_MAX) _center_floor_anchor_now = true;
     }
     var _on_ground_now = false;
@@ -1977,9 +1972,9 @@ function scr_player_movement() {
     } else {
         var _span_lr_full = 999;
         if (_tm6c != noone) {
-            _span_lr_full = abs(tilemap_get_cell_x_at_pixel(_tm6c, _p_left_now, _feet_y_now) - tilemap_get_cell_x_at_pixel(_tm6c, _p_right_now, _feet_y_now));
+            _span_lr_full = abs(tilemap_sample_cell_x(_tm6c, _p_left_now, _feet_y_now) - tilemap_sample_cell_x(_tm6c, _p_right_now, _feet_y_now));
         }
-        var _toe_raw_now = check_tile_collision(_p_left_now, _fpy_now) || check_tile_collision(_p_right_now, _fpy_now);
+        var _toe_raw_now = check_floor_tile(_p_left_now, _fpy_now) || check_floor_tile(_p_right_now, _fpy_now);
         var _full_lip_ok = FULL_BLOCK_EDGE_GROUND_FORGIVE && _raw_floor_any_now && _span_lr_full <= CAP_GROUND_CELL_SPAN_MAX
             && (_raw_floor_now >= 2 || (_raw_floor_now >= 1 && _toe_raw_now));
         _on_ground_now = (_floor_votes_now >= _votes_needed) && (
@@ -2002,7 +1997,7 @@ function scr_player_movement() {
     if (grounded && vsp > 0.001 && stunTimer <= 0) vsp = 0;
     if (grounded) air_attack_used = false;
 
-    // Land frame on shelf: only plant/cancel sprint when holding into wall or shelf→void (keep walk snappy otherwise).
+    // Land frame on shelf: only plant/cancel sprint when holding into wall or shelfâ†’void (keep walk snappy otherwise).
     if (grounded && !_s2_grounded_in && !jumped_this_frame && stunTimer <= 0
         && global.tilemap_collision_id != noone) {
         var _fy_lb = floor(bbox_bottom);
@@ -2028,14 +2023,14 @@ function scr_player_movement() {
                 sprint_dash_standstill = false;
                 sprint_resume_hold = false;
             } else if ((key_right - key_left) != 0) {
-                // Same-frame walk after land — §4 ran while still airborne.
+                // Same-frame walk after land â€” Â§4 ran while still airborne.
                 hsp = walksp * clamp(key_right - key_left, -1, 1);
                 runMomentum = 0;
             }
         }
     }
 
-    // §4 runs before 6c sets grounded — resume hold sprint same frame we land (Z still held, no re-press)
+    // Â§4 runs before 6c sets grounded â€” resume hold sprint same frame we land (Z still held, no re-press)
     if (!attacking && stunTimer <= 0 && grounded && vsp >= 0 && !jumped_this_frame
         && key_sprint && sprint_hold_latched && sprint_resume_hold && !sprint_committed) {
         var _inputDir_land = (key_right - key_left);
@@ -2064,9 +2059,9 @@ function scr_player_movement() {
     // Full-block lip: animation-only stability (peak/fall probes use center-heavy checks that flicker at the last pixel).
     var _span_lr_ast = 999;
     if (_tm6c != noone && !_cap_cell_now) {
-        _span_lr_ast = abs(tilemap_get_cell_x_at_pixel(_tm6c, _p_left_now, _feet_y_now) - tilemap_get_cell_x_at_pixel(_tm6c, _p_right_now, _feet_y_now));
+        _span_lr_ast = abs(tilemap_sample_cell_x(_tm6c, _p_left_now, _feet_y_now) - tilemap_sample_cell_x(_tm6c, _p_right_now, _feet_y_now));
     }
-    // Only true "teeter" geometry: center probe misses void while feet still vote — not every full-block stand (span≤1 covers most landings).
+    // Only true "teeter" geometry: center probe misses void while feet still vote â€” not every full-block stand (spanâ‰¤1 covers most landings).
     var _lip_ast_refresh = FULL_BLOCK_EDGE_GROUND_FORGIVE && !_cap_cell_now && !_center_floor_now && _raw_floor_any_now
         && (_stand_l_now || _stand_c_now || _stand_r_now) && _span_lr_ast <= CAP_GROUND_CELL_SPAN_MAX && !_torso_overlap_6c && !_feet_embed_6c;
     if (_lip_ast_refresh) full_lip_anim_sticky = FULL_BLOCK_LIP_ANIM_STICKY_HOLD_FRAMES;
@@ -2097,32 +2092,34 @@ function scr_player_movement() {
     var _pc_pose = floor((bbox_left + bbox_right) * 0.5);
     var _tm_pose = global.tilemap_collision_id;
     var _cap_under_mc = (_tm_pose != noone) && tilemap_cell_thin_floor_near_feet(_tm_pose, _pc_pose, _fy_pose);
-    var _center_floor_pose = check_tile_collision(_pc_pose, _fy_pose + GROUND_CHECK_DIST);
+    var _center_floor_pose = check_floor_tile(_pc_pose, _fy_pose + GROUND_CHECK_DIST);
     var _pl_pose = floor(bbox_left) + 1;
     var _pr_pose = floor(bbox_right) - 1;
-    // Lip landing-crouch / teeter anim are for full-block edges only — shelves use center-missing + toe-hit too, but normal shelf idle/jog is correct there.
+    // Lip landing-crouch / teeter anim are for full-block edges only â€” shelves use center-missing + toe-hit too, but normal shelf idle/jog is correct there.
     var _shelf_any_near_feet_pose = (_tm_pose != noone) && (
         tilemap_cell_thin_floor_near_feet(_tm_pose, _pl_pose, _fy_pose) ||
         tilemap_cell_thin_floor_near_feet(_tm_pose, _pc_pose, _fy_pose) ||
         tilemap_cell_thin_floor_near_feet(_tm_pose, _pr_pose, _fy_pose));
     if (_shelf_any_near_feet_pose) full_lip_anim_sticky = 0;
     var _fp_pose = _fy_pose + GROUND_CHECK_DIST;
-    var _raw_c_teet = check_tile_collision(_pc_pose, _fp_pose);
-    var _raw_l_teet = check_tile_collision(_pl_pose, _fp_pose);
-    var _raw_r_teet = check_tile_collision(_pr_pose, _fp_pose);
+    var _raw_c_teet = check_floor_tile(_pc_pose, _fp_pose);
+    var _raw_l_teet = check_floor_tile(_pl_pose, _fp_pose);
+    var _raw_r_teet = check_floor_tile(_pr_pose, _fp_pose);
     var _span_teet = 999;
     if (_tm_pose != noone) {
-        _span_teet = abs(tilemap_get_cell_x_at_pixel(_tm_pose, _pl_pose, _fy_pose) - tilemap_get_cell_x_at_pixel(_tm_pose, _pr_pose, _fy_pose));
+        _span_teet = abs(tilemap_sample_cell_x(_tm_pose, _pl_pose, _fy_pose) - tilemap_sample_cell_x(_tm_pose, _pr_pose, _fy_pose));
     }
     var _torso_y_pose = floor((bbox_top + bbox_bottom) * 0.5);
     var _torso_overlap_pose = check_tile_collision(_pc_pose, _torso_y_pose);
     var _feet_embed_pose = tilemap_any_feet_row_full_block_embedded(_tm_pose, _pl_pose, _pc_pose, _pr_pose, floor(bbox_left), floor(bbox_right), _fy_pose, FULL_BLOCK_FEET_INTERIOR_LY_MIN);
-    // Same geometry as peel/snap skip: center misses at feet probe while a toe still hits — physics grounded can flicker one frame.
+    // Same geometry as peel/snap skip: center misses at feet probe while a toe still hits â€” physics grounded can flicker one frame.
     // When full_lip_anim_sticky is active, center probe can hiccup true for one frame while toes still hug the lip; without this,
-    // _teeter_anim drops out → _anim_grounded false → jump peak/fall with image_speed 0 while y barely moves (felt "stall").
+    // _teeter_anim drops out â†’ _anim_grounded false â†’ jump peak/fall with image_speed 0 while y barely moves (felt "stall").
     var _teeter_toe_floor = (_raw_l_teet || _raw_r_teet) && (!_raw_c_teet || full_lip_anim_sticky > 0);
     var _teeter_anim = FULL_BLOCK_EDGE_GROUND_FORGIVE && !_shelf_any_near_feet_pose && _teeter_toe_floor && _span_teet <= CAP_GROUND_CELL_SPAN_MAX
         && wall_side == 0 && abs(vsp) <= 2 && !_torso_overlap_pose && !_feet_embed_pose;
+    scr_room_exit_lock_ground();
+    if (scr_room_exit_is_crossing()) _teeter_anim = false;
     // Keep crouch art through a 1-frame ground flicker only while still on jump land frames.
     // A deliberate jump is not a flicker: without the rising guard this holds _anim_grounded
     // true while the player is already on the way up, so the ground pose branch keeps playing
@@ -2134,10 +2131,30 @@ function scr_player_movement() {
         && image_index >= ANIM_LAND_CROUCH_START && image_index <= ANIM_LAND_CROUCH_END;
     var _anim_grounded = grounded || _teeter_anim || _land_crouch_anim_hold;
 
-    if (!attacking) {
+    // A jump that was already in the air keeps its landing crouch. The walk-off flicker never raises jump_count.
+    var _exit_land = scr_room_exit_is_crossing() && (_exit_jump_count > 0
+        || (force_landing_crouch && (sprite_index == spr_mc_jump || sprite_index == spr_mc_doublejump)));
+    if (!attacking && scr_room_exit_is_crossing() && !_exit_land) {
+        // Front foot is off the map, back foot is still on it. That swap is the fall/land flicker.
+        grounded = true;
+        vsp = 0;
+        force_landing_crouch = false;
+        var _exit_fast = is_sprinting || sprint_committed;
+        var _exit_move = (abs(hsp) > 0.2);
+        if (variable_instance_exists(id, "key_right") && variable_instance_exists(id, "key_left")) {
+            _exit_move = _exit_move || ((key_right - key_left) != 0);
+        }
+        var _exit_spr = _exit_fast ? spr_mc_sprint : (_exit_move ? spr_mc_jog : spr_mc_idle);
+        if (sprite_index != _exit_spr) {
+            sprite_index = _exit_spr;
+            image_index = 0;
+        }
+        image_speed = 1;
+    } else if (!attacking) {
+        if (_exit_land) force_landing_crouch = true;
         if (stunTimer > 0) {
             // Hurt flinch takes priority over locomotion/jump pose for the whole stun/knockback
-            // lock — movement stays frozen (see stunned-physics block above) until this clears,
+            // lock â€” movement stays frozen (see stunned-physics block above) until this clears,
             // so the pose can never outlast (or be outlasted by) player control. Per-frame pacing
             // is tuned via HURT_ANIM_HOLD_FRAMES; overall length via ENEMY_STUN_FRAMES.
             sprint_reel_active = false;
@@ -2150,8 +2167,8 @@ function scr_player_movement() {
                 ? HURT_AIR_HOLD_FRAMES : max(1, floor(_hurt_hold * 0.5)));
 
             if (hurt_fall_anim) {
-                // Flinch finished mid-air (or ground-hurt walked off a ledge) — fall pose until plant.
-                if (_anim_grounded) {
+                // Flinch finished mid-air (or ground-hurt walked off a ledge) â€” fall pose until plant.
+                if (grounded) {
                     hurt_fall_anim = false;
                     hurt_is_air = false;
                     hurt_air_landed = true;
@@ -2183,7 +2200,7 @@ function scr_player_movement() {
                     sprite_index = spr_mc_hurt_air;
                     hurt_anim_tick = 0;
                 }
-                if (!hurt_air_landed && _anim_grounded) {
+                if (!hurt_air_landed && grounded) {
                     // Touchdown: switch to the landing block and restart its frame timing.
                     hurt_air_landed = true;
                     hurt_anim_tick = 0;
@@ -2213,11 +2230,11 @@ function scr_player_movement() {
                     hurt_anim_tick++;
                 }
             } else {
-                // Ground hurt — if knockback/walk carries off a ledge, hand off to fall.
+                // Ground hurt â€” if knockback/walk carries off a ledge, hand off to fall.
                 if (!_anim_grounded) {
                     hurt_fall_anim = true;
                     hair_flicker_counter = 0;
-                    // Ground stun used to charge knockBackY with gravity while planted — reset to a normal fall seed.
+                    // Ground stun used to charge knockBackY with gravity while planted â€” reset to a normal fall seed.
                     var _fall_cap = (variable_instance_exists(id, "MAX_FALL_VSP") ? MAX_FALL_VSP : 10);
                     knockBackY = clamp(knockBackY, -_fall_cap, 2);
                     vsp = knockBackY;
@@ -2242,7 +2259,7 @@ function scr_player_movement() {
                 && sprite_index != spr_mc_downward_attack && sprite_index != spr_mc_walljump
                 && sprite_index != spr_mc_jump && sprite_index != spr_mc_doublejump; // allow landing crouch on full-block lip edges
             if (_hold_full_lip_pose) {
-                // No dedicated teeter art yet — keep stable *ground* visuals on full-block lip (after jump land anim finishes).
+                // No dedicated teeter art yet â€” keep stable *ground* visuals on full-block lip (after jump land anim finishes).
                 var _lip_move = (_input_dir != 0) || (abs(hsp) > MOVEMENT_THRESHOLD);
                 if (_lip_move) {
                     if (sprite_index != spr_mc_jog) {
@@ -2262,8 +2279,8 @@ function scr_player_movement() {
                 if (image_index < ANIM_LAND_CROUCH_START) image_index = ANIM_LAND_CROUCH_START;
                 image_speed = 1; // Fall anim uses image_speed = 0; restore so crouch can play
                 
-                // Holding a direction skips crouch → jog/sprint — but only if that direction is open.
-                // Into a wall (or shelf→void) is not movement: play the land crouch like a plant.
+                // Holding a direction skips crouch â†’ jog/sprint â€” but only if that direction is open.
+                // Into a wall (or shelfâ†’void) is not movement: play the land crouch like a plant.
                 var _land_move = (_input_dir != 0);
                 if (_land_move && global.tilemap_collision_id != noone) {
                     var _wx_lm = (_input_dir > 0) ? (floor(bbox_right) + 1) : (floor(bbox_left) - 1);
@@ -2304,7 +2321,7 @@ function scr_player_movement() {
                 force_landing_crouch = true;
             } else if (sprite_index == spr_mc_attack2 || sprite_index == spr_asta_attack1
                 || sprite_index == spr_mc_air_attack || sprite_index == spr_mc_downward_attack) {
-                // Attack just ended — sprint if the run resumed, otherwise jog/idle
+                // Attack just ended â€” sprint if the run resumed, otherwise jog/idle
                 sprite_index = (is_sprinting || sprint_committed) ? spr_mc_sprint
                     : ((abs(hsp) > MOVEMENT_THRESHOLD) ? spr_mc_jog : spr_mc_idle);
                 image_index = 0;
@@ -2336,7 +2353,7 @@ function scr_player_movement() {
             if (sprint_reel_active || sprite_index == spr_mc_reelback
                 || sprint_reel_wall
                 || (sprint_reel_pending && !(key_left || key_right))) {
-                // Play reel as soon as direction is released — do NOT wait for Z up.
+                // Play reel as soon as direction is released â€” do NOT wait for Z up.
                 // Wall dead-stop: keep reel while jammed into the wall (holding into it / no dir).
                 sprint_reel_active = true;
                 sprint_reel_pending = false;
@@ -2358,7 +2375,7 @@ function scr_player_movement() {
                     image_index = 0;
                 }
             } else if (sprint_reel_pending && !key_sprint && (key_left || key_right) && sprint_reel_dir_wait > 0) {
-                // Staggered key release — keep sprint pose until direction lets go or wait expires
+                // Staggered key release â€” keep sprint pose until direction lets go or wait expires
                 sprint_reel_active = false;
                 if (sprite_index != spr_mc_sprint) {
                     sprite_index = spr_mc_sprint;
@@ -2367,7 +2384,7 @@ function scr_player_movement() {
                 image_speed = 1;
             } else {
                 if (!sprint_reel_pending) sprint_reel_active = false;
-                // Left jump crouch without clearing the latch (e.g. shelf land → idle) — release control.
+                // Left jump crouch without clearing the latch (e.g. shelf land â†’ idle) â€” release control.
                 force_landing_crouch = false;
                 // Normal ground movement (walk / idle)
                 image_speed = 1;
@@ -2384,12 +2401,12 @@ function scr_player_movement() {
             sprint_reel_wall = false;
             sprint_reel_wall_dir = 0;
             sprint_reel_dir_wait = 0;
-            // Air logic — wall cling / wall-jump pose (MMX wall_slide + wall_jump anim), then jump rise / peak / fall
-            if (wall_jump_kick_hold_timer > 0) {
+            // Air logic â€” wall cling / wall-jump pose (MMX wall_slide + wall_jump anim), then jump rise / peak / fall
+            if (wall_jump_kick_hold_timer > 0 && !(wall_side != 0 && cling_eff && vsp > 0)) {
                 sprite_index = spr_mc_walljump;
                 image_index = 1;
                 image_speed = 0;
-                image_xscale = -wall_side * image_base_scale;
+                image_xscale = (last_direction != 0) ? last_direction * image_base_scale : image_xscale;
             } else if (wall_side != 0 && cling_eff && vsp > 0) {
                 sprite_index = spr_mc_walljump;
                 image_index = 0;
@@ -2404,7 +2421,7 @@ function scr_player_movement() {
                 image_index = min(floor(double_jump_anim_tick / _dj_hold), _dj_n - 1);
             } else {
             var _lip_fall_teeter_geom = _teeter_anim || (!_raw_c_teet && (_raw_l_teet || _raw_r_teet));
-            // Sticky can linger after stepping off toward a lower floor; vsp<6 kept idle for the whole drop — only
+            // Sticky can linger after stepping off toward a lower floor; vsp<6 kept idle for the whole drop â€” only
             // use air-idle when still reading as lip teeter and vertical speed is tiny (first ticks off the edge).
             var _lip_fall_pose = FULL_BLOCK_EDGE_GROUND_FORGIVE && full_lip_anim_sticky > 0 && !_shelf_any_near_feet_pose
                 && vsp > -2 && vsp <= 2 && !_torso_overlap_pose && !_feet_embed_pose && _lip_fall_teeter_geom;
@@ -2428,7 +2445,7 @@ function scr_player_movement() {
                     var _near_col = check_tile_collision(_fc_pk, _ft_pk + 1) || check_tile_collision(_fc_pk, _ft_pk + 2)
                         || check_tile_collision(_toe_l_pk, _ft_pk + 1) || check_tile_collision(_toe_r_pk, _ft_pk + 1);
                     var _peak_has_floor_center = _below_any && _near_col;
-                    // Apex-over-ground frame only while still rising. At vsp ≈ 0 on a ledge (tiles 1/5/34/35/36),
+                    // Apex-over-ground frame only while still rising. At vsp â‰ˆ 0 on a ledge (tiles 1/5/34/35/36),
                     // floor probes stay true and this branch would lock 2f/3f forever; image_speed must be 0 when
                     // pinning frame 2 or GM advances to subimage 3 the same frame.
                     if (_peak_has_floor_center && vsp < 0) {
@@ -2460,7 +2477,7 @@ function scr_player_movement() {
                     var _is_near_ground = (vsp > 0) && _below_anim && _near_anim;
                     
                     if (_is_near_ground) {
-                        // Only enter crouch — do NOT pin to START every frame (that restarts the land anim).
+                        // Only enter crouch â€” do NOT pin to START every frame (that restarts the land anim).
                         image_speed = 1;
                         if (image_index < ANIM_LAND_CROUCH_START) image_index = ANIM_LAND_CROUCH_START;
                     } else {
@@ -2489,17 +2506,17 @@ function scr_player_movement() {
             : 1;
     }
 
-    // --- 7b. LANDING CROUCH MOVEMENT LOCK (animation runs after §5 hsp — zero slide during crouch) ---
+    // --- 7b. LANDING CROUCH MOVEMENT LOCK (animation runs after Â§5 hsp â€” zero slide during crouch) ---
     if (!attacking && stunTimer <= 0) {
         var _land_crouch_now = grounded
             && (sprite_index == spr_mc_jump || sprite_index == spr_mc_doublejump)
             && image_index >= ANIM_LAND_CROUCH_START && image_index < ANIM_LAND_CROUCH_END;
-        if (_land_crouch_now) {
+        if (_land_crouch_now && !scr_room_exit_is_crossing()) {
             hsp = 0;
             runMomentum = 0;
         } else if (force_landing_crouch && (jumped_this_frame || (!grounded && vsp < 0))) {
             // Jumped out of a land crouch. The sprite-mismatch release below can never catch
-            // this, because a rising player is still on spr_mc_jump — so the latch would ride
+            // this, because a rising player is still on spr_mc_jump â€” so the latch would ride
             // out the whole jump and also block the next landing from skipping its crouch.
             force_landing_crouch = false;
         } else if (force_landing_crouch
@@ -2527,15 +2544,13 @@ function scr_player_movement() {
     if (_dash_face_lock) {
         image_xscale = (sprint_commit_dir > 0) ? image_base_scale : -image_base_scale;
         last_direction = sprint_commit_dir;
-    } else if (wall_jump_lock > 0) {
+    } else if (wall_jump_lock > 0 && !(wall_side != 0 && cling_eff && vsp > 0)) {
         var _move_dir = sign(hsp);
         if (_move_dir != 0) {
             image_xscale = (_move_dir > 0) ? image_base_scale : -image_base_scale;
             last_direction = _move_dir;
         }
     } else if (wall_side != 0 && !_anim_grounded && cling_eff && vsp > 0 && !attacking) {
-        // Slide facing waits until the swing ends. Applying it mid air-attack flips the
-        // slash toward the wall, then the cling pose takes over when the swing finishes.
         image_xscale = -wall_side * image_base_scale;
         last_direction = -wall_side;
     } else if (_input_dir != 0 && stunTimer <= 0 && !attacking) {
@@ -2658,6 +2673,10 @@ function scr_player_movement() {
         }
     }
 
+    scr_player_spike_side_eject();
+    scr_player_spike_tile_touch(_spike_edge_x);
+    scr_room_transition_hold_exit_line(_exit_grounded, _exit_y);
+    scr_room_exit_lock_pose();
     shelf_bb_bottom_prev = bbox_bottom;
 }
 
@@ -2669,7 +2688,7 @@ function scr_player_sprint_jump_carry_speed() {
 }
 
 /// @function scr_player_dash_speed_mult
-/// @description 0..1 dash progress → speed multiplier (ease-in, hold peak, ease-out).
+/// @description 0..1 dash progress â†’ speed multiplier (ease-in, hold peak, ease-out).
 function scr_player_dash_speed_mult(_u) {
     _u = clamp(_u, 0, 1);
     var _in = variable_instance_exists(id, "DASH_EASE_IN") ? DASH_EASE_IN : 0.30;
@@ -2693,12 +2712,12 @@ function scr_player_dash_speed_mult(_u) {
 }
 
 /// @function scr_player_sprint_try_begin
-/// @description Commit dash/sprint on the input frame — sets hsp + i-frames immediately.
+/// @description Commit dash/sprint on the input frame â€” sets hsp + i-frames immediately.
 /// @param {Bool} _early True from Begin Step (before movement / other instances' Step).
 /// @returns {Bool} True if a new dash or sprint session started.
 function scr_player_sprint_try_begin(_early) {
     if (is_dying || stunTimer > 0 || sprint_committed) return false;
-    // Perfect-dodge window owns movement — don't start a dash from buffered Z mid-flip
+    // Perfect-dodge window owns movement â€” don't start a dash from buffered Z mid-flip
     if (state == PLAYER_STATE.PERFECT_DODGE_SLOWMO || state == PLAYER_STATE.DODGE_COUNTER) return false;
 
     var _dash_wants = (key_sprint_press || dash_input_buffer > 0);
@@ -2730,7 +2749,7 @@ function scr_player_sprint_try_begin(_early) {
     var _dash_speed = (variable_instance_exists(id, "DASH_SPEED") ? DASH_SPEED : 8.5);
     var _burst_speed = (variable_instance_exists(id, "SPRINT_BURST_SPEED") ? SPRINT_BURST_SPEED : runsp);
 
-    // Atk1 poke-and-run — buffered Z works too
+    // Atk1 poke-and-run â€” buffered Z works too
     if (attacking && !_recovery_locked) {
         var _dc_dir = inputDir;
         if (_dc_dir == 0) _dc_dir = last_direction;
@@ -2751,7 +2770,7 @@ function scr_player_sprint_try_begin(_early) {
     // the dash before the jump, so the jump would carry dash speed off a standstill.
     if (key_jump && !is_sprinting && abs(hsp) <= walksp + 0.01) return false;
 
-    // Standstill tap-Z: fixed burst in facing direction — never extends to run
+    // Standstill tap-Z: fixed burst in facing direction â€” never extends to run
     if (inputDir == 0 && _dash_sprite_ok) {
         var _sd = last_direction;
         if (_sd == 0) _sd = sign(image_xscale);
@@ -2777,7 +2796,7 @@ function scr_player_sprint_try_begin(_early) {
         }
         image_speed = 1;
         sprint_squash_coil_frames = 1;
-        // Start at eased entry speed — peak comes mid-dash, not on frame 0.
+        // Start at eased entry speed â€” peak comes mid-dash, not on frame 0.
         hsp = _dash_speed * scr_player_dash_speed_mult(0) * _sd;
         runMomentum = hsp;
         scr_player_dash_iframes_begin();
@@ -2816,4 +2835,125 @@ function scr_player_sprint_try_begin(_early) {
     }
 
     return false;
+}
+
+/// @function scr_player_spike_side_eject
+/// @description If a landing left the body in the spike wall, push back out. The tip is left alone so a protected landing can stand there.
+function scr_player_spike_side_eject() {
+    var _tm = global.tilemap_collision_id;
+    if (_tm == noone || _tm == -1) return;
+    repeat (20) {
+        var _l = floor(bbox_left);
+        var _r = floor(bbox_right);
+        var _feet = floor(bbox_bottom);
+        var _mid = floor((bbox_top + bbox_bottom) * 0.5);
+        var _lo = _feet - 1;
+        var _in_l = tilemap_spike_side_at(_tm, _l, _mid) || tilemap_spike_side_at(_tm, _l, _lo) || tilemap_spike_side_at(_tm, _l, _feet);
+        var _in_r = tilemap_spike_side_at(_tm, _r, _mid) || tilemap_spike_side_at(_tm, _r, _lo) || tilemap_spike_side_at(_tm, _r, _feet);
+        if (!_in_l && !_in_r) break;
+        if (_in_l && _in_r) break;
+        x += _in_r ? -1 : 1;
+        hsp = 0;
+        runMomentum = 0;
+    }
+}
+
+/// @function scr_player_spike_tile_touch
+/// @description Feet on the spike tips take damage, including either edge of that top. The sides do not.
+/// @param {Id.Instance|Real} _edge_x Cell center if this step already crossed a tip the feet have since left.
+function scr_player_spike_tile_touch(_edge_x) {
+    if (global.tilemap_collision_id == noone) return;
+    // The downward arc bounces off any spike it touches, not only a feet-first landing on the tips.
+    var _blade = scr_player_down_attack_spike_x();
+    if (_blade != noone && scr_player_spike_pogo_try(_blade)) return;
+    var _hit_x = tilemap_spike_touch_x(global.tilemap_collision_id, bbox_left, bbox_right, floor(bbox_bottom));
+    if (_hit_x == noone) _hit_x = _edge_x;
+    if (_hit_x == noone) return;
+    if (scr_player_spike_pogo_try(_hit_x)) return;
+    scr_player_spike_hurt(_hit_x);
+}
+
+/// @function scr_player_down_attack_spike_x
+/// @description A point on a spike inside the downward slash. noone if the arc misses.
+function scr_player_down_attack_spike_x() {
+    if (!attacking || !variable_instance_exists(id, "attack_is_down") || !attack_is_down) return noone;
+    var _tm = global.tilemap_collision_id;
+    if (_tm == noone || _tm == -1) return noone;
+    var _hb = scr_player_attack_compute_hitbox();
+    if (!_hb.active || !_hb.downward) return noone;
+    var _x0 = floor(min(_hb.x1, _hb.x2));
+    var _x1 = floor(max(_hb.x1, _hb.x2));
+    var _y0 = floor(min(_hb.y1, _hb.y2));
+    var _y1 = floor(max(_hb.y1, _hb.y2));
+    var _step = 6;
+    for (var _py = _y0; _py <= _y1; _py += _step) {
+        for (var _px = _x0; _px <= _x1; _px += _step) {
+            if (tilemap_point_spike_solid(_tm, _px, _py)) return _px;
+            var _top = tilemap_spike_top_at(_tm, _px, _py);
+            if (_top != noone) return _top;
+        }
+    }
+    if (tilemap_point_spike_solid(_tm, _x1, _y1)) return _x1;
+    return tilemap_spike_top_at(_tm, _x1, _y1);
+}
+
+/// @function scr_player_spike_pogo_try
+/// @description Pop off spike tips during the active downward slash. No damage, and the swing keeps playing.
+/// @param {Real} _hit_x Spike cell center under the feet.
+function scr_player_spike_pogo_try(_hit_x) {
+    if (!attacking || !variable_instance_exists(id, "attack_is_down") || !attack_is_down) return false;
+    var _hb = scr_player_attack_compute_hitbox();
+    if (!_hb.active || !_hb.downward) return false;
+    // Already bouncing from this swing — don't pop again, and don't take the tip damage either.
+    if (pogo_rising) return true;
+    // Underside of the downward arc. 270 sends the same hit sparks down, away from the blade.
+    var _fx_x = (_hit_x != noone) ? _hit_x : ((_hb.x1 + _hb.x2) * 0.5);
+    var _below = _hb.edge_y1 + 8;
+    scr_player_impact_lines_on_hit(_fx_x - 8, _below - 4, _fx_x + 8, _below + 4, noone, false, true, 270, true);
+    var _stop = (variable_instance_exists(id, "ATTACK_LIGHT_HITSTOP") ? ATTACK_LIGHT_HITSTOP : 5);
+    scr_hitstop_trigger(_stop);
+    scr_player_apply_nail_pogo();
+    return true;
+}
+
+/// @function scr_player_spike_hurt
+/// @description Damage and pop off spike tips. Dash i-frames skip it.
+function scr_player_spike_hurt(_spike_x) {
+    if (scr_player_has_damage_iframes()) return;
+
+    var _dmg = (variable_instance_exists(id, "SPIKE_DAMAGE") ? SPIKE_DAMAGE : ENEMY_COLLISION_DAMAGE);
+    obj_player_health -= _dmg;
+    attacking = false;
+    attack_lockout = 0;
+    attack_commit_lock = 0;
+    attack_recovery_lock = 0;
+    attackCooldownTimer = 0;
+    attack_buffer_timer = 0;
+    attack_chain_buffer_timer = 0;
+    attack_chain_latched = false;
+    attack_shift_remaining = 0;
+    combo_buffer = false;
+    comboTimer = 0;
+    comboCount = 0;
+    debug_hitbox_active = false;
+    attack_priority_timer = 0;
+
+    var _push = sign(x - _spike_x);
+    if (_push == 0) _push = -last_direction;
+    if (_push == 0) _push = 1;
+    var _ky = (variable_instance_exists(id, "SPIKE_KNOCK_Y") ? SPIKE_KNOCK_Y : -6);
+    knockBackX = _push * ENEMY_KNOCKBACK_X;
+    knockBackY = _ky;
+    hsp = knockBackX;
+    vsp = _ky;
+    runMomentum = hsp;
+    grounded = false;
+    coyote_time_timer = 0;
+    stunTimer = ENEMY_STUN_FRAMES;
+    hurt_is_air = true;
+    hurt_air_landed = false;
+    hurt_fall_anim = false;
+    hurt_anim_tick = 0;
+    invincible = true;
+    invincibleTimer = INVINCIBILITY_FRAMES;
 }

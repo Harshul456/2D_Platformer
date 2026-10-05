@@ -987,20 +987,8 @@ function scr_water_glow_spawn(_controller) {
     scr_water_glow_cleanup(_controller);
 
     with (_controller) {
-        // Falls are placed first on purpose: they need only a few lights each, whereas a
-        // room-wide pool could otherwise eat the whole budget and leave the streams dark.
-        if (BULB_WATERFALL_ENABLED && variable_instance_exists(id, "waterfall_soft_columns")) {
-            var _fstep = max(8, BULB_WATER_GLOW_FALL_SPACING);
-
-            for (var _c = 0; _c < array_length(waterfall_soft_columns); _c++) {
-                var _col = waterfall_soft_columns[_c];
-                for (var _y = _col.y0 + _fstep * 0.5; _y < _col.y1; _y += _fstep) {
-                    scr_water_glow_add(id, _col.cx, _y,
-                        BULB_WATER_GLOW_FALL_LIGHT_XSCALE, BULB_WATER_GLOW_FALL_LIGHT_YSCALE);
-                }
-            }
-        }
-
+        // Falls carry no lights of their own: the stream is drawn behind the platforms, and
+        // lighting it from inside washed over the rock around it. Pools only from here.
         if (BULB_POND_ENABLED && variable_instance_exists(id, "pond_list")) {
             var _step = max(8, BULB_WATER_GLOW_POND_SPACING);
 
@@ -1095,24 +1083,34 @@ function scr_water_glow_draw(_controller) {
             }
         }
 
-        if (BULB_WATERFALL_ENABLED && variable_instance_exists(id, "waterfall_soft_columns")) {
-            var _fall_a = BULB_WATER_GLOW_FALL_CORE_ALPHA;
+        // Stream edges get the same band, replaying the rippling rim path the waterfall
+        // drew this frame, so both waters glow identically.
+        if (BULB_WATERFALL_ENABLED && variable_instance_exists(id, "waterfall_baked") && waterfall_baked
+            && variable_instance_exists(id, "waterfall_soft_columns")) {
+            var _fall_depth = BULB_WATER_GLOW_POND_CORE_DEPTH;
+            var _fall_a = BULB_WATER_GLOW_POND_CORE_ALPHA;
 
-            for (var _c2 = 0; _c2 < array_length(waterfall_soft_columns); _c2++) {
-                var _col = waterfall_soft_columns[_c2];
-                var _half = max(2, _col.half);
-                if (_col.cx + _half < _vx0 || _col.cx - _half > _vx1) continue;
-                if (_col.y1 < _vy0 || _col.y0 > _vy1) continue;
+            for (var _f = 0; _f < array_length(waterfall_soft_columns); _f++) {
+                var _fc = waterfall_soft_columns[_f];
+                if (!variable_struct_exists(_fc, "rim_n") || _fc.rim_n < 2) continue;
+                if (_fc.y1 < _vy0 || _fc.y0 > _vy1) continue;
+                if (_fc.cx + _fc.half < _vx0 || _fc.cx - _fc.half > _vx1) continue;
 
-                // Bright down the centre line, falling to nothing at the stream edges.
-                draw_primitive_begin(pr_trianglestrip);
-                draw_vertex_colour(_col.cx - _half, _col.y0, _glow, 0);
-                draw_vertex_colour(_col.cx - _half, _col.y1, _glow, 0);
-                draw_vertex_colour(_col.cx, _col.y0, _glow, _fall_a);
-                draw_vertex_colour(_col.cx, _col.y1, _glow, _fall_a);
-                draw_vertex_colour(_col.cx + _half, _col.y0, _glow, 0);
-                draw_vertex_colour(_col.cx + _half, _col.y1, _glow, 0);
-                draw_primitive_end();
+                var _fn = _fc.rim_n;
+                var _fy = _fc.rim_y;
+                var _in = min(_fall_depth, max(2, _fc.half));
+
+                // Left edge fades inward (+x), right edge inward (-x).
+                for (var _side = 0; _side < 2; _side++) {
+                    var _fx = (_side == 0) ? _fc.rim_lx : _fc.rim_rx;
+                    var _dir = (_side == 0) ? 1 : -1;
+                    draw_primitive_begin(pr_trianglestrip);
+                    for (var _k = 0; _k < _fn; _k++) {
+                        draw_vertex_colour(_fx[_k], _fy[_k], _glow, _fall_a);
+                        draw_vertex_colour(_fx[_k] + _dir * _in, _fy[_k], _glow, 0);
+                    }
+                    draw_primitive_end();
+                }
             }
         }
 

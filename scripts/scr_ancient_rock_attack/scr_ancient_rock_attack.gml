@@ -164,6 +164,42 @@ function scr_ancient_rock_light_release_step() {
     }
 }
 
+/// Bridge tiles are one-way for the player. A bolt treats the whole cell as solid, so it cannot slip under them.
+function tilemap_point_blocks_ancient_bolt(_tm, _px, _py) {
+    if (tilemap_point_solid(_tm, _px, _py)) return true;
+    if (_tm == noone || _tm == -1) return false;
+    var _td = tilemap_sample(_tm, _px, _py);
+    if (_td == 0) return false;
+    return tilecol_one_way_shelf_tile_index(tile_get_index(_td));
+}
+
+/// @description True if the bolt body overlaps a wall or a bridge cell.
+function scr_ancient_rock_bolt_space_blocked(_tm, _px, _py) {
+    if (_tm == noone || _tm == -1) return check_tile_collision(_px, _py);
+    return tilemap_point_blocks_ancient_bolt(_tm, _px, _py)
+        || tilemap_point_blocks_ancient_bolt(_tm, _px + 3, _py)
+        || tilemap_point_blocks_ancient_bolt(_tm, _px - 3, _py)
+        || tilemap_point_blocks_ancient_bolt(_tm, _px, _py + 3)
+        || tilemap_point_blocks_ancient_bolt(_tm, _px, _py - 3);
+}
+
+/// @description First open point along the shot. Hover bob can park the core inside the ledge.
+function scr_ancient_rock_bolt_clear_origin(_ox, _oy, _dir) {
+    var _tm = (variable_global_exists("tilemap_collision_id") ? global.tilemap_collision_id : noone);
+    var _ahead = ROCK_BOLT_SPEED;
+    for (var _d = 0; _d <= 48; _d += 2) {
+        var _x = _ox + lengthdir_x(_d, _dir);
+        var _y = _oy + lengthdir_y(_d, _dir);
+        var _nx = _x + lengthdir_x(_ahead, _dir);
+        var _ny = _y + lengthdir_y(_ahead, _dir);
+        if (!scr_ancient_rock_bolt_space_blocked(_tm, _x, _y)
+            && !scr_ancient_rock_bolt_space_blocked(_tm, _nx, _ny)) {
+            return { x: _x, y: _y };
+        }
+    }
+    return { x: _ox, y: _oy };
+}
+
 /// @description Fire one bolt aimed at the player — direction locks at launch (no homing).
 function scr_ancient_rock_fire_bolt() {
     var _core = scr_ancient_rock_core_xy();
@@ -175,13 +211,16 @@ function scr_ancient_rock_fire_bolt() {
         _ty = (obj_player.bbox_top + obj_player.bbox_bottom) * 0.5;
     }
 
+    var _dir = point_direction(_core.x, _core.y, _tx, _ty);
+    _dir += random_range(-ROCK_BOLT_AIM_SPREAD, ROCK_BOLT_AIM_SPREAD);
+    var _spawn = scr_ancient_rock_bolt_clear_origin(_core.x, _core.y, _dir);
+
     var _layer = scr_hit_fx_layer();
-    var _bolt = instance_create_layer(_core.x, _core.y, _layer, obj_ancient_rock_bolt);
+    var _bolt = instance_create_layer(_spawn.x, _spawn.y, _layer, obj_ancient_rock_bolt);
     with (_bolt) {
         owner = other.id;
         damage = other.rock_bolt_damage;
-        bolt_dir = point_direction(x, y, _tx, _ty);
-        bolt_dir += random_range(-ROCK_BOLT_AIM_SPREAD, ROCK_BOLT_AIM_SPREAD);
+        bolt_dir = _dir;
         bolt_spd = ROCK_BOLT_SPEED;
     }
 

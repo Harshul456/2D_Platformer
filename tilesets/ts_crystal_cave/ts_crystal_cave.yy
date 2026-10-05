@@ -1,7 +1,12 @@
 {
   "$GMTileSet":"v1",
   "%Name":"ts_crystal_cave",
-  "autoTileSets":[],
+  "autoTileSets":[
+    {"$GMAutoTileSet":"","%Name":"autotile_1","closed_edge":false,"name":"autotile_1","resourceType":"GMAutoTileSet","resourceVersion":"2.0","tiles":[120,119,117,118,93,106,0,85,91,0,104,86,92,98,99,105,],},
+    {"$GMAutoTileSet":"","%Name":"autotile_2","closed_edge":false,"name":"autotile_2","resourceType":"GMAutoTileSet","resourceVersion":"2.0","tiles":[78,119,117,118,93,106,0,85,91,0,104,86,92,98,99,105,],},
+    {"$GMAutoTileSet":"","%Name":"autotile_3","closed_edge":false,"name":"autotile_3","resourceType":"GMAutoTileSet","resourceVersion":"2.0","tiles":[79,119,117,118,93,106,0,85,91,0,104,86,92,98,99,105,],},
+    {"$GMAutoTileSet":"","%Name":"autotile_4","closed_edge":false,"name":"autotile_4","resourceType":"GMAutoTileSet","resourceVersion":"2.0","tiles":[80,119,117,118,93,106,0,85,91,0,104,86,92,98,99,105,],},
+  ],
   "macroPageTiles":{
     "SerialiseHeight":0,
     "SerialiseWidth":0,

@@ -1,7 +1,8 @@
 /// @description Waterfall on Tiles_Waterfall (tile 24 stream).
 /// Native tilemap draw. Y wrap-scroll = downward flow.
 /// X is world-locked so the column stays where you authored it.
-/// Depth sits just in front of mid so mid rock cannot bury it.
+/// Soft stream is drawn by obj_waterfall_drawer on WaterfallBehind, one step behind
+/// lay_collision / near_tiles, so bridges, platforms, and the player cover it.
 /// Optional: tile 24 painted on mid_tiles is moved onto Tiles_Waterfall at bake.
 /// Ground splash particles use the tile-24 teal/lime palette.
 
@@ -267,9 +268,16 @@ function scr_waterfall_bake(_controller, _layer_name = BULB_WATERFALL_LAYER) {
         waterfall_sfx_gain = 0;
         if (waterfall_layer_id == -1) return;
 
+        // Layer begin/end scripts were still compositing the column after Instances
+        // (bridge, crystal wing, and the player all sat under the stream).
+        // The stream is drawn by obj_waterfall_drawer instead, on a real layer
+        // behind the platforms. Keep these scripts empty so they cannot draw on top.
         layer_script_begin(waterfall_layer_id, scr_waterfall_layer_script_noop);
-        // All waterfall visuals draw on this layer (behind Instances / player).
-        layer_script_end(waterfall_layer_id, scr_waterfall_layer_draw_soft);
+        layer_script_end(waterfall_layer_id, scr_waterfall_layer_script_noop);
+        var _near = layer_get_id("near_tiles");
+        if (_near != -1) layer_script_begin(_near, scr_waterfall_layer_script_noop);
+        var _collision = layer_get_id("lay_collision");
+        if (_collision != -1) layer_script_begin(_collision, scr_waterfall_layer_script_noop);
 
         waterfall_tilemap = layer_tilemap_get_id(waterfall_layer_id);
         if (waterfall_tilemap == -1) return;
@@ -285,19 +293,8 @@ function scr_waterfall_bake(_controller, _layer_name = BULB_WATERFALL_LAYER) {
 
         waterfall_tile_h = max(1, tilemap_get_tile_height(waterfall_tilemap));
 
-        if (_mid != -1) {
-            // Just in front of mid rock, still well behind Instances (player).
-            layer_depth(waterfall_layer_id, layer_get_depth(_mid) - 1);
-        }
-
-        // Guarantee behind the actor layer so the player always reads in front of the water.
-        var _actors = layer_get_id("Instances");
-        if (_actors != -1) {
-            var _behind_player = layer_get_depth(_actors) + 80;
-            if (layer_get_depth(waterfall_layer_id) < _behind_player) {
-                layer_depth(waterfall_layer_id, _behind_player);
-            }
-        }
+        // Leftover stream tiles sit behind the drawer. Platforms and the player draw later.
+        scr_waterfall_pin_behind_platforms(waterfall_layer_id);
 
         // Only place ponds relative to the waterfall when there's no lay_collision to
         // mask their wall-seam overlap (scr_pond_bake pins them behind it otherwise).
@@ -316,7 +313,7 @@ function scr_waterfall_bake(_controller, _layer_name = BULB_WATERFALL_LAYER) {
         }
         if (BULB_WATERFALL_SOFT_STREAM) {
             waterfall_soft_columns = scr_waterfall_bake_soft_columns(waterfall_splash_emitters);
-            // Remove zig-zag tiles; soft columns draw in the layer script instead.
+            // Remove zig-zag tiles; soft columns draw on WaterfallBehind instead.
             scr_waterfall_clear_stream_tiles(waterfall_tilemap);
         }
         if (BULB_WATERFALL_LEAK_ENABLED) {
@@ -327,6 +324,7 @@ function scr_waterfall_bake(_controller, _layer_name = BULB_WATERFALL_LAYER) {
         layer_set_visible(waterfall_layer_id, true);
 
         waterfall_baked = true;
+        scr_waterfall_ensure_drawer();
         scr_waterfall_sfx_start(id);
     }
 }
@@ -334,8 +332,57 @@ function scr_waterfall_bake(_controller, _layer_name = BULB_WATERFALL_LAYER) {
 function scr_waterfall_layer_script_noop() {
 }
 
-/// @description Draw soft translucent main columns + sparkles at Tiles_Waterfall depth.
-/// Splash / side leaks also draw here so the player (Instances) stays visually in front.
+/// @description Depth just behind lay_collision / near_tiles. Higher depth draws further back.
+function scr_waterfall_platform_back_depth() {
+    var _names = ["lay_collision", "near_tiles", "foreground"];
+    var _furthest = undefined;
+    for (var _i = 0; _i < array_length(_names); _i++) {
+        var _id = layer_get_id(_names[_i]);
+        if (_id == -1) continue;
+        var _d = layer_get_depth(_id);
+        if (is_undefined(_furthest) || _d > _furthest) _furthest = _d;
+    }
+
+    var _target = _furthest;
+    if (is_undefined(_target)) {
+        var _bg = layer_get_id("Background");
+        if (_bg != -1) return layer_get_depth(_bg) - 1;
+        return 1000;
+    }
+
+    _target += 1;
+    var _actors = layer_get_id("Instances");
+    if (_actors != -1) {
+        var _behind_player = layer_get_depth(_actors) + 1;
+        if (_target < _behind_player) _target = _behind_player;
+    }
+    return _target;
+}
+
+/// @description Keep leftover stream tiles behind the soft-draw layer.
+function scr_waterfall_pin_behind_platforms(_layer) {
+    if (_layer == -1) return;
+    layer_depth(_layer, scr_waterfall_platform_back_depth() + 1);
+}
+
+/// @description Instance layer behind the platforms. Its Draw runs before near_tiles,
+/// lay_collision, and Instances, so those cover the stream.
+function scr_waterfall_ensure_drawer() {
+    var _depth = scr_waterfall_platform_back_depth();
+    var _lay = layer_get_id("WaterfallBehind");
+    if (_lay == -1) {
+        _lay = layer_create(_depth, "WaterfallBehind");
+    } else {
+        layer_depth(_lay, _depth);
+    }
+
+    if (!instance_exists(obj_waterfall_drawer)) {
+        instance_create_layer(0, 0, _lay, obj_waterfall_drawer);
+    }
+}
+
+/// @description Draw soft translucent main columns + sparkles.
+/// Called from obj_waterfall_drawer, which sits behind platforms and the player.
 function scr_waterfall_layer_draw_soft() {
     if (!instance_exists(obj_bulb_controller)) return;
 
@@ -363,6 +410,9 @@ function scr_waterfall_layer_draw_soft() {
             gpu_set_texfilter(true);
             gpu_set_blendmode(bm_normal);
             var _a_main = BULB_WATERFALL_SOFT_ALPHA;
+            // Measured in pixels off the droplet scroll, so the edge pattern travels down
+            // at the same rate as the droplets inside the stream.
+            var _rim_scroll = waterfall_scroll * BULB_WATERFALL_SPARKLE_SCROLL * BULB_WATERFALL_RIM_SPEED;
 
             for (var _ci = 0; _ci < array_length(waterfall_soft_columns); _ci++) {
                 var _col = waterfall_soft_columns[_ci];
@@ -371,15 +421,13 @@ function scr_waterfall_layer_draw_soft() {
                 scr_waterfall_draw_soft_stream(_col.cx, _col.y0, _col.y1, _half, _col_base, _a_main, true);
                 scr_waterfall_draw_soft_stream(_col.cx, _col.y0 + 2, _col.y1, max(2, _half - 2), _col_mid, _a_main * 0.55, true);
 
-                // Soft bright rim edges (like the reference stream borders).
-                draw_set_color(_col_bri);
-                draw_set_alpha(_a_main * 0.45);
-                draw_rectangle(_col.cx - _half, _col.y0 + 2, _col.cx - _half + 1, _col.y1, false);
-                draw_rectangle(_col.cx + _half - 1, _col.y0 + 2, _col.cx + _half, _col.y1, false);
-
-                // Interior core wash (no horizontal stripes).
-                draw_set_alpha(_a_main * 0.32);
-                draw_rectangle(_col.cx - max(1, _half * 0.28), _col.y0 + 4, _col.cx + max(1, _half * 0.28), _col.y1, false);
+                // Rippling bright edges, drawn like the pond waterline: an inward wash with
+                // the crest line on top. scr_water_glow_draw replays the same path as the
+                // pond's additive glow band.
+                scr_waterfall_rim_build(_col, _half, _col.y0 + 2, _col.y1, _rim_scroll);
+                var _wash = min(max(3, _half * 0.4), 10);
+                scr_waterfall_draw_rim(_col.rim_lx, _col.rim_y, _col.rim_n, -1, _col_bri, _a_main, _wash);
+                scr_waterfall_draw_rim(_col.rim_rx, _col.rim_y, _col.rim_n, 1, _col_bri, _a_main, _wash);
             }
 
             // Tiny scrolling dots / short vertical streaks inside the stream.
@@ -734,19 +782,23 @@ function scr_waterfall_draw_soft_stream(_cx, _y0, _y1, _half_w, _col, _alpha, _f
         draw_circle(_cx + _half_w * 0.35, _y0 + 1, _top_r * 0.7, false);
     }
 
-    // Soft body: nested narrower fills (fake soft edges, no internal lines).
+    // One flat fill, so the rock on mid_tiles stays readable through the water. Nested
+    // fills stacked their alpha and built up to a nearly opaque slab.
     var _body_top = _flush_top ? _y0 : (_y0 + 1);
     var _body_bot = _flush_foot ? _y1 : (_y1 - _bot_r);
     if (_body_bot > _body_top) {
-        draw_set_alpha(_alpha * 0.9);
-        draw_rectangle(_cx - _half_w, _body_top, _cx + _half_w, _body_bot, false);
-        if (_half_w >= 3) {
-            draw_set_alpha(_alpha * 0.55);
-            draw_rectangle(_cx - (_half_w - 1), _body_top, _cx + (_half_w - 1), _body_bot, false);
-        }
-        if (_half_w >= 5) {
-            draw_set_alpha(_alpha * 0.35);
-            draw_rectangle(_cx - (_half_w - 2), _body_top, _cx + (_half_w - 2), _body_bot, false);
+        var _inset = (_half_w >= 5) ? 2 : 0;
+        draw_set_alpha(_alpha);
+        draw_rectangle(_cx - (_half_w - _inset), _body_top, _cx + (_half_w - _inset), _body_bot, false);
+
+        // Feathered sides: two thin strips fading outward, in place of the old stack.
+        if (_inset > 0) {
+            draw_set_alpha(_alpha * 0.6);
+            draw_rectangle(_cx - (_half_w - 1), _body_top, _cx - (_half_w - 2), _body_bot, false);
+            draw_rectangle(_cx + (_half_w - 2), _body_top, _cx + (_half_w - 1), _body_bot, false);
+            draw_set_alpha(_alpha * 0.3);
+            draw_rectangle(_cx - _half_w, _body_top, _cx - (_half_w - 1), _body_bot, false);
+            draw_rectangle(_cx + (_half_w - 1), _body_top, _cx + _half_w, _body_bot, false);
         }
     }
 
@@ -754,6 +806,87 @@ function scr_waterfall_draw_soft_stream(_cx, _y0, _y1, _half_w, _col, _alpha, _f
         draw_set_alpha(_alpha * 0.75);
         draw_circle(_cx, _y1 - 1, _bot_r, false);
     }
+}
+
+/// @description Sideways shift for one edge segment: mostly none, sometimes a step out or
+/// in. Hashed off the segment index, so the pattern is stable as it scrolls.
+function scr_waterfall_rim_shift(_cell, _salt) {
+    var _v = frac(sin(_cell * 12.9898 + _salt * 78.233) * 43758.5453);
+    if (_v < BULB_WATERFALL_RIM_SHIFT_CHANCE) return -1;
+    if (_v > 1 - BULB_WATERFALL_RIM_SHIFT_CHANCE) return 1;
+    return 0;
+}
+
+/// @description Sample both edge paths down a column, cached on the column struct so the
+/// soft draw and scr_water_glow_draw trace the exact same line. Mirrors how a pond
+/// publishes col_x / col_sy for its glow band.
+/// Each segment holds one x for its whole height, so the edge stays a straight line that
+/// steps sideways between segments rather than curving.
+function scr_waterfall_rim_build(_col, _half, _y0, _y1, _scroll) {
+    _col.rim_n = 0;
+    if (_y1 <= _y0) return;
+
+    var _seg = max(4, BULB_WATERFALL_RIM_SEG);
+    var _cells = ceil((_y1 - _y0) / _seg) + 1;
+    var _n = _cells * 2;
+
+    if (!variable_struct_exists(_col, "rim_y") || array_length(_col.rim_y) < _n) {
+        _col.rim_y = array_create(_n, 0);
+        _col.rim_lx = array_create(_n, 0);
+        _col.rim_rx = array_create(_n, 0);
+    }
+
+    var _amp = BULB_WATERFALL_RIM_AMP;
+    var _base_l = _col.cx - _half + 1;
+    var _base_r = _col.cx + _half - 1;
+    var _rim_y = _col.rim_y;
+    var _rim_lx = _col.rim_lx;
+    var _rim_rx = _col.rim_rx;
+
+    // Segment boundaries ride the scroll, so the whole pattern travels downstream.
+    var _first = floor((_y0 - _scroll) / _seg);
+    var _k = 0;
+
+    for (var _c = 0; _c < _cells; _c++) {
+        var _cell = _first + _c;
+        var _top = max(_y0, _cell * _seg + _scroll);
+        var _bot = min(_y1, (_cell + 1) * _seg + _scroll);
+        if (_bot <= _top) continue;
+
+        // Separate salts, so the two edges step at different times.
+        var _lx = _base_l + scr_waterfall_rim_shift(_cell, 0) * _amp;
+        var _rx = _base_r + scr_waterfall_rim_shift(_cell, 7) * _amp;
+
+        _rim_y[_k] = _top; _rim_lx[_k] = _lx; _rim_rx[_k] = _rx; _k++;
+        _rim_y[_k] = _bot; _rim_lx[_k] = _lx; _rim_rx[_k] = _rx; _k++;
+    }
+
+    _col.rim_n = _k;
+}
+
+/// @description One stream edge, built like a pond waterline: an inward gradient wash with
+/// the crisp crest line on top.
+/// @param {Real} _side -1 for the left edge, 1 for the right (which way is "outward").
+function scr_waterfall_draw_rim(_xs, _ys, _n, _side, _col, _alpha, _wash) {
+    if (_n < 2) return;
+
+    // Wash: alpha at the edge fading inward, same shape as the pond's body-top strip.
+    draw_primitive_begin(pr_trianglestrip);
+    for (var _i = 0; _i < _n; _i++) {
+        draw_vertex_colour(_xs[_i], _ys[_i], _col, _alpha * 0.5);
+        draw_vertex_colour(_xs[_i] - _side * _wash, _ys[_i], _col, 0);
+    }
+    draw_primitive_end();
+
+    // Crest line, at the pond's own surface alpha so both waters match.
+    var _core = max(1, BULB_WATERFALL_RIM_WIDTH);
+    var _a = BULB_POND_SURFACE_ALPHA;
+    draw_primitive_begin(pr_trianglestrip);
+    for (var _j = 0; _j < _n; _j++) {
+        draw_vertex_colour(_xs[_j], _ys[_j], _col, _a);
+        draw_vertex_colour(_xs[_j] - _side * _core, _ys[_j], _col, _a);
+    }
+    draw_primitive_end();
 }
 
 /// @description Moving ground sheet on the splash ledge — flows outward into side leaks.
@@ -959,38 +1092,71 @@ function scr_waterfall_draw(_controller) {
     // scr_waterfall_layer_draw_soft so the player stays visually in front.
 }
 
-/// @description Nearest splash / stream point for distance-based waterfall ambience.
+/// @description Closest point on the falling water, plus distance to the splash.
+/// dist is the stream body (so the loop is audible beside the column).
+/// bottom_dist is the splash, which drives the louder gain.
 function scr_waterfall_sfx_nearest_point(_controller) {
     with (_controller) {
-        var _best = undefined;
+        var _has_player = instance_exists(obj_player);
+        var _px = _has_player ? obj_player.x : 0;
+        var _py = _has_player ? obj_player.y : 0;
+
         var _best_d = 1000000000;
-        var _px = instance_exists(obj_player) ? obj_player.x : 0;
-        var _py = instance_exists(obj_player) ? obj_player.y : 0;
+        var _best_x = 0;
+        var _best_y = 0;
+        var _have = false;
+        var _bottom_d = 1000000000;
+
+        if (variable_instance_exists(id, "waterfall_soft_columns")) {
+            for (var _c = 0; _c < array_length(waterfall_soft_columns); _c++) {
+                var _col = waterfall_soft_columns[_c];
+                var _left = variable_struct_exists(_col, "left") ? _col.left : _col.cx;
+                var _right = variable_struct_exists(_col, "right") ? _col.right : _col.cx;
+                var _nx = clamp(_px, _left, _right);
+                var _ny = clamp(_py, _col.y0, _col.y1);
+                var _d = _has_player ? point_distance(_nx, _ny, _px, _py) : 0;
+                if (!_have || _d < _best_d) {
+                    _have = true;
+                    _best_d = _d;
+                    _best_x = _nx;
+                    _best_y = _ny;
+                }
+                var _foot = _has_player ? point_distance(_col.cx, _col.y1, _px, _py) : 0;
+                if (_foot < _bottom_d) _bottom_d = _foot;
+            }
+        }
+
+        if (variable_instance_exists(id, "waterfall_side_streams")) {
+            for (var _s = 0; _s < array_length(waterfall_side_streams); _s++) {
+                var _st = waterfall_side_streams[_s];
+                var _sx = clamp(_px, _st.x, _st.x + _st.width);
+                var _sy = clamp(_py, _st.y0, _st.y1);
+                var _sd = _has_player ? point_distance(_sx, _sy, _px, _py) : 0;
+                if (!_have || _sd < _best_d) {
+                    _have = true;
+                    _best_d = _sd;
+                    _best_x = _sx;
+                    _best_y = _sy;
+                }
+            }
+        }
 
         if (variable_instance_exists(id, "waterfall_splash_emitters")) {
             for (var _i = 0; _i < array_length(waterfall_splash_emitters); _i++) {
                 var _em = waterfall_splash_emitters[_i];
-                var _d = instance_exists(obj_player) ? point_distance(_em.x, _em.y, _px, _py) : 0;
-                if (_d < _best_d) {
-                    _best_d = _d;
-                    _best = { x: _em.x, y: _em.y, dist: _d };
+                var _ed = _has_player ? point_distance(_em.x, _em.y, _px, _py) : 0;
+                if (_ed < _bottom_d) _bottom_d = _ed;
+                if (!_have || _ed < _best_d) {
+                    _have = true;
+                    _best_d = _ed;
+                    _best_x = _em.x;
+                    _best_y = _em.y;
                 }
             }
         }
 
-        if (_best == undefined && variable_instance_exists(id, "waterfall_soft_columns")) {
-            for (var _c = 0; _c < array_length(waterfall_soft_columns); _c++) {
-                var _col = waterfall_soft_columns[_c];
-                var _cy = (_col.y0 + _col.y1) * 0.5;
-                var _d2 = instance_exists(obj_player) ? point_distance(_col.cx, _cy, _px, _py) : 0;
-                if (_d2 < _best_d) {
-                    _best_d = _d2;
-                    _best = { x: _col.cx, y: _cy, dist: _d2 };
-                }
-            }
-        }
-
-        return _best;
+        if (!_have) return undefined;
+        return { x: _best_x, y: _best_y, dist: _best_d, bottom_dist: _bottom_d };
     }
     return undefined;
 }
@@ -1111,18 +1277,33 @@ function scr_waterfall_sfx_update(_controller) {
 
         var _target = 0;
         if (instance_exists(obj_player)) {
-            var _dist = _pt.dist;
             var _hear = BULB_WATERFALL_SFX_HEAR_RADIUS;
-            if (_dist <= _hear) {
-                var _t = clamp(1 - (_dist / max(1, _hear)), 0, 1);
-                _target = lerp(BULB_WATERFALL_SFX_VOL_MIN, BULB_WATERFALL_SFX_VOL_MAX, _t);
-                if (!_in_view) _target *= 0.55;
-            } else if (_in_view) {
-                // Visible but outside hear radius — keep a quiet bed so it isn't totally silent on-screen.
+            var _stream_dist = _pt.dist;
+            if (_stream_dist <= _hear) {
+                var _t = clamp(1 - (_stream_dist / max(1, _hear)), 0, 1);
+                _target = lerp(BULB_WATERFALL_SFX_VOL_MIN, BULB_WATERFALL_SFX_STREAM_VOL, _t);
+            }
+
+            // Splash is the same loop, raised as you reach the base.
+            var _bottom_r = BULB_WATERFALL_SFX_BOTTOM_RADIUS;
+            var _bottom_d = variable_struct_exists(_pt, "bottom_dist") ? _pt.bottom_dist : _stream_dist;
+            if (_bottom_d <= _bottom_r) {
+                var _bt = clamp(1 - (_bottom_d / max(1, _bottom_r)), 0, 1);
+                var _loud = lerp(BULB_WATERFALL_SFX_STREAM_VOL, BULB_WATERFALL_SFX_VOL_MAX, _bt);
+                if (_loud > _target) _target = _loud;
+            }
+
+            if (_target <= 0 && _in_view) {
                 _target = BULB_WATERFALL_SFX_VOL_MIN * 0.65;
+            } else if (!_in_view) {
+                _target *= 0.55;
             }
         } else if (_in_view) {
             _target = BULB_WATERFALL_SFX_VOL_MIN;
+        }
+
+        if (variable_global_exists("sfx_waterfall_emitter")) {
+            audio_emitter_position(global.sfx_waterfall_emitter, _pt.x, _pt.y, 0);
         }
 
         if (abs(_target - waterfall_sfx_gain) > 0.005) {

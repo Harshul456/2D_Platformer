@@ -24,16 +24,14 @@ grv = 0;
 enemy_grounded = false;
 enemy_ai_enabled = true;
 
-// Same bob feel as crystal core, locked to an elevated float line
+// Same bob as crystal core, around the position placed in the room
 scr_enemy_floating_hover_init();
 enemy_is_floating = true;
 hover_amplitude = 10;
 hover_cycle_seconds = 3;
 hover_time_speed = (2 * pi) / (hover_cycle_seconds * max(1, room_speed));
-enemy_air_altitude = 112; // px above floor — stays clearly airborne vs crystal core
-
-// Place on collision floor then lift into air (room markers can sit on platforms)
-scr_enemy_air_anchor_above_floor(enemy_air_altitude);
+// Float at the room-editor position. Hover bob is a draw offset around ystart.
+ystart = y;
 home_x = x;
 spawn_x = x;
 gnd_patrol_x1 = x - gnd_patrol_half_width;

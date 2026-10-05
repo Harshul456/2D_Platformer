@@ -72,14 +72,19 @@ function scr_enemy_air_patrol_step() {
         }
     } else {
         gnd_state = GND_STATE_PATROL;
-        if (x <= gnd_patrol_x1) {
-            gnd_facing = 1;
-            image_xscale = abs(image_xscale);
-        } else if (x >= gnd_patrol_x2) {
-            gnd_facing = -1;
-            image_xscale = -abs(image_xscale);
+        // Hover-engage enemies (ancient rock) stay planted until the player is in range.
+        if (variable_instance_exists(id, "air_hover_on_notice") && air_hover_on_notice) {
+            hsp = 0;
+        } else {
+            if (x <= gnd_patrol_x1) {
+                gnd_facing = 1;
+                image_xscale = abs(image_xscale);
+            } else if (x >= gnd_patrol_x2) {
+                gnd_facing = -1;
+                image_xscale = -abs(image_xscale);
+            }
+            hsp = gnd_facing * _speed;
         }
-        hsp = gnd_facing * _speed;
     }
 
     // Horizontal move with soft cave-wall probe (no gravity / floor)

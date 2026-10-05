@@ -100,11 +100,60 @@ function scr_player_clear_hurt_state() {
     knockBackY = 0;
 }
 
+/// @function scr_checkpoint_globals_ensure
+/// @description Checkpoint globals survive global_init, which runs on every room.
+function scr_checkpoint_globals_ensure() {
+    if (variable_global_exists("checkpoint_set")) return;
+    global.checkpoint_set = false;
+    global.checkpoint_room = -1;
+    global.checkpoint_x = 0;
+    global.checkpoint_y = 0;
+    global.checkpoint_face = 1;
+}
+
+/// @function scr_checkpoint_activate
+/// @description Last column the player crosses becomes the respawn point.
+function scr_checkpoint_activate(_inst) {
+    scr_checkpoint_globals_ensure();
+    var _face = sign(_inst.image_xscale);
+    if (_face == 0) _face = 1;
+    if (global.checkpoint_set && global.checkpoint_room == room
+        && global.checkpoint_x == _inst.x && global.checkpoint_y == _inst.y
+        && global.checkpoint_face == _face) return;
+    global.checkpoint_set = true;
+    global.checkpoint_room = room;
+    global.checkpoint_x = _inst.x;
+    global.checkpoint_y = _inst.y;
+    global.checkpoint_face = _face;
+}
+
+/// @function scr_checkpoint_respawn_point
+/// @description Active checkpoint in this room, else the marker that was placed, else where the player started.
+function scr_checkpoint_respawn_point() {
+    scr_checkpoint_globals_ensure();
+    var _px = variable_instance_exists(id, "room_spawn_x") ? room_spawn_x : x;
+    var _py = variable_instance_exists(id, "room_spawn_y") ? room_spawn_y : y;
+    var _face = 1;
+    if (global.checkpoint_set && global.checkpoint_room == room) {
+        _px = global.checkpoint_x;
+        _py = global.checkpoint_y;
+        _face = global.checkpoint_face;
+    } else if (instance_exists(obj_checkpoint)) {
+        var _c = instance_find(obj_checkpoint, 0);
+        _px = _c.x;
+        _py = _c.y;
+        _face = sign(_c.image_xscale);
+        if (_face == 0) _face = 1;
+    }
+    return { x: _px, y: _py, face: _face };
+}
+
 /// @function scr_player_respawn
 /// @description Restore player at spawn. Fade sequence keeps can_move locked until FADE_IN ends.
 function scr_player_respawn(_unlock_move = true) {
-    var _sx = variable_instance_exists(id, "DEATH_SPAWN_X") ? DEATH_SPAWN_X : 96;
-    var _sy = variable_instance_exists(id, "DEATH_SPAWN_Y") ? DEATH_SPAWN_Y : 960;
+    var _spawn = scr_checkpoint_respawn_point();
+    var _sx = _spawn.x;
+    var _sy = _spawn.y;
 
     x = _sx;
     y = _sy;
@@ -133,9 +182,8 @@ function scr_player_respawn(_unlock_move = true) {
     sprite_index = spr_mc_idle;
     image_index = 0;
     image_speed = 1;
-    // Always face right on respawn (ignore death facing)
-    last_direction = 1;
-    image_xscale = abs(image_base_scale);
+    last_direction = _spawn.face;
+    image_xscale = _spawn.face * abs(image_base_scale);
 
     if (variable_instance_exists(id, "bulb_light") && bulb_light != undefined) {
         bulb_light.x = x;

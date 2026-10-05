@@ -167,8 +167,12 @@ function scr_enemy_ai_patrol_core() {
                 lost_los_timer = 0;
             }
 
-            // Always close horizontally — tile movement resolves walls (no asymmetric wall-ray gate).
-            if (_dir != 0) {
+            // Close horizontally only while the next step is still floor. A pit between platforms is not a path.
+            var _floor_ahead = (_dir != 0) && scr_enemy_patrol_floor_ahead(_dir);
+            var _fp_pit = scr_enemy_foot_probes();
+            var _pit_x = (_dir >= 0) ? (_fp_pit.right + 1) : (_fp_pit.left - 1);
+            var _spike_drop = scr_enemy_column_is_spike_drop(_pit_x, _fp_pit.feet_y);
+            if (_floor_ahead && !_spike_drop) {
                 hsp = moveSpeed * _dir;
                 // Player on a higher ledge — don't keep walking into the wall underneath them.
                 if (scr_enemy_player_above_unreachable() && scr_enemy_patrol_wall_ahead(_dir)) {
@@ -178,8 +182,9 @@ function scr_enemy_ai_patrol_core() {
                 hsp = 0;
             }
 
-            // Player on a lower ledge — fall/step down instead of hovering stuck above them.
-            if (instance_exists(obj_player) && obj_player.bbox_bottom > bbox_bottom + 10) {
+            // A short drop onto more floor is fine. A bridge is a floor, not a way down.
+            if (_floor_ahead && !_spike_drop && !scr_enemy_hold_on_bridge()
+                && instance_exists(obj_player) && obj_player.bbox_bottom > bbox_bottom + 10) {
                 vsp = max(vsp, moveSpeed);
             }
         } break;

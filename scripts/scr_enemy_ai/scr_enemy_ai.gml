@@ -43,6 +43,7 @@ function scr_enemy_abort_combat() {
     hsp = 0;
     attack_frame = 0;
     attack_hit_dealt = false;
+    scr_enemy_attack_swing_sfx_stop();
     telegraph_shake_x = 0;
     telegraph_shake_y = 0;
     telegraph_commit_dir = 0;
@@ -200,6 +201,15 @@ function scr_enemy_player_above_unreachable() {
     return obj_player.bbox_bottom < bbox_top + _band;
 }
 
+/// @function scr_enemy_player_below_unreachable
+/// @description Player is on a lower floor — a bridge swing cannot reach them.
+function scr_enemy_player_below_unreachable() {
+    if (!instance_exists(obj_player)) return false;
+    if (scr_enemy_player_vertically_aligned_for_melee()) return false;
+    var _band = (variable_instance_exists(id, "chase_above_unreachable_px") ? chase_above_unreachable_px : 12);
+    return obj_player.bbox_top > bbox_bottom - _band;
+}
+
 /// @function scr_enemy_begin_notice
 /// @description HK threat reaction — freeze, face player, blue alert tint, then commit to chase.
 function scr_enemy_begin_notice() {
@@ -310,6 +320,16 @@ function scr_enemy_attack_swing_sfx() {
     return _snd_id;
 }
 
+/// @function scr_enemy_attack_swing_sfx_stop
+/// @description Cut the whoosh when the dash is aborted before the slash is out.
+function scr_enemy_attack_swing_sfx_stop() {
+    if (variable_instance_exists(id, "attack_swing_snd") && attack_swing_snd != -1
+        && audio_is_playing(attack_swing_snd)) {
+        audio_stop_sound(attack_swing_snd);
+    }
+    attack_swing_snd = -1;
+}
+
 /// @function scr_enemy_begin_attack_dash
 /// @description Locked launch after telegraph — uses committed direction, not live player bait.
 function scr_enemy_begin_attack_dash() {
@@ -331,7 +351,7 @@ function scr_enemy_begin_attack_dash() {
     hsp = _dir * enemy_attack_dash_hsp;
     image_blend = c_white;
     scr_enemy_set_facing(_dir);
-    scr_enemy_attack_swing_sfx();
+    attack_swing_snd = scr_enemy_attack_swing_sfx();
 }
 
 /// @function scr_enemy_attack_draw_origin
@@ -725,22 +745,6 @@ function scr_enemy_attack_windup_visuals() {
     telegraph_shake_y = random_range(-1.5, 1.5);
 }
 
-/// @function scr_enemy_wall_impact_feedback
-/// @description Screen shake + crystal spark burst when attack hits a wall.
-function scr_enemy_wall_impact_feedback() {
-    scr_camera_trigger_shake(5, 10);
-    scr_enemy_impact_spark_burst(x, y - 8);
-    scr_hitstop_trigger(2);
-}
-
-/// @function scr_enemy_impact_spark_burst
-function scr_enemy_impact_spark_burst(_cx, _cy) {
-    if (!variable_instance_exists(id, "impact_spark_list")) impact_spark_list = [];
-    repeat (8) {
-        array_push(impact_spark_list, scr_crystal_spark_create(_cx, _cy));
-    }
-}
-
 /// @function scr_enemy_impact_spark_step
 function scr_enemy_impact_spark_step() {
     if (!variable_instance_exists(id, "impact_spark_list")) return;
@@ -829,19 +833,22 @@ function scr_enemy_ai() {
             if (_hgap <= _melee_band) {
                 hsp = 0;
                 if (attack_cooldown <= 0 && scr_enemy_dual_los_clear()
-                    && !scr_enemy_player_above_unreachable()) {
+                    && !scr_enemy_player_above_unreachable()
+                    && !scr_enemy_player_below_unreachable()) {
                     scr_enemy_begin_telegraph();
                 }
                 break;
             }
 
-            // Keep closing until tight telegraph range (don't stop in the wide approach zone).
-            if (_dir != 0) {
+            // Keep closing until tight telegraph range. A pit is not a path — stay on this platform.
+            if (_dir != 0 && scr_enemy_patrol_floor_ahead(_dir)) {
                 hsp = scr_enemy_chase_hsp_for_distance(_hgap, _dir);
                 if (variable_instance_exists(id, "enemy_poise_timer") && enemy_poise_timer > 0) {
                     var _mult = (variable_instance_exists(id, "enemy_poise_chase_mult") ? enemy_poise_chase_mult : 1.35);
                     hsp *= _mult;
                 }
+            } else {
+                hsp = 0;
             }
         } break;
 
@@ -908,6 +915,19 @@ function scr_enemy_patrol_reanchor_here() {
 /// @description Dual center + feet raycast (delegates to scr_enemy_raycast).
 function scr_enemy_los_to_player() {
     return scr_enemy_dual_los_clear();
+}
+
+/// @function scr_enemy_attack_slash_is_out
+/// @description True once the attack sheet is on an active slash frame. Earlier than that is still windup.
+function scr_enemy_attack_slash_is_out() {
+    var _attack = (variable_instance_exists(id, "ENEMY_SPRITE_ATTACK") ? ENEMY_SPRITE_ATTACK : spr_crystal_core_attack);
+    var _a_frames = max(1, sprite_get_number(_attack));
+    var _a_dur = max(1, (variable_instance_exists(id, "enemy_attack_dash_frames") ? enemy_attack_dash_frames : 14));
+    var _af = (variable_instance_exists(id, "attack_frame") ? attack_frame : 0);
+    var _idx = clamp(floor(clamp(_af / _a_dur, 0, 0.999) * _a_frames), 0, _a_frames - 1);
+    var _table = (variable_instance_exists(id, "ENEMY_ATTACK_SLASH_HITBOX") ? ENEMY_ATTACK_SLASH_HITBOX : undefined);
+    if (_table == undefined || _idx < 0 || _idx >= array_length(_table)) return false;
+    return _table[_idx].active;
 }
 
 /// @function scr_enemy_attack_wall_probe

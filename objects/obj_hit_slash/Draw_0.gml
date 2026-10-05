@@ -6,7 +6,8 @@ if (!fx_built) {
     star_len = array_create(star_n);
     for (var _i = 0; _i < star_n; _i++) {
         // Bias sparks along the swing axis so it reads directional, not a starburst blob
-        var _bias = (irandom(1) == 0) ? slash_angle : slash_angle + 180;
+        var _bias = slash_angle;
+        if (!outward_only && irandom(1) == 0) _bias = slash_angle + 180;
         star_ang[_i] = _bias + random_range(-42, 42);
         star_len[_i] = slash_length * random_range(0.24, 0.55);
     }

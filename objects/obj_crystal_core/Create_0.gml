@@ -38,6 +38,7 @@ base_yscale = image_yscale;
 
 // HK rhythm: telegraph → dash → recoil (+ stunned on nail hit)
 attack_hit_dealt = false;
+attack_swing_snd = -1;
 attack_frame = 0;
 dash_sweep_prev_x = x;
 attack_cooldown = 0;

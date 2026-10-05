@@ -182,6 +182,20 @@ function scr_camera_control() {
     var _max_x = global.camera_max_x;
     var _min_y = global.camera_min_y;
     var _max_y = global.camera_max_y;
+    // A zone box that starts inside the room and runs past the edge locks the
+    // view on empty space. One-screen rooms then show only the black background.
+    if (_min_x < 0 || _max_x > room_width || (_max_x - _min_x) < cam_w) {
+        _min_x = 0;
+        _max_x = room_width;
+        global.camera_min_x = _min_x;
+        global.camera_max_x = _max_x;
+    }
+    if (_min_y < 0 || _max_y > room_height || (_max_y - _min_y) < cam_h) {
+        _min_y = 0;
+        _max_y = room_height;
+        global.camera_min_y = _min_y;
+        global.camera_max_y = _max_y;
+    }
 
     // Offset from view center (MMX obj_camera_rds)
     var _ox = ceil(_px - (_cam_x + cam_w * 0.5));

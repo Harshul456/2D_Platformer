@@ -10,7 +10,7 @@ function scr_hit_fx_layer() {
 
 /// @function scr_hit_slash_burst_debris
 /// @description Spawn blocky debris + fast axis sparks (call AFTER slash_angle is set).
-function scr_hit_slash_burst_debris(_glow = c_aqua, _finisher = false) {
+function scr_hit_slash_burst_debris(_glow = c_aqua, _finisher = false, _one_way = false) {
     var _layer = scr_hit_fx_layer();
 
     // Chunky debris — spread across the swing arc
@@ -31,7 +31,7 @@ function scr_hit_slash_burst_debris(_glow = c_aqua, _finisher = false) {
     // Fast long sparks streaking along the swing axis (both ways)
     repeat (_finisher ? irandom_range(3, 5) : irandom_range(2, 3)) {
         var _sp = instance_create_layer(x, y, _layer, obj_hit_particle);
-        _sp.direction = slash_angle + choose(0, 180) + random_range(-8, 8);
+        _sp.direction = slash_angle + (_one_way ? 0 : choose(0, 180)) + random_range(-8, 8);
         _sp.speed = random_range(9, 15);
         _sp.size = irandom_range(1, 2);
         _sp.life_max = irandom_range(6, 11);
@@ -43,7 +43,7 @@ function scr_hit_slash_burst_debris(_glow = c_aqua, _finisher = false) {
 
 /// @function scr_hit_slash_create
 /// @description Spawn one razor slash at world coords; optionally burst debris.
-function scr_hit_slash_create(_x, _y, _angle, _length = 56, _color_outer = c_aqua, _life = 7, _burst = true, _finisher = false) {
+function scr_hit_slash_create(_x, _y, _angle, _length = 56, _color_outer = c_aqua, _life = 7, _burst = true, _finisher = false, _one_way = false) {
     var _layer = scr_hit_fx_layer();
     var _s = instance_create_layer(_x, _y, _layer, obj_hit_slash);
     _s.slash_angle = _angle;
@@ -52,9 +52,10 @@ function scr_hit_slash_create(_x, _y, _angle, _length = 56, _color_outer = c_aqu
     _s.color_inner = c_white;
     _s.life_max = _life;
     _s.life_timer = _life;
+    _s.outward_only = _one_way;
     if (_burst) {
         with (_s) {
-            scr_hit_slash_burst_debris(_color_outer, _finisher);
+            scr_hit_slash_burst_debris(_color_outer, _finisher, _one_way);
         }
     }
     return _s;
@@ -68,6 +69,36 @@ function scr_player_impact_lines_clear() {
 /// @function scr_player_impact_lines_step
 function scr_player_impact_lines_step() {
     // Legacy no-op — objects tick themselves.
+}
+
+/// @function scr_gameplay_fx_draw_world
+/// @description Sword hits, enemy bursts, and death debris. Not part of the cave lighting pass.
+function scr_gameplay_fx_draw_world() {
+    var _cam = view_camera[0];
+    if (instance_exists(obj_camera_controller)) _cam = obj_camera_controller.cam;
+    camera_apply(_cam);
+
+    scr_bulb_draw_enemy_emissive_glow_all();
+    scr_crystal_spark_draw_all();
+    scr_ancient_rock_charge_motes_draw_all();
+    scr_player_impact_lines_draw();
+    scr_ancient_rock_bolts_draw_all();
+    scr_enemy_shards_draw();
+    scr_player_death_fx_draw();
+}
+
+/// @function scr_gameplay_fx_draw_screen
+/// @description Dodge flashes and full-screen fades. Drawn after the cave vignette when lighting is on.
+function scr_gameplay_fx_draw_screen() {
+    var _cam = view_camera[0];
+    if (instance_exists(obj_camera_controller)) _cam = obj_camera_controller.cam;
+    camera_apply(_cam);
+
+    scr_player_perfect_dodge_fx_draw();
+    scr_cutscene_debug_draw();
+    scr_player_death_fade_draw();
+    scr_room_transition_fade_draw();
+    scr_cutscene_draw_fade();
 }
 
 /// @function scr_player_impact_lines_draw
@@ -126,8 +157,9 @@ function scr_player_attack_swing_sfx(_finisher = false) {
 /// @description Random impact with pitch variation (crystal hits on core, else clanks). Cave reverb bus.
 /// @param {Bool} [_finisher]
 /// @param {Id.Instance} [_enemy] Hit target — crystal core uses snd_crystal_hit_*
-function scr_player_attack_impact_sfx(_finisher = false, _enemy = noone) {
-    var _crystal = (_enemy != noone && instance_exists(_enemy)
+/// @param {Bool} [_enemy_sfx] Play the enemy impact set when there is no instance (spike pogo).
+function scr_player_attack_impact_sfx(_finisher = false, _enemy = noone, _enemy_sfx = false) {
+    var _crystal = _enemy_sfx || (_enemy != noone && instance_exists(_enemy)
         && (_enemy.object_index == obj_crystal_core
             || object_is_ancestor(_enemy.object_index, obj_enemy_parent)));
 
@@ -173,7 +205,7 @@ function scr_player_attack_impact_sfx(_finisher = false, _enemy = noone) {
 
 /// @function scr_player_impact_lines_on_hit
 /// @description Spawn directional slash FX aligned to the attack angle.
-function scr_player_impact_lines_on_hit(_x1, _y1, _x2, _y2, _enemy = noone, _skip_sfx = false) {
+function scr_player_impact_lines_on_hit(_x1, _y1, _x2, _y2, _enemy = noone, _skip_sfx = false, _enemy_sfx = false, _angle_override = undefined, _one_way = false) {
     var _cx = (_x1 + _x2) * 0.5;
     var _cy = (_y1 + _y2) * 0.5;
     if (_enemy != noone && instance_exists(_enemy)) {
@@ -185,13 +217,18 @@ function scr_player_impact_lines_on_hit(_x1, _y1, _x2, _y2, _enemy = noone, _ski
 
     // Cave-reverb impact with randomized pitch (crystal hits on core)
     if (!_skip_sfx) {
-        scr_player_attack_impact_sfx(_finisher, _enemy);
+        scr_player_attack_impact_sfx(_finisher, _enemy, _enemy_sfx);
     }
 
     var _angle;
 
-    // Align to attack vector — downward air strike vs facing slash
-    if (scr_player_is_downward_air_strike()) {
+    // Align to attack vector — downward air strike vs facing slash.
+    // A spike landing has already zeroed vsp, so the falling check alone would
+    // aim the burst sideways into the tile instead of out along the swing.
+    var _down_swing = variable_instance_exists(id, "attack_is_down") && attack_is_down;
+    if (!is_undefined(_angle_override)) {
+        _angle = _angle_override;
+    } else if (scr_player_is_downward_air_strike() || _down_swing) {
         _angle = 270; // straight down
     } else {
         var _face = (last_direction != 0) ? last_direction : sign(image_xscale);
@@ -206,7 +243,7 @@ function scr_player_impact_lines_on_hit(_x1, _y1, _x2, _y2, _enemy = noone, _ski
     var _col = _finisher ? make_colour_rgb(140, 255, 255) : c_aqua;
 
     // Primary razor slash + debris burst
-    scr_hit_slash_create(_cx, _cy, _angle, _len, _col, _life, true, _finisher);
+    scr_hit_slash_create(_cx, _cy, _angle, _len, _col, _life, true, _finisher, _one_way);
 
     // Companion secondary slash — layered punch, no extra debris
     var _ang2 = _angle + random_range(-16, 16);

@@ -21,16 +21,7 @@ var _ny = y + lengthdir_y(bolt_spd, bolt_dir);
 
 // Die on wall / floor tiles (probe a few points so thin hits still count)
 var _tm = (variable_global_exists("tilemap_collision_id") ? global.tilemap_collision_id : noone);
-var _hit_tile = false;
-if (_tm != noone && _tm != -1) {
-    _hit_tile = tilemap_point_solid(_tm, _nx, _ny)
-        || tilemap_point_solid(_tm, _nx + 3, _ny)
-        || tilemap_point_solid(_tm, _nx - 3, _ny)
-        || tilemap_point_solid(_tm, _nx, _ny + 3)
-        || tilemap_point_solid(_tm, _nx, _ny - 3);
-} else if (check_tile_collision(_nx, _ny)) {
-    _hit_tile = true;
-}
+var _hit_tile = scr_ancient_rock_bolt_space_blocked(_tm, _nx, _ny);
 
 if (_hit_tile) {
     repeat (4) {

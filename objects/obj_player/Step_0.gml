@@ -28,6 +28,16 @@ function _player_sprint_deform() {
     image_yscale = scr_player_texel_perfect_scale(_sy, sprite_get_height(sprite_index));
 }
 
+// Door fade keeps running through hitstop. A dead player still takes the death path below.
+if (obj_player_health > 0 && scr_room_transition_blocks_player()) {
+    scr_room_transition_step();
+    hsp = 0;
+    vsp = 0;
+    can_move = false;
+    _player_sprint_deform();
+    exit;
+}
+
 // --- HP DEATH (before hitstop so dissolve can trigger the freeze) ---
 if (obj_player_health <= 0 && state != PLAYER_STATE.DEATH) {
     scr_time_scale_set(1);
@@ -328,7 +338,7 @@ if (attacking && stunTimer <= 0) {
                     }
                 }
                 if (_fx_target == noone) _fx_target = _inst;
-                if (attack_is_down && scr_player_pogo_angle_ok(_inst)) _pogo_enemy = _inst;
+                if (attack_is_down) _pogo_enemy = _inst;
             }
             ds_list_destroy(_hit_list);
 
@@ -474,6 +484,7 @@ if (variable_global_exists("bulb_renderer") && global.bulb_renderer != undefined
 scr_player_footsteps_cooldown_tick();
 scr_player_invincibility();
 _player_sprint_deform();
+scr_room_transition_try();
 
 // NOTE:
 // Keep sub-pixel positions for smoother movement. Draw events already snap to pixels where needed.

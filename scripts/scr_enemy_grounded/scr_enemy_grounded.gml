@@ -461,7 +461,9 @@ function scr_enemy_grounded_state_attack() {
     }
 
     if (_in_lunge) {
-        scr_enemy_grounded_apply_hmove(sign(image_xscale) * _lunge);
+        var _ld = sign(image_xscale);
+        if (_ld != 0 && !scr_enemy_grounded_floor_or_ledge_ahead(_ld)) _ld = 0;
+        scr_enemy_grounded_apply_hmove(_ld * _lunge);
     }
     gnd_attack_timer--;
     if (gnd_attack_timer <= 0) {
@@ -481,6 +483,8 @@ function scr_enemy_grounded_state_attack() {
 
 /// @function scr_enemy_grounded_state_damaged
 function scr_enemy_grounded_state_damaged() {
+    var _kdir = sign(gnd_knock_h);
+    if (_kdir != 0 && !scr_enemy_grounded_floor_or_ledge_ahead(_kdir)) gnd_knock_h = 0;
     scr_enemy_grounded_apply_hmove(gnd_knock_h);
     gnd_knock_h = lerp(gnd_knock_h, 0, 0.22);
     gnd_hurt_stun_timer--;

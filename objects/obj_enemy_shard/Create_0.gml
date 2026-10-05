@@ -1,7 +1,7 @@
 /// Flying geometric crystal shard from a shattered enemy.
 image_speed = 0;
-// Bulb rooms draw this in Post-Draw so fog cannot bury it. Without that controller, draw normally.
-visible = !instance_exists(obj_bulb_controller);
+// Drawn with the other gameplay FX, after the room, so cave fog cannot bury it.
+visible = false;
 
 size = random_range(2, 5);
 shard_color = choose(c_aqua, c_white, c_orange); // Overridden by shatter to match enemy palette

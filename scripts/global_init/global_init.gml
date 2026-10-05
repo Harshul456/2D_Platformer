@@ -38,12 +38,47 @@ global.camera_look_ahead_mult = 1;   // Per-zone multiplier on state look-ahead
 global.camera_look_ahead_bonus = 0;  // Per-zone extra px ahead (facing dir)
 global.camera_look_ahead_trail_margin = 0.16; // Player stays at least this far from trailing edge
 
-// Force the game to render at your specific resolution without sub-pixel blurring
-surface_resize(application_surface, 1280, 720); // Match your Viewport Width/Height
+// Force the game to render at your specific resolution without sub-pixel blurring.
+// display_reset recreates the window, so the view port has to be set AFTER it.
+surface_resize(application_surface, 1280, 720);
 display_set_gui_size(1280, 720);
+gpu_set_texfilter(false);
+display_reset(0, true);
 
-gpu_set_texfilter(false); // Disables "Interpolate Colors" (already done, but safe to force)
-display_reset(0, true);   // Forces VSync ON via code
+view_enabled = true;
+view_visible[0] = true;
+view_xport[0] = 0;
+view_yport[0] = 0;
+view_wport[0] = 1280;
+view_hport[0] = 720;
+var _boot_cam = view_camera[0];
+camera_set_view_size(_boot_cam, 640, 360);
+if (instance_exists(obj_player)) {
+    var _boot_x = clamp(obj_player.x - 320, 0, max(0, room_width - 640));
+    var _boot_y = clamp(obj_player.y - 220, 0, max(0, room_height - 360));
+    camera_set_view_pos(_boot_cam, _boot_x, _boot_y);
+}
+if (instance_exists(obj_camera_controller)) {
+    obj_camera_controller.cam = _boot_cam;
+    obj_camera_controller.cam_w = 640;
+    obj_camera_controller.cam_h = 360;
+    obj_camera_controller.cam_base_x = camera_get_view_x(_boot_cam);
+    obj_camera_controller.cam_base_y = camera_get_view_y(_boot_cam);
+}
+// Lighting rooms paint the lit scene themselves. Everywhere else the window
+// only receives Draw GUI unless we put the room view up there too.
+if (!instance_exists(obj_bulb_controller)) {
+    application_surface_draw_enable(false);
+    global.present_room_in_gui = true;
+    global.room_view_presented = false;
+} else {
+    global.present_room_in_gui = false;
+    global.room_view_presented = false;
+}
+
+scr_checkpoint_globals_ensure();
+scr_room_transition_globals_ensure();
+scr_room_music_sync();
 
 global.show_debug = false; // Renamed to avoid conflict with built-in variable
 global.debug_enemy_raycast = false; // F3 — enemy LOS / patrol probe overlay

@@ -11,8 +11,8 @@ DEATH_HOLD_FRAMES = 55;         // Linger on dissolve before fade
 DEATH_FADE_OUT_FRAMES = 32;     // Ease into void black
 DEATH_BLACK_FRAMES = 8;         // Short beat under black while camera snaps to spawn
 DEATH_FADE_IN_FRAMES = 28;      // Ease back in at spawn (control unlocks when this starts)
-DEATH_SPAWN_X = 96;
-DEATH_SPAWN_Y = 960;
+room_spawn_x = x;
+room_spawn_y = y;
 can_move        = true;         // Control toggle for input
 obj_player_health_max = 100;    // Restored on respawn
 attacking       = false;        // State for combat lockout
@@ -184,7 +184,7 @@ WALL_CONTACT_MIN_SAMPLES = 2;   // Need this many hits among [low, mid, high] on
 WALL_CLING_REQUIRE_FEET_BAND = true;
 // If true: cannot cling on the top tile of a wall — requires solid one tile height above the top wall hit on the face column.
 WALL_CLING_BLOCK_TOP_TILE = true;
-// If true: cannot cling on the bottom tile of a wall — requires solid one tile height below the lowest wall hit. Turn off if it fights floors / short walls.
+// If true: the feet pixel on the wall face must be solid. The wall ending above the feet drops the cling.
 WALL_CLING_BLOCK_BOTTOM_TILE = true;
 // MMX-style: while holding Shift to cling, require a solid hit 1px past the bbox face (like !can_move_x(move)); rejects false clings.
 WALL_REQUIRE_SCRAPE_MOTION = true;
@@ -207,8 +207,12 @@ WALL_JUMP_MIN_FALL_VSP = 0.15;
 WALL_JUMP_MIN_VSP_FOR_DOUBLE_GUARD = -1;
 // With Shift at a wall: allow wall jump if downward speed is this close to the fall threshold (apex / guard edge).
 WALL_JUMP_FALL_VSP_EPSILON_CLING = 0.31;
-// Wall slide + wall jump: hold Shift (L or R) in air for WALL_SHIFT_HOLD_FRAMES_REQUIRED consecutive Steps; arrows alone never cling.
-WALL_SHIFT_HOLD_FRAMES_REQUIRED = 14;
+// Shift grabs the frame it is held. Arrows alone never cling.
+// The old 14-frame wait kept the hand off the lip by sliding first. The hand
+// check does that instead: no cling unless the wall still covers the hand.
+WALL_SHIFT_HOLD_FRAMES_REQUIRED = 1;
+// Extra pixels of wall above the cling sprite's top. 0 = the hand pixel itself must be on the wall.
+WALL_CLING_HAND_MARGIN_PX = 0;
 WALL_KICK_COOLDOWN_FRAMES = 22; // Cannot re-stick to kicked wall this long (first kick / same face)
 // When wall-jumping between two walls: shorter cooldown after leaving the opposite face (narrow shaft zigzag).
 WALL_KICK_COOLDOWN_SHAFT_FRAMES = 8;
@@ -345,6 +349,8 @@ ATTACK_ON_HIT_PUSHBACK = 2.5;   // Player pushback on hit (prevent overlap)
 ENEMY_COLLISION_DAMAGE  = 10;   // Health lost per touch
 ENEMY_KNOCKBACK_X       = 4;    // Horizontal knockback
 ENEMY_KNOCKBACK_Y       = -3;   // Vertical knockback (up)
+SPIKE_DAMAGE            = 10;   // Landing on spike tips
+SPIKE_KNOCK_Y           = -6;   // Pop off the tips so the player is not stuck in them
 ENEMY_STUN_FRAMES       = 30;   // Frames player is stunned/locked out (matches hurt-pose animation length)
 INVINCIBILITY_FRAMES    = 90;   // Frames of invincibility after hit
 DASH_IFRAME_FRAMES      = 14;   // Silent i-frames at dash start (covers eased dash + margin)

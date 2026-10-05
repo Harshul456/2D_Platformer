@@ -107,7 +107,9 @@ if (!_hitstop_frozen) {
                 state = ENEMY_STATE.RECOIL;
                 state_timer = (attack_hit_dealt ? enemy_recover_frames : enemy_recover_frames_whiff);
                 image_blend = c_white;
-                scr_enemy_wall_impact_feedback();
+                // Hitting a wall only ends the dash. No shake or debris.
+                // If the slash never came out, cut the whoosh too.
+                if (!scr_enemy_attack_slash_is_out()) scr_enemy_attack_swing_sfx_stop();
                 if (scr_enemy_player_above_unreachable()) {
                     attack_cooldown = attack_cooldown_max_frames;
                 }

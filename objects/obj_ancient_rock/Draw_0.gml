@@ -25,21 +25,6 @@ var _lean = scr_enemy_draw_lean_angle();
 draw_sprite_ext(sprite_index, image_index, _draw_x, _draw_y,
     _xs, image_yscale, _lean, _col, image_alpha);
 
-// Charge motes and the additive glow are painted in the lighting post-draw.
-// Without that controller they never run, so draw them here.
-if (!instance_exists(obj_bulb_controller)) {
-    var _old_blend = gpu_get_blendmode();
-    var _old_alpha = draw_get_alpha();
-    var _old_col = draw_get_color();
-    gpu_set_blendmode(bm_add);
-    draw_set_color(c_white);
-    scr_enemy_draw_emissive_glow();
-    gpu_set_blendmode(_old_blend);
-    draw_set_alpha(_old_alpha);
-    draw_set_color(_old_col);
-    scr_ancient_rock_charge_motes_draw();
-}
-
 if (global.show_debug) {
     var _core = scr_ancient_rock_core_xy();
     draw_set_color(c_lime);

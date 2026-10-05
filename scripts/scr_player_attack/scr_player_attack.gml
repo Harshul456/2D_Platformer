@@ -135,12 +135,17 @@ function scr_player_attack() {
     // A run that is already going, with run still held, should come back on landing.
     var _air_keep_run = _air && key_sprint
         && (is_sprinting || sprint_committed || sprint_resume_hold || sprint_jump_carry || sprint_hold_latched);
+    // Dash-jump glide stays on through an air slash, so a double jump after it
+    // coasts at the same rate as a dash jump that never swung.
+    var _keep_air_carry = _air && sprint_jump_carry;
 
     // Hard cancel sprint/dash/reel — must not be gated on image_index (float / remap races).
     is_sprinting = false;
     sprint_afterimage_tick = 0;
-    sprint_jump_carry = false;
-    sprint_air_trail = false;
+    if (!_keep_air_carry) {
+        sprint_jump_carry = false;
+        sprint_air_trail = false;
+    }
     sprint_reel_active = false;
     sprint_reel_pending = false;
     sprint_reel_dir_wait = 0;
@@ -399,7 +404,24 @@ function scr_player_apply_nail_pogo() {
     grounded = false;
     coyote_time_timer = 0;
     pogo_rising = true;
+    // Held direction drifts at walk speed. Neutral kills the dive's leftover hsp so the pop is straight up.
+    scr_player_pogo_apply_horizontal();
     // This swing is already out. Clear the once-per-air lock so the next downslash can chain after it finishes.
     air_attack_used = false;
     attackCooldownTimer = 0;
+}
+
+/// @function scr_player_pogo_apply_horizontal
+/// @description Rise steers with the held direction. No direction is a vertical pop.
+function scr_player_pogo_apply_horizontal() {
+    var _dir = 0;
+    if (variable_instance_exists(id, "key_right") && variable_instance_exists(id, "key_left")) {
+        _dir = (key_right ? 1 : 0) - (key_left ? 1 : 0);
+    }
+    var _spd = (variable_instance_exists(id, "walksp") ? walksp : 3.5);
+    hsp = _spd * _dir;
+    runMomentum = 0;
+    sprint_jump_carry = false;
+    sprint_air_trail = false;
+    if (_dir != 0) last_direction = _dir;
 }

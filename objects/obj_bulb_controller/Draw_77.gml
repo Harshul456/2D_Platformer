@@ -14,7 +14,7 @@ scr_cave_dust_draw(id);
 scr_ceiling_drip_draw(id);
 scr_waterfall_draw(id);
 
-// Waterfall draws natively on Tiles_Waterfall (parallax + Y scroll in scr_parallax_update).
+// Waterfall stream draws on WaterfallBehind, behind platforms and the player.
 
 // Low mist sits in front of parallax walls, behind player + emissive glow.
 scr_cave_fog_draw(id);
@@ -22,25 +22,12 @@ scr_cave_fog_draw(id);
 scr_bulb_draw_glow_tile_layer();
 scr_water_glow_draw(id);
 scr_bulb_redraw_over_emissive_glow(_lit_scene);
-scr_bulb_draw_enemy_emissive_glow_all();
-scr_crystal_spark_draw_all();
 scr_fairy_draw(id);
 
-// Hit slash FX — after glow so neon cores stay razor-visible (room Draw gets buried).
-var _cam_imp = view_camera[0];
-if (instance_exists(obj_camera_controller)) _cam_imp = obj_camera_controller.cam;
-camera_apply(_cam_imp);
-scr_ancient_rock_charge_motes_draw_all();
-scr_player_impact_lines_draw();
-scr_ancient_rock_bolts_draw_all();
-scr_enemy_shards_draw();
-scr_player_death_fx_draw();
-
+// Combat, death, and screen fades are not part of the cave darkening pass.
+scr_gameplay_fx_draw_world();
 scr_cave_vignette_draw();
-scr_player_perfect_dodge_fx_draw();
-scr_cutscene_debug_draw();
-scr_player_death_fade_draw();
-scr_cutscene_draw_fade();
+scr_gameplay_fx_draw_screen();
 
 if (BULB_POND_DEBUG_PERF) {
     var _cam_perf = view_camera[0];
