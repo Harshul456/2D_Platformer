@@ -53,9 +53,10 @@
           -2147483648,
         ],"TileDataFormat":1,},"tilesetId":{"name":"ts_crystal_cave","path":"tilesets/ts_crystal_cave/ts_crystal_cave.yy",},"userdefinedDepth":false,"visible":true,"x":0,"y":0,},
     {"$GMRTileLayer":"","%Name":"tiles_glow","depth":200,"effectEnabled":true,"effectType":null,"gridX":32,"gridY":32,"hierarchyFrozen":false,"inheritLayerDepth":false,"inheritLayerSettings":false,"inheritSubLayers":true,"inheritVisibility":true,"layers":[],"name":"tiles_glow","properties":[],"resourceType":"GMRTileLayer","resourceVersion":"2.0","tiles":{"SerialiseHeight":58,"SerialiseWidth":80,"TileCompressedData":[
-          -3079,-2147483648,1,69,-15,-2147483648,1,71,-9,-2147483648,1,73,-6,-2147483648,1,69,-296,-2147483648,
-          1,69,-206,-2147483648,1,72,-155,-2147483648,1,73,-31,-2147483648,1,70,-10,-2147483648,1,73,-192,-2147483648,
-          1,70,-154,-2147483648,1,69,-131,-2147483648,1,72,-89,-2147483648,1,70,-11,-2147483648,1,69,-242,-2147483648,
+          -3079,-2147483648,1,69,-15,-2147483648,1,71,-9,-2147483648,1,73,-6,-2147483648,1,69,-41,-2147483648,
+          1,73,-254,-2147483648,1,69,-138,-2147483648,1,69,-67,-2147483648,1,72,-155,-2147483648,1,73,-31,-2147483648,
+          1,70,-10,-2147483648,1,73,-192,-2147483648,1,70,-154,-2147483648,1,69,-131,-2147483648,1,72,-89,-2147483648,
+          1,70,-11,-2147483648,1,69,-242,-2147483648,
         ],"TileDataFormat":1,},"tilesetId":{"name":"ts_foreground_glow","path":"tilesets/ts_foreground_glow/ts_foreground_glow.yy",},"userdefinedDepth":false,"visible":true,"x":0,"y":0,},
     {"$GMRTileLayer":"","%Name":"Tiles_Ceiling_Drips","depth":300,"effectEnabled":true,"effectType":null,"gridX":32,"gridY":32,"hierarchyFrozen":false,"inheritLayerDepth":false,"inheritLayerSettings":false,"inheritSubLayers":true,"inheritVisibility":true,"layers":[],"name":"Tiles_Ceiling_Drips","properties":[],"resourceType":"GMRTileLayer","resourceVersion":"2.0","tiles":{"SerialiseHeight":58,"SerialiseWidth":80,"TileCompressedData":[
           -2673,-2147483648,8,68,67,67,-2147483648,-2147483648,67,67,68,-13,-2147483648,-2,67,23,-2147483648,67,

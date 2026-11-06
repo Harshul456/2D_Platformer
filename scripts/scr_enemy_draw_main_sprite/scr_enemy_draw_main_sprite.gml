@@ -2,7 +2,15 @@
 function scr_enemy_crystal_light_init() {
     bulb_light = undefined;
     scr_enemy_hit_react_init();
+    scr_enemy_crystal_light_ensure();
+}
+
+/// @description Build the BulbLight once the renderer exists. A room can list its enemies
+/// ahead of obj_bulb_controller (room_test2 does), so Create runs before there is anything
+/// to attach to — the step calls this again until the light lands.
+function scr_enemy_crystal_light_ensure() {
     if (!BULB_ENEMY_CRYSTAL_LIGHT_ENABLED) return;
+    if (bulb_light != undefined) return;
     if (!variable_global_exists("bulb_renderer") || global.bulb_renderer == undefined) return;
 
     // Default pink crystal; callers may pre-set crystal_kind (e.g. blue ancient rock = 2)
@@ -20,6 +28,7 @@ function scr_enemy_crystal_light_step() {
     scr_enemy_hit_react_step();
 
     if (!BULB_ENEMY_CRYSTAL_LIGHT_ENABLED) return;
+    scr_enemy_crystal_light_ensure();
     if (bulb_light == undefined) return;
 
     var _hover_y = scr_enemy_floating_hover_draw_offset_y();

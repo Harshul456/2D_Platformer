@@ -8,11 +8,11 @@
   "instanceCreationOrder":[
     {"name":"inst_5B668443","path":"rooms/room_test2/room_test2.yy",},
     {"name":"inst_4F6CD94C","path":"rooms/room_test2/room_test2.yy",},
+    {"name":"inst_78FE12C0","path":"rooms/room_test2/room_test2.yy",},
     {"name":"inst_4F379CF3","path":"rooms/room_test2/room_test2.yy",},
     {"name":"inst_754394C8","path":"rooms/room_test2/room_test2.yy",},
     {"name":"inst_13688C07","path":"rooms/room_test2/room_test2.yy",},
     {"name":"inst_3AE16DC8","path":"rooms/room_test2/room_test2.yy",},
-    {"name":"inst_78FE12C0","path":"rooms/room_test2/room_test2.yy",},
   ],
   "isDnd":false,
   "layers":[
