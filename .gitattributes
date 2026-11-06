@@ -6,3 +6,9 @@
 *.yy text eol=lf
 *.yyp text eol=lf
 *.json text eol=lf
+
+# assets pass through untouched, whatever a clone has autocrlf set to
+*.ogg binary
+*.wav binary
+*.mp3 binary
+*.png binary

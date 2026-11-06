@@ -20,11 +20,20 @@ function scr_room_links() {
     ];
 }
 
+/// @function scr_room_music_track
+/// @description Look a track up by name. A name the project has no asset for reads as a
+/// plain variable and crashes the room on entry, so resolve it and let the room be silent.
+function scr_room_music_track(_name) {
+    var _snd = asset_get_index(_name);
+    if (_snd == -1 || asset_get_type(_name) != asset_sound) return -1;
+    return _snd;
+}
+
 /// @function scr_room_music_groups
 /// @description Rooms in one group keep the same looping track. A room in no group is silent.
 function scr_room_music_groups() {
     return [
-        { sound: s_past, rooms: [room_test, room_test2, room_test3] },
+        { sound: scr_room_music_track("s_past"), rooms: [room_test, room_test2, room_test3] },
     ];
 }
 
