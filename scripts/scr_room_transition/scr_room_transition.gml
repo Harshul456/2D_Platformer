@@ -17,23 +17,20 @@ function scr_room_links() {
     return [
         { left: room_test, left_y: 960, right: room_test2, right_y: 352 },
         { left: room_test2, left_y: 288, right: room_test3, right_y: 1696 },
+        { left: room_test3, left_y: 1248, right: room_test4, right_y: 1248 },
+        // Room 5 picks the path back up far below room 4's ledge: the two sides of one door
+        // do not have to sit at the same height.
+        { left: room_test4, left_y: 320, right: room_test5, right_y: 1600 },
     ];
-}
-
-/// @function scr_room_music_track
-/// @description Look a track up by name. A name the project has no asset for reads as a
-/// plain variable and crashes the room on entry, so resolve it and let the room be silent.
-function scr_room_music_track(_name) {
-    var _snd = asset_get_index(_name);
-    if (_snd == -1 || asset_get_type(_name) != asset_sound) return -1;
-    return _snd;
 }
 
 /// @function scr_room_music_groups
 /// @description Rooms in one group keep the same looping track. A room in no group is silent.
+/// Name the sound directly. Looking it up through asset_get_index leaves nothing in the
+/// code referring to it, so the build strips the asset and every room goes silent.
 function scr_room_music_groups() {
     return [
-        { sound: scr_room_music_track("s_past"), rooms: [room_test, room_test2, room_test3] },
+        { sound: s_past, rooms: [room_test, room_test2, room_test3, room_test4, room_test5] },
     ];
 }
 
@@ -104,18 +101,44 @@ function scr_room_entry_feet_x(_side) {
 }
 
 /// @function scr_room_exit_is_crossing
-/// @description Body is on a linked room edge. Landing crouch and the side-embed shove zero hsp,
-///             so this cannot depend on speed: the next frame would miss the lock and play fall.
+/// @description Body is over the border, past where the room's tiles stop. Landing crouch and
+///             the side-embed shove zero hsp, so this cannot depend on speed: the next frame
+///             would miss the lock and play fall.
 function scr_room_exit_is_crossing() {
     var _dir = scr_room_exit_dir();
     if (_dir == 0) return false;
     if (variable_instance_exists(id, "jumped_this_frame") && jumped_this_frame) return false;
     if (variable_instance_exists(id, "jump_count") && jump_count > 0) return false;
     if (vsp < -1) return false;
-    // 64px sprite, origin at 32. Lock once the drawn body meets the edge, before the
-    // center foot leaves the tile and the fall / land poses start swapping.
-    if (_dir > 0) return x >= room_width - 48;
-    return x <= 48;
+    // The floor probes sit a pixel inside bbox_left / bbox_right, so they begin reading
+    // outside the tilemap the moment the body passes the border — that is where land and
+    // fall swap every frame and the walk-off needs the lock. Further in, real tiles are
+    // under the feet: locking there froze falls in mid-air a tile and a half from the edge
+    // and snapped landings down onto a stale line, which drove the body into the floor.
+    if (_dir > 0) return (bbox_right - 1) >= room_width;
+    return (bbox_left + 1) < 0;
+}
+
+/// @function scr_room_edge_blocks_walk_out
+/// @description A side with no link on it is the end of the world: room_test has no room to
+///             its left, and nothing out there holds the player up. Stand the body against
+///             that border so walking into it stops instead of dropping into the void.
+function scr_room_edge_blocks_walk_out() {
+    if (hsp < 0 && is_undefined(scr_room_link_for_edge(-1))) {
+        var _min_x = x - bbox_left;
+        if (x + hsp < _min_x) {
+            x = max(x, _min_x);
+            hsp = 0;
+            runMomentum = 0;
+        }
+    } else if (hsp > 0 && is_undefined(scr_room_link_for_edge(1))) {
+        var _max_x = room_width - (bbox_right - x);
+        if (x + hsp > _max_x) {
+            x = min(x, _max_x);
+            hsp = 0;
+            runMomentum = 0;
+        }
+    }
 }
 
 /// @function scr_room_exit_lock_ground
@@ -146,8 +169,11 @@ function scr_room_exit_lock_pose() {
 /// @function scr_room_transition_hold_exit_line
 /// @description Once the body crosses a linked edge, keep the feet on the path so the walk off screen doesn't drop.
 function scr_room_transition_hold_exit_line(_grounded_in, _y_in) {
-    if (!scr_room_exit_is_crossing()) return;
+    // The line is the floor last stood on, refreshed on every grounded step. Capturing it
+    // only while already over the border let a jump take off from one floor, land on
+    // another, and then get snapped back down to the old line.
     if (_grounded_in) exit_line_y = _y_in;
+    if (!scr_room_exit_is_crossing()) return;
     if (variable_instance_exists(id, "exit_line_y")) y = exit_line_y;
     vsp = 0;
     grounded = true;

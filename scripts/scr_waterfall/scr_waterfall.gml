@@ -1302,10 +1302,9 @@ function scr_waterfall_sfx_update(_controller) {
             _target = BULB_WATERFALL_SFX_VOL_MIN;
         }
 
-        if (variable_global_exists("sfx_waterfall_emitter")) {
-            audio_emitter_position(global.sfx_waterfall_emitter, _pt.x, _pt.y, 0);
-        }
-
+        // The emitter stays at the origin with the listener, like the combat and cave
+        // emitters. Nothing in the game moves the listener, so placing this one out at the
+        // stream panned and dropped the loop instead of locating it. Distance is gain only.
         if (abs(_target - waterfall_sfx_gain) > 0.005) {
             waterfall_sfx_gain = _target;
             audio_sound_gain(waterfall_sfx_id, _target, BULB_WATERFALL_SFX_FADE_MS);

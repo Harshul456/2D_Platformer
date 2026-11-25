@@ -859,6 +859,22 @@ function tilemap_air_fall_step_clear(_tm, _xl, _xc, _xr, _py) {
     return false;
 }
 
+/// Solid for collision and not a spike tile. Full blocks next to spikes sit 8px above the tip
+/// band, so a seam landing rests on this while the other toe hangs in spike air.
+function tilemap_point_non_spike_solid(_tm, _px, _py) {
+    if (_tm == noone || _tm == -1) return false;
+    if (!tilemap_point_solid(_tm, _px, _py)) return false;
+    if (tilemap_point_spike_solid(_tm, _px, _py)) return false;
+    return true;
+}
+
+/// Any of the usual foot probes rests on real floor (not spike).
+function tilemap_feet_on_non_spike_solid(_tm, _pl, _pc, _pr, _py) {
+    return tilemap_point_non_spike_solid(_tm, _pl, _py)
+        || tilemap_point_non_spike_solid(_tm, _pc, _py)
+        || tilemap_point_non_spike_solid(_tm, _pr, _py);
+}
+
 /// Feet buried in a spike on one side only. Popping that up plants the body back on the corner.
 function tilemap_spike_toe_embed_only(_tm, _pl, _pc, _pr, _bl, _br, _feet, _ly) {
     if (_tm == noone || _tm == -1) return false;

@@ -404,6 +404,11 @@ function scr_player_apply_nail_pogo() {
     grounded = false;
     coyote_time_timer = 0;
     pogo_rising = true;
+    // A landed pogo hands the air jump back, on enemies and on spike tops alike. Capping at 1
+    // banks exactly one jump, so it still fires as the double jump with its own anim and
+    // particles; dropping to 0 would bank two. A player who has not spent theirs keeps it.
+    jump_count = min(jump_count, 1);
+    air_chain_jump_used = false;
     // Held direction drifts at walk speed. Neutral kills the dive's leftover hsp so the pop is straight up.
     scr_player_pogo_apply_horizontal();
     // This swing is already out. Clear the once-per-air lock so the next downslash can chain after it finishes.

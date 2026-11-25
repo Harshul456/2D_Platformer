@@ -177,7 +177,14 @@ function scr_player_movement() {
             || (full_lip_anim_sticky > 0 && _raw_support_n >= 1 && _toe_floor_raw)
             || (full_lip_anim_sticky > 0 && _feet_row_support));
     var _s2_lip_hold = _s2_grounded_in && _s2_lip_fence;
-    if ((touch_stand_for_ground && _shelf_ground_vote_ok && _touch_floor_anchor) || _thin_cap_ground || _strict3426_ground) {
+    // A non-spike solid under the feet that also blocks a 1px step down is holding the body up.
+    // Without this, §6 plants on a spike|stone seam and this block clears grounded next frame,
+    // so the hang breaker seeds gravity into the solid forever.
+    var _held_by_solid_s2 = (_stand_l || _stand_c || _stand_r)
+        && tilemap_feet_on_non_spike_solid(_tm_lc, _xl_floor, p_center, _xr_floor, _floor_probe_y)
+        && !tilemap_air_fall_step_clear(_tm_lc, p_left, p_center, p_right, feet_y + 1);
+    if ((touch_stand_for_ground && _shelf_ground_vote_ok && _touch_floor_anchor) || _thin_cap_ground || _strict3426_ground
+        || _held_by_solid_s2) {
         coyote_time_timer = coyote_time_max;
         jump_count = 0;
         air_chain_jump_used = false;
@@ -190,11 +197,15 @@ function scr_player_movement() {
             else if (!(_lip_ctx_wide && lip_s2_edge_air_streak < GROUND_LIP_S2_AIR_STREAK_TO_CLEAR)) grounded = false;
         }
         if (!_s2_lip_hold && (!touch_stand_for_ground || !_shelf_ground_vote_ok || !_touch_floor_anchor)
-            && !(_feet_on_cap_cell && _touch_floor_anchor && touch_floor_for_ground && (_stand_l || _stand_c || _stand_r))) {
+            && !(_feet_on_cap_cell && _touch_floor_anchor && touch_floor_for_ground && (_stand_l || _stand_c || _stand_r))
+            && !_held_by_solid_s2) {
             if (!(_lip_ctx_wide && lip_s2_edge_air_streak < GROUND_LIP_S2_AIR_STREAK_TO_CLEAR)) grounded = false;
         }
     }
-    if (!grounded && _s2_grounded_in && _s2_lip_fence) {
+    if (!grounded && _held_by_solid_s2) {
+        grounded = true;
+        coyote_time_timer = coyote_time_max;
+    } else if (!grounded && _s2_grounded_in && _s2_lip_fence) {
         grounded = true;
         coyote_time_timer = coyote_time_max;
     } else if (!grounded && lip_ground_bless > 0 && _lip_ctx_wide && (_floor_probe_broad || _feet_row_support)) {
@@ -1055,6 +1066,8 @@ function scr_player_movement() {
     }
 
     // --- 5. COLLISIONS (Horizontal) ---
+    scr_room_edge_blocks_walk_out();
+
     if (hsp != 0) {
         var _h_step = sign(hsp);
         var _target_side = (hsp > 0) ? floor(bbox_right) : floor(bbox_left);
@@ -1518,8 +1531,18 @@ function scr_player_movement() {
                         air_chain_jump_used = false;
                         shelf_threshold_snap_this_step = true;
                         global.player_ledge_bb_prev = bbox_bottom;
+                    } else if (!grounded && global.tilemap_collision_id != noone
+                        && tilemap_feet_on_non_spike_solid(global.tilemap_collision_id, p_left, p_center, p_right, feet_y + _v_step)) {
+                        // A full block stopped the fall. One toe on stone next to spikes used to
+                        // zero vsp without setting grounded: spike tips sit 8px below a full-block
+                        // top, so they never vote as floor or deal tip damage, and the fall pose
+                        // hung until something else knocked the body free.
+                        grounded = true;
+                        coyote_time_timer = coyote_time_max;
+                        jump_count = 0;
+                        air_chain_jump_used = false;
                     } else {
-                        // Keep y float â€” do not floor/ceil here (thin ledge rest + sub-pixel snap).
+                        // Keep y float — do not floor/ceil here (thin ledge rest + sub-pixel snap).
                     }
                 } else {
                     // Ceiling / upward stop: zero vsp only (avoid ceil(y) stripping float contact).
@@ -1581,9 +1604,17 @@ function scr_player_movement() {
             p_left = floor(bbox_left) + 1;
             p_right = floor(bbox_right) - 1;
             p_center = floor((bbox_left + bbox_right) * 0.5);
+        } else if (!_col_clear_z
+            && tilemap_feet_on_non_spike_solid(_tmvz, p_left, p_center, p_right, _foot_probe_z)) {
+            // Same spike|solid seam plant as the stepped fall loop — do not seed gravity into a wall.
+            grounded = true;
+            coyote_time_timer = coyote_time_max;
+            jump_count = 0;
+            air_chain_jump_used = false;
+            vsp = 0;
         } else {
-            // Blocked lip, open air at exact-zero vsp, or 1px hover with no feet-row hull sample â€” still need fall
-            // progress; Â§6d peel is vsp-gated and this branch only runs when the stepped loop was skipped.
+            // Blocked lip, open air at exact-zero vsp, or 1px hover with no feet-row hull sample — still need fall
+            // progress; §6d peel is vsp-gated and this branch only runs when the stepped loop was skipped.
             vsp = grv;
         }
     }
@@ -1965,6 +1996,11 @@ function scr_player_movement() {
     var _torso_overlap_6c = check_tile_collision(_p_center_now, _mid_y_6c);
     var _feet_embed_6c = tilemap_any_feet_row_full_block_embedded(_tm6c, _p_left_now, _p_center_now, _p_right_now, floor(bbox_left), floor(bbox_right), _feet_y_now, FULL_BLOCK_FEET_INTERIOR_LY_MIN);
     if (_torso_overlap_6c || _feet_embed_6c) full_lip_anim_sticky = 0;
+    // One standable toe on stone is enough when that solid also blocks a step down — the rest of
+    // the mask can hang over spike air (tips sit 8px below a full-block top) without voting.
+    var _held_by_solid_6c = (_floor_votes_now >= 1)
+        && tilemap_feet_on_non_spike_solid(_tm6c, _p_left_now, _p_center_now, _p_right_now, _fpy_now)
+        && !tilemap_air_fall_step_clear(_tm6c, _p_left_now, _p_center_now, _p_right_now, _feet_y_now + 1);
     if (_cap_cell_now) {
         _on_ground_now = (_votes_ok_6c && _shelf_raw_ok_now
             && _raw_floor_any_now && (_stand_l_now || _stand_c_now || _stand_r_now) && _center_floor_anchor_now)
@@ -1977,10 +2013,10 @@ function scr_player_movement() {
         var _toe_raw_now = check_floor_tile(_p_left_now, _fpy_now) || check_floor_tile(_p_right_now, _fpy_now);
         var _full_lip_ok = FULL_BLOCK_EDGE_GROUND_FORGIVE && _raw_floor_any_now && _span_lr_full <= CAP_GROUND_CELL_SPAN_MAX
             && (_raw_floor_now >= 2 || (_raw_floor_now >= 1 && _toe_raw_now));
-        _on_ground_now = (_floor_votes_now >= _votes_needed) && (
+        _on_ground_now = _held_by_solid_6c || ((_floor_votes_now >= _votes_needed) && (
             (_raw_floor_now >= GROUND_LAND_VOTES_MIN_AIR && _center_floor_now) ||
             _full_lip_ok
-        );
+        ));
     }
     if (_on_ground_now && vsp >= 0) {
         grounded = true;

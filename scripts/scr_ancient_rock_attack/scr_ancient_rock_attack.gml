@@ -2,7 +2,9 @@
 /// @description Hover-in-place charge → imperfect homing bolt for obj_ancient_rock.
 
 #macro ROCK_CHARGE_FRAMES          52
-#macro ROCK_COOLDOWN_FRAMES        100
+// Rest between bolts, in frames at 60 fps. The charge adds about another second on top, so
+// a bolt lands roughly every four seconds rather than every two and a half.
+#macro ROCK_COOLDOWN_FRAMES        180
 #macro ROCK_CHARGE_FLASH_HZ        0.28   // Blend flicker speed
 #macro ROCK_CHARGE_MOTE_MAX        28
 #macro ROCK_CHARGE_MOTE_RATE       1.35   // Motes per frame while charging
@@ -242,6 +244,9 @@ function scr_ancient_rock_attack_step() {
     if (!scr_time_scale_should_tick()) exit;
     if (!variable_instance_exists(id, "gnd_state")) exit;
     if (gnd_state == GND_STATE_DEAD || gnd_state == GND_STATE_DAMAGED) {
+        // A charge broken by a hit owes the full rest. Without this the stun ends on a cooldown
+        // that already ran down and the next charge starts immediately.
+        if (rock_charge_timer > 0) rock_cooldown = max(rock_cooldown, ROCK_COOLDOWN_FRAMES);
         rock_charge_timer = 0;
         rock_light_release = 0;
         scr_ancient_rock_charge_visuals_reset();

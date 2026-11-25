@@ -936,6 +936,7 @@ function scr_player_perfect_dodge_apply_flip_motion() {
     var _tm = (variable_global_exists("tilemap_collision_id")) ? global.tilemap_collision_id : noone;
 
     // Horizontal — solids / walls / tile solids at torso (enemies are not solid)
+    scr_room_edge_blocks_walk_out();
     var _dx = hsp;
     var _sx = sign(_dx);
     var _n = ceil(abs(_dx));

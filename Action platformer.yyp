@@ -87,6 +87,8 @@
     {"id":{"name":"room_test","path":"rooms/room_test/room_test.yy",},},
     {"id":{"name":"room_test2","path":"rooms/room_test2/room_test2.yy",},},
     {"id":{"name":"room_test3","path":"rooms/room_test3/room_test3.yy",},},
+    {"id":{"name":"room_test4","path":"rooms/room_test4/room_test4.yy",},},
+    {"id":{"name":"room_test5","path":"rooms/room_test5/room_test5.yy",},},
     {"id":{"name":"__BulbAddOcclusionHard","path":"scripts/__BulbAddOcclusionHard/__BulbAddOcclusionHard.yy",},},
     {"id":{"name":"__BulbAddOcclusionSoft","path":"scripts/__BulbAddOcclusionSoft/__BulbAddOcclusionSoft.yy",},},
     {"id":{"name":"__BulbConfig","path":"scripts/__BulbConfig/__BulbConfig.yy",},},
@@ -301,6 +303,8 @@
     {"roomId":{"name":"room_test","path":"rooms/room_test/room_test.yy",},},
     {"roomId":{"name":"room_test2","path":"rooms/room_test2/room_test2.yy",},},
     {"roomId":{"name":"room_test3","path":"rooms/room_test3/room_test3.yy",},},
+    {"roomId":{"name":"room_test4","path":"rooms/room_test4/room_test4.yy",},},
+    {"roomId":{"name":"room_test5","path":"rooms/room_test5/room_test5.yy",},},
   ],
   "templateType":"game",
   "TextureGroups":[

@@ -191,8 +191,8 @@ WALL_REQUIRE_SCRAPE_MOTION = true;
 // When clinging with Shift only (no L/R): scan this many pixels past bbox for scrape — fixes 1–2px air gap vs strict bbox+1 check.
 WALL_SCRAPE_DEPTH_NEUTRAL_CLING_PX = 8;
 WALL_SLIDE_VSP = 2;             // Max downward speed while sliding (MMX wall_slide_vspeed)
-WALL_JUMP_VSP = 9;              // Upward impulse on wall jump (tune height)
-WALL_JUMP_HSP = 6;              // Horizontal: initial push away; also caps enforced-away speed during kick
+WALL_JUMP_VSP = 10;             // Upward impulse on wall jump. Peak rise ≈ VSP²/(2×grv) + VSP/2, so 10 climbs ~105px (3¼ tiles) against jumpsp 9's ~85px
+WALL_JUMP_HSP = 6.5;              // Horizontal: initial push away; also caps enforced-away speed during kick
 WALL_JUMP_AWAY_CLAMP_MULT = 0.82; // During wall_kick: at least HSP×this toward away if holding into wall (never above HSP)
 WALL_JUMP_MIN_AWAY_HOLD = 0;    // Extra |hsp| floor while kicking (0 = off). Capped at WALL_JUMP_HSP so low HSP works
 WALL_JUMP_LOCK_FRAMES = 12;
@@ -494,7 +494,7 @@ DOWN_ATTACK_MOMENTUM_KEEP = 1;
 DOWN_ATTACK_MIN_HSP = 0;
 // Hollow Knight nail bounce. Higher than a jump so the pop reads, and the slash keeps playing.
 // The cone is degrees off straight down: the arc under the feet pogos, a side overlap does not.
-POGO_VSP = 9;
+POGO_VSP = 10;      // Peak rise ≈ VSP²/(2×grv) + VSP/2, so ~105px against jumpsp 9's ~85px
 POGO_CONE_DEG = 58;
 pogo_rising = false;
 AIR_ATTACK_MOMENTUM_KEEP = 1.0;   // Keep full air hsp (no dead-stop lunge overwrite)
