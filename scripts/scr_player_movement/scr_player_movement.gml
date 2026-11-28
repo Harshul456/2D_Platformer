@@ -2448,6 +2448,9 @@ function scr_player_movement() {
                 image_index = 0;
                 image_speed = 0;
                 image_xscale = -wall_side * image_base_scale;
+            } else if (variable_instance_exists(id, "perfect_dodge_flip_loop") && perfect_dodge_flip_loop) {
+                scr_player_perfect_dodge_flip_anim_update();
+                image_xscale = last_direction * image_base_scale;
             } else if (double_jump_anim_active) {
                 var _dj_hold = (variable_instance_exists(id, "DOUBLE_JUMP_ANIM_HOLD_FRAMES") ? DOUBLE_JUMP_ANIM_HOLD_FRAMES : 6);
                 var _dj_n = sprite_get_number(spr_mc_doublejump);
@@ -2664,6 +2667,10 @@ function scr_player_movement() {
         wall_jump_kick_hold_timer = 0;
         double_jump_anim_active = false;
         double_jump_anim_tick = 0;
+        if (variable_instance_exists(id, "perfect_dodge_flip_loop")) {
+            perfect_dodge_flip_loop = false;
+            perfect_dodge_flip_landing = false;
+        }
         wall_kick_cooldown = 0;
         wall_kick_from_side = 0;
         wall_shift_hold_timer = 0;

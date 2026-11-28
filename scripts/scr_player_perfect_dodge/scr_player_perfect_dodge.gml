@@ -158,11 +158,15 @@ function scr_player_perfect_dodge_try_trigger() {
     hsp = _through * _coast;
     vsp = _hop;
 
-    // Flip sprite override (double-jump anim scrubbed across the window)
+    // Flip sprite override — same asset + whirl as the air double jump
     sprite_index = spr_mc_doublejump;
     image_index = 0;
     image_speed = 0;
-    double_jump_anim_active = true;
+    double_jump_anim_active = false;
+    double_jump_anim_tick = 0;
+    perfect_dodge_flip_loop = true;
+    perfect_dodge_flip_landing = false;
+    scr_player_double_jump_whirl_begin();
 
     var _slow = variable_instance_exists(id, "PERFECT_DODGE_TIME_SCALE")
         ? PERFECT_DODGE_TIME_SCALE : 0.38;
@@ -204,6 +208,11 @@ function scr_player_perfect_dodge_end_slowmo() {
     image_speed = 1;
     image_blend = c_white;
     double_jump_anim_active = false;
+    // Keep the flip cycling into free air; clear only when we already planted.
+    if (grounded || !_arm_counter) {
+        perfect_dodge_flip_loop = false;
+        perfect_dodge_flip_landing = false;
+    }
 
     // Don't inherit the dash that triggered the PD — landing + direction alone must not re-dash.
     // If sprint is still held, arm idle-charge so direction + Z can start a fresh sprint intentionally.
@@ -228,6 +237,8 @@ function scr_player_perfect_dodge_end_slowmo() {
 function scr_player_perfect_dodge_jump_cancel() {
     scr_player_perfect_dodge_end_slowmo(false);
     perfect_dodge_counter_armed = false;
+    perfect_dodge_flip_loop = false;
+    perfect_dodge_flip_landing = false;
     perfect_dodge_skip_move_frame = true; // consume this Up press — don't double-jump in movement
 
     grounded = false;
@@ -326,6 +337,8 @@ function scr_player_begin_dodge_counter() {
     perfect_dodge_timer = 0;
     perfect_dodge_counter_armed = false;
     double_jump_anim_active = false;
+    perfect_dodge_flip_loop = false;
+    perfect_dodge_flip_landing = false;
 
     // Face the threat we slipped through
     if (instance_exists(perfect_dodge_target)) {
@@ -994,6 +1007,70 @@ function scr_player_perfect_dodge_spawn_ghost() {
     _g.image_yscale = image_yscale;
 }
 
+/// @function scr_player_perfect_dodge_flip_anim_update
+/// @description Cycle spr_mc_doublejump until ground; scrub so the last frame hits just before touchdown.
+function scr_player_perfect_dodge_flip_anim_update() {
+    if (!variable_instance_exists(id, "perfect_dodge_flip_loop") || !perfect_dodge_flip_loop) {
+        return;
+    }
+
+    var _frames = max(1, sprite_get_number(spr_mc_doublejump));
+    var _hold = (variable_instance_exists(id, "DOUBLE_JUMP_ANIM_HOLD_FRAMES") ? DOUBLE_JUMP_ANIM_HOLD_FRAMES : 3);
+    if (_hold < 1) _hold = 1;
+
+    double_jump_anim_tick++;
+
+    var _ft = floor(bbox_bottom);
+    var _pc = floor((bbox_left + bbox_right) * 0.5);
+    var _pl = floor(bbox_left) + 2;
+    var _pr = floor(bbox_right) - 2;
+    var _gap = 9999;
+    var _probe_max = 128;
+    for (var _i = 1; _i <= _probe_max; _i++) {
+        if (check_tile_collision(_pc, _ft + _i)
+            || check_tile_collision(_pl, _ft + _i)
+            || check_tile_collision(_pr, _ft + _i)) {
+            _gap = _i - 1;
+            break;
+        }
+    }
+
+    var _ftl = 9999;
+    if (vsp > 0.05 && _gap < 9999) {
+        _ftl = max(1, ceil(_gap / vsp));
+    }
+
+    sprite_index = spr_mc_doublejump;
+    image_speed = 0;
+
+    // Final plant window — last strip frame as feet are about to touch.
+    if ((_ftl <= _hold) || (_gap <= 3 && vsp >= 0)) {
+        image_index = _frames - 1;
+        return;
+    }
+
+    var _cycle = _frames * _hold;
+    var _pos = double_jump_anim_tick % _cycle;
+    var _cur = floor(_pos / _hold);
+    var _ticks_left_in_cycle = _cycle - _pos;
+
+    // Landing before the next wrap: scrub remaining strip so last frame lands on time.
+    if (_ftl < _ticks_left_in_cycle) {
+        if (!perfect_dodge_flip_landing) {
+            perfect_dodge_flip_landing = true;
+            perfect_dodge_flip_land_ftl0 = _ftl;
+            perfect_dodge_flip_land_i0 = _cur;
+        }
+        var _t0 = max(1, perfect_dodge_flip_land_ftl0 - _hold);
+        var _prog = 1 - clamp((_ftl - _hold) / _t0, 0, 1);
+        image_index = clamp(floor(lerp(perfect_dodge_flip_land_i0, _frames - 1, _prog)), 0, _frames - 1);
+        return;
+    }
+
+    perfect_dodge_flip_landing = false;
+    image_index = _cur;
+}
+
 /// @function scr_player_perfect_dodge_slowmo_step
 /// @description Flip window: X = counter, Jump = cancel to free air. Expire airborne → free + armed counter until land.
 function scr_player_perfect_dodge_slowmo_step() {
@@ -1015,13 +1092,8 @@ function scr_player_perfect_dodge_slowmo_step() {
         perfect_dodge_light_t = min(1, perfect_dodge_light_t + 0.16);
     }
 
-    // Scrub double-jump flip across the window
-    var _max = max(1, perfect_dodge_window_max);
-    var _u = 1 - (perfect_dodge_timer / _max);
-    var _frames = max(1, sprite_get_number(spr_mc_doublejump));
-    sprite_index = spr_mc_doublejump;
-    image_index = clamp(_u * (_frames - 0.01), 0, _frames - 0.01);
-    image_speed = 0;
+    // Keep the flip cycling (same pace as double jump); last frame timed to touchdown.
+    scr_player_perfect_dodge_flip_anim_update();
     image_blend = merge_color(c_white, make_color_rgb(160, 210, 255), 0.35);
 
     scr_player_perfect_dodge_apply_flip_motion();
@@ -1039,17 +1111,9 @@ function scr_player_perfect_dodge_slowmo_step() {
     scr_player_perfect_dodge_particles_trail();
 
     // Flip window over: free movement. If still airborne, X can counter until land.
+    // Flip keeps cycling via perfect_dodge_flip_loop until touchdown.
     if (perfect_dodge_timer <= 0) {
-        if (!grounded) {
-            scr_player_perfect_dodge_end_slowmo(true);
-            // Hand off to normal fall pose (not stuck on flip end frame)
-            sprite_index = spr_mc_jump;
-            image_index = 5;
-            image_speed = 0;
-            hair_flicker_counter = 0;
-        } else {
-            scr_player_perfect_dodge_end_slowmo(false);
-        }
+        scr_player_perfect_dodge_end_slowmo(!grounded);
     }
 }
 

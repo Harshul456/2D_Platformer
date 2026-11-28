@@ -94,10 +94,96 @@ function scr_player_dash_particles_burst() {
     scr_player_mote_burst(_dir, _cols, _count, true);
 }
 
+/// @function scr_player_double_jump_whirl_begin
+/// @description Start the circular whirl that rides the flip.
+function scr_player_double_jump_whirl_begin() {
+    double_jump_whirl_active = true;
+    double_jump_whirl_t = 0;
+    double_jump_whirl_angle = random(360);
+    var _dir = (variable_instance_exists(id, "last_direction") && last_direction != 0)
+        ? last_direction
+        : sign(image_xscale);
+    if (_dir == 0) _dir = 1;
+    double_jump_whirl_dir = _dir;
+}
+
+/// @function scr_player_double_jump_whirl_step
+/// @description Advance the whirl's spin and life with the flip.
+function scr_player_double_jump_whirl_step() {
+    if (!variable_instance_exists(id, "double_jump_whirl_active") || !double_jump_whirl_active) return;
+    if (variable_global_exists("hitstop") && global.hitstop > 0) return;
+
+    var _life = (variable_instance_exists(id, "DOUBLE_JUMP_WHIRL_LIFE") ? DOUBLE_JUMP_WHIRL_LIFE : 18);
+    var _spin = (variable_instance_exists(id, "DOUBLE_JUMP_WHIRL_SPIN") ? DOUBLE_JUMP_WHIRL_SPIN : 22);
+    double_jump_whirl_t++;
+    double_jump_whirl_angle += _spin * double_jump_whirl_dir;
+    if (double_jump_whirl_t >= _life) double_jump_whirl_active = false;
+}
+
+/// @function scr_player_double_jump_whirl_draw
+/// @description Soft additive ring + orbiting 1px motes around the torso.
+function scr_player_double_jump_whirl_draw() {
+    if (!variable_instance_exists(id, "double_jump_whirl_active") || !double_jump_whirl_active) return;
+
+    var _life = max(1, (variable_instance_exists(id, "DOUBLE_JUMP_WHIRL_LIFE") ? DOUBLE_JUMP_WHIRL_LIFE : 18));
+    var _u = clamp(double_jump_whirl_t / _life, 0, 1);
+    var _pop = min(1, double_jump_whirl_t / 3);
+    var _fade = (1 - _u);
+    _fade *= _fade;
+    var _a = _pop * _fade * 0.8;
+    if (_a <= 0.02) return;
+
+    var _r0 = (variable_instance_exists(id, "DOUBLE_JUMP_WHIRL_RADIUS") ? DOUBLE_JUMP_WHIRL_RADIUS : 16);
+    var _r1 = (variable_instance_exists(id, "DOUBLE_JUMP_WHIRL_RADIUS_END") ? DOUBLE_JUMP_WHIRL_RADIUS_END : 30);
+    var _r = lerp(_r0, _r1, _u);
+    var _n = (variable_instance_exists(id, "DOUBLE_JUMP_WHIRL_COUNT") ? DOUBLE_JUMP_WHIRL_COUNT : 12);
+    var _cx = (bbox_left + bbox_right) * 0.5;
+    var _cy = (bbox_top + bbox_bottom) * 0.5;
+    var _cols = [c_white, make_color_rgb(230, 240, 255), make_color_rgb(200, 220, 255)];
+
+    var _old_alpha = draw_get_alpha();
+    var _old_col = draw_get_color();
+    var _old_blend = gpu_get_blendmode();
+    var _old_tex = gpu_get_texfilter();
+
+    gpu_set_texfilter(false);
+    gpu_set_blendmode(bm_add);
+
+    // Soft double ring — reads as a whirl disk without a heavy filled circle.
+    draw_set_alpha(_a * 0.28);
+    draw_set_color(_cols[1]);
+    draw_circle(_cx, _cy, _r, true);
+    draw_circle(_cx, _cy, max(2, _r - 2), true);
+
+    // Orbiting motes + short arc ghosts so the spin reads even at 1px.
+    for (var _i = 0; _i < _n; _i++) {
+        var _ang = double_jump_whirl_angle + (_i / max(1, _n)) * 360;
+        var _rr = _r + dsin(_ang * 2 + double_jump_whirl_t * 18) * 2.5;
+        var _px = floor(_cx + lengthdir_x(_rr, _ang));
+        var _py = floor(_cy + lengthdir_y(_rr * 0.7, _ang));
+        draw_set_alpha(_a * (0.55 + 0.45 * ((_i mod 2) == 0)));
+        draw_set_color(_cols[_i mod array_length(_cols)]);
+        draw_rectangle(_px, _py, _px, _py, false);
+
+        var _ang_g = _ang - double_jump_whirl_dir * 16;
+        var _gx = floor(_cx + lengthdir_x(_rr, _ang_g));
+        var _gy = floor(_cy + lengthdir_y(_rr * 0.7, _ang_g));
+        draw_set_alpha(_a * 0.22);
+        draw_rectangle(_gx, _gy, _gx, _gy, false);
+    }
+
+    draw_set_alpha(_old_alpha);
+    draw_set_color(_old_col);
+    gpu_set_blendmode(_old_blend);
+    gpu_set_texfilter(_old_tex);
+}
+
 /// @function scr_player_double_jump_particles_burst
 /// @description Same crystal motes as dash, sprayed outward then arcing down under gravity.
+///             Also starts the circular whirl that rides the flip.
 function scr_player_double_jump_particles_burst() {
     if (!variable_instance_exists(id, "dash_spark_list")) dash_spark_list = [];
+    scr_player_double_jump_whirl_begin();
 
     var _cols = [c_white, make_color_rgb(230, 240, 255), make_color_rgb(200, 220, 255)];
     var _count = variable_instance_exists(id, "DOUBLE_JUMP_PARTICLE_COUNT")
@@ -211,6 +297,7 @@ function scr_player_perfect_dodge_particles_trail() {
 /// @description Advance mote drift / short trail emit after dash or Perfect Dodge.
 function scr_player_dash_particles_step() {
     if (!variable_instance_exists(id, "dash_spark_list")) dash_spark_list = [];
+    scr_player_double_jump_whirl_step();
     if (variable_global_exists("hitstop") && global.hitstop > 0) return;
 
     // Keep trailing a few frames after activate so motes stream behind the body
@@ -271,6 +358,7 @@ function scr_player_dash_particles_step() {
 /// @function scr_player_dash_particles_draw
 /// @description Additive 1px motes (crystal spark look), drawn in Post-Draw in front of the scene.
 function scr_player_dash_particles_draw() {
+    scr_player_double_jump_whirl_draw();
     if (!variable_instance_exists(id, "dash_spark_list")) return;
     if (array_length(dash_spark_list) <= 0) return;
 
